@@ -1,0 +1,94 @@
+import cupy
+from cupyx.scipy.ndimage import filters
+from cupyx.scipy.signal import convolve2d
+
+import numpy
+import tqdm
+
+mempool = cupy.get_default_memory_pool()
+
+
+def median(input_image, kernel_size):
+    r = kernel_size
+    y, x = numpy.ogrid[-r:r + 1, -r:r + 1]
+    footprint = x * x + y * y <= r * r
+
+    filtered_image_cpu = numpy.empty(input_image.shape, dtype=input_image.dtype)
+    input_image = numpy.pad(input_image, (r, r))
+
+    gpu_free_memory = cupy.cuda.Device(0).mem_info[0] + mempool.free_bytes()
+    gpu_needed_memory = input_image.nbytes * 2
+    number_of_chunks = max(int(4 ** numpy.ceil(numpy.log(gpu_needed_memory / gpu_free_memory) / numpy.log(4))), 1)
+    chunks_per_dim = number_of_chunks / 2
+
+    tqdm_chunks = tqdm.tqdm(range(number_of_chunks), leave=False)
+    tqdm_chunks.set_description('Chunkwise application of filter')
+    for chunk in tqdm_chunks:
+        x_min = int((chunk % chunks_per_dim) * input_image.shape[0] // chunks_per_dim)
+        x_max = min(int(((chunk % chunks_per_dim) + 1) * input_image.shape[0] // chunks_per_dim), input_image.shape[0])
+        y_min = int((chunk // chunks_per_dim) * input_image.shape[1] // chunks_per_dim)
+        y_max = min(int(((chunk // chunks_per_dim) + 1) * input_image.shape[1] // chunks_per_dim), input_image.shape[1])
+
+        gpu_image_chunk = cupy.asarray(input_image[x_min:x_max+2*kernel_size, y_min:y_max+2*kernel_size])
+        filtered_image = filters.median_filter(gpu_image_chunk, footprint=cupy.asarray(footprint))
+        del gpu_image_chunk
+        filtered_image_cpu[x_min:x_max, y_min:y_max] = filtered_image[kernel_size:-kernel_size,
+                                                                      kernel_size:-kernel_size].get()
+        del filtered_image
+
+    cupy.get_default_memory_pool().free_all_blocks()
+    cupy.get_default_pinned_memory_pool().n_free_blocks()
+
+    return filtered_image_cpu
+
+
+def median_with_mask(input_image, kernel_size, white_mask, gray_mask):
+    r = kernel_size
+
+    y, x = numpy.ogrid[-r:r + 1, -r:r + 1]
+    footprint = x * x + y * y <= r * r
+
+    filtered_image_cpu = numpy.empty(input_image.shape, dtype=input_image.dtype)
+    input_image = numpy.pad(input_image, (r, r))
+    white_mask = numpy.pad(white_mask, (r, r))
+    gray_mask = numpy.pad(gray_mask, (r, r))
+
+    gpu_free_memory = cupy.cuda.Device(0).mem_info[0] + mempool.free_bytes()
+    gpu_needed_memory = input_image.nbytes * 3.25
+    number_of_chunks = max(int(4 ** numpy.ceil(numpy.log(gpu_needed_memory / gpu_free_memory) / numpy.log(4))), 1)
+    chunks_per_dim = number_of_chunks / 2
+
+    tqdm_chunks = tqdm.tqdm(range(number_of_chunks), leave=True, position=0)
+    tqdm_chunks.set_description('Chunkwise application of filter')
+    for chunk in tqdm_chunks:
+        x_min = int((chunk % chunks_per_dim) * input_image.shape[0] // chunks_per_dim)
+        x_max = min(int(((chunk % chunks_per_dim) + 1) * input_image.shape[0] // chunks_per_dim), input_image.shape[0])
+        y_min = int((chunk // chunks_per_dim) * input_image.shape[1] // chunks_per_dim)
+        y_max = min(int(((chunk // chunks_per_dim) + 1) * input_image.shape[1] // chunks_per_dim), input_image.shape[1])
+
+        input_image_gpu = cupy.asarray(input_image[x_min:x_max + 2 * kernel_size, y_min:y_max + 2 * kernel_size])
+        gray_mask_gpu = cupy.asarray(gray_mask[x_min:x_max + 2 * kernel_size, y_min:y_max + 2 * kernel_size])
+        input_image_gpu[gray_mask_gpu] = cupy.NAN
+        filtered_image = filters.median_filter(input_image_gpu, footprint=cupy.asarray(footprint))
+        del input_image_gpu
+        del gray_mask_gpu
+
+        input_image_gpu = cupy.asarray(input_image[x_min:x_max + 2 * kernel_size, y_min:y_max + 2 * kernel_size])
+        white_mask_gpu = cupy.asarray(white_mask[x_min:x_max + 2 * kernel_size, y_min:y_max + 2 * kernel_size])
+        print(input_image_gpu.shape, white_mask_gpu.shape)
+        input_image_gpu[white_mask_gpu] = cupy.NAN
+        del white_mask_gpu
+        gray_mask_gpu = cupy.asarray(gray_mask[x_min:x_max + 2 * kernel_size, y_min:y_max + 2 * kernel_size])
+        filtered_image[gray_mask_gpu] = filters.median_filter(input_image_gpu,
+                                                              footprint=cupy.asarray(footprint))[gray_mask_gpu]
+        del input_image_gpu
+        del gray_mask_gpu
+
+        filtered_image_cpu[x_min:x_max, y_min:y_max] = filtered_image[kernel_size:-kernel_size,
+                                                                      kernel_size:-kernel_size].get()
+        del filtered_image
+    tqdm_chunks.close()
+
+    cupy.get_default_memory_pool().free_all_blocks()
+    cupy.get_default_pinned_memory_pool().n_free_blocks()
+    return filtered_image_cpu
