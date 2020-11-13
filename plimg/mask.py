@@ -3,8 +3,7 @@ from . import histgram_toolbox
 from .numba import mask
 
 import numpy
-from scipy.signal import find_peaks
-from matplotlib import pyplot as plt
+from scipy.signal import find_peaks, convolve
 
 try:
     from functools import cached_property
@@ -46,16 +45,22 @@ class MaskGeneration:
                                      bins=BINS,
                                      range=(1e-15, 1 - 1e-15))
         hist = hist/hist.max()
-        peak_positions, _ = find_peaks(hist, prominence=0.01)
-        hist = hist[peak_positions[-1]:]
-        bins = bins[peak_positions[-1]:]
-        #plt.plot(bins[:-1], hist)
-        #plt.show()
+        kernel = numpy.full(20, 1/20.)
+        hist = convolve(hist, kernel, mode='same')
+        hist = hist / hist.max()
+        peak_positions, _ = find_peaks(hist, prominence=0.1)
+
+        stop_position = BINS//2
+        if len(peak_positions) > 0:
+            hist = hist[peak_positions[-1]:]
+            bins = bins[peak_positions[-1]:]
+            stop_position = stop_position - peak_positions[-1]
+
         return histgram_toolbox.plateau(hist,
                                         bins,
                                         +1,
                                         start=0,
-                                        stop=BINS//2 - peak_positions[-1])
+                                        stop=stop_position)
 
     @cached_property
     def t_tra(self):
