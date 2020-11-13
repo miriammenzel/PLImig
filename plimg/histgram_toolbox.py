@@ -4,7 +4,7 @@ import cv2
 
 
 @numba.jit(nopython=True)
-def __histogram_peak_width(hist, peak_pos, direction, target_height=0.5):
+def _histogram_peak_width(hist, peak_pos, direction, target_height=0.5):
     height = hist[peak_pos] * target_height
     i = peak_pos
     if direction > 0:
@@ -20,7 +20,7 @@ def __histogram_peak_width(hist, peak_pos, direction, target_height=0.5):
 @numba.jit(nopython=True)
 def plateau(hist, bins, direction, start, stop):
     max_pos = hist[start:stop].argmax() + start
-    width = __histogram_peak_width(hist, max_pos, direction)
+    width = _histogram_peak_width(hist, max_pos, direction)
 
     if direction > 0:
         roi_start = max_pos
@@ -48,8 +48,6 @@ def plateau(hist, bins, direction, start, stop):
 
 
 def region_growing(modality, percent_pixels=0.5):
-    # TODO: Optimize this method! Slowest component during mask calculation
-    # Generating mask for transmittance_avg_val based on highest connected retardation
     threshold = modality.size * percent_pixels / 100
     # Find first bin with enough pixels to satisfy threshold
     hist, bins = numpy.histogram(modality, bins=256)
