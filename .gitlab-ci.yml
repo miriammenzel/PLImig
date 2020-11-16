@@ -5,7 +5,7 @@ stages:
 
 before_script:
     - apt-get update -qq && apt-get upgrade -y
-    - apt-get install -y python3 python3-pip
+    - apt-get install -y python3 python3-pip libgl1-mesa-glx
     - /usr/bin/python3 -m pip install --upgrade pip
 
 lint:python3:
