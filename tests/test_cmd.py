@@ -13,7 +13,7 @@ class Test:
                                      '--input',
                                      file_path,
                                      '--output',
-                                     'tests/files/output/detailed/cpu',
+                                     'tests/output/',
                                      '--detailed',
                                      '--dataset',
                                      '/pyramid/06']):
