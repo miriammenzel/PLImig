@@ -33,7 +33,7 @@ def plateau(hist, bins, direction, start, stop):
     bin_roi = bins[roi_start+width:roi_end]
     alpha = numpy.zeros(roi_end - roi_start - 1)
 
-    for i in range(roi_end - roi_start - 1):
+    for i in range(roi_end - roi_start - 2):
         y2 = hist_roi[i] - hist_roi[i + 1]
         y1 = hist_roi[i] - hist_roi[i - 1]
         x2 = bin_roi[i] - bin_roi[i + 1]
@@ -60,7 +60,8 @@ def region_growing(modality, percent_pixels=0.5):
         region_growing_mask = (modality > bins[front_bin])\
                               .astype(numpy.uint8)
         _, labels, stats, _ = cv2.connectedComponentsWithStats(region_growing_mask)
-        counts = stats[1:, cv2.CC_STAT_AREA].max()
+        if len(stats[1:, cv2.CC_STAT_AREA]) > 0:
+            counts = stats[1:, cv2.CC_STAT_AREA].max()
         front_bin -= 1
     max_saturated_cluster = stats[1:, cv2.CC_STAT_AREA].argmax() + 1
     return (labels == max_saturated_cluster).astype(numpy.bool)

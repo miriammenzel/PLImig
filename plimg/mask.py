@@ -1,9 +1,11 @@
 #!/usr/env/bin python3
-from . import histgram_toolbox
+from . import histogram_toolbox
 from .numba import mask
 
 import numpy
 from scipy.signal import find_peaks, convolve
+
+from matplotlib import pyplot as plt
 
 try:
     from functools import cached_property
@@ -48,7 +50,7 @@ class MaskGeneration:
         kernel = numpy.full(20, 1/20.)
         hist = convolve(hist, kernel, mode='same')
         hist = hist / hist.max()
-        peak_positions, _ = find_peaks(hist, prominence=0.1)
+        peak_positions, _ = find_peaks(hist, prominence=0.2)
 
         stop_position = BINS//2
         if len(peak_positions) > 0:
@@ -56,11 +58,11 @@ class MaskGeneration:
             bins = bins[peak_positions[-1]:]
             stop_position = stop_position - peak_positions[-1]
 
-        return histgram_toolbox.plateau(hist,
-                                        bins,
-                                        +1,
-                                        start=0,
-                                        stop=stop_position)
+        return histogram_toolbox.plateau(hist,
+                                         bins,
+                                         +1,
+                                         start=0,
+                                         stop=stop_position)
 
     @cached_property
     def t_tra(self):
@@ -68,7 +70,7 @@ class MaskGeneration:
 
     @cached_property
     def t_min(self):
-        mask = histgram_toolbox.region_growing(self.retardation)
+        mask = histogram_toolbox.region_growing(self.retardation)
         return self.transmittance[mask].mean()
 
     @cached_property
@@ -76,11 +78,11 @@ class MaskGeneration:
         hist, bins = numpy.histogram(self.transmittance.flatten(),
                                      bins=BINS,
                                      range=(0, 1 - 1e-15))
-        return histgram_toolbox.plateau(hist/hist.max(),
-                                        bins,
-                                        -1,
-                                        start=BINS//2,
-                                        stop=BINS)
+        return histogram_toolbox.plateau(hist / hist.max(),
+                                         bins,
+                                         -1,
+                                         start=BINS//2,
+                                         stop=BINS)
 
     @property
     def gray_mask(self):

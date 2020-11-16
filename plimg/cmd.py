@@ -52,12 +52,12 @@ def main() -> None:
         tqdm_paths.set_description(slice_name)
 
         tqdm_step.set_description('Read transmittance')
-        reader.set(transmittance_path, h5_dataset=args['dataset'])
+        reader.set(transmittance_path, dataset=args['dataset'])
         transmittance = reader.get()
         tqdm_step.update()
 
         tqdm_step.set_description('Read retardation')
-        reader.set(retardation_path, h5_dataset=args['dataset'])
+        reader.set(retardation_path, dataset=args['dataset'])
         retardation = reader.get()
         tqdm_step.update()
 
