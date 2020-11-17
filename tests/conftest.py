@@ -28,3 +28,8 @@ def filewriter(request):
         if os.path.isdir('tests/output/'):
             shutil.rmtree('tests/output/')
     request.addfinalizer(remove_test_dir)
+
+
+@pytest.fixture(scope="function")
+def maskgeneration(request):
+    yield plimg.mask.MaskGeneration(None, None)

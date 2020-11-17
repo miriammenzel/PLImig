@@ -46,11 +46,14 @@ class MaskGeneration:
         hist, bins = numpy.histogram(self.retardation.flatten(),
                                      bins=BINS,
                                      range=(1e-15, 1 - 1e-15))
+
         hist = hist/hist.max()
-        kernel = numpy.full(20, 1/20.)
+        kernel_size = BINS//20
+        kernel = numpy.full(kernel_size, 1/kernel_size)
         hist = convolve(hist, kernel, mode='same')
         hist = hist / hist.max()
-        peak_positions, _ = find_peaks(hist, prominence=0.2)
+        bins = bins - kernel_size / 2 * (bins.max() - bins.min()) / BINS
+        peak_positions, _ = find_peaks(hist, prominence=0.1)
 
         stop_position = BINS//2
         if len(peak_positions) > 0:
