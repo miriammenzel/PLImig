@@ -62,5 +62,11 @@ class TestMaskGeneration:
     def test_no_nerve_fiber_mask(self):
         assert False
 
-    def test_full_mask(self):
-        assert False
+    def test_full_mask(self, maskgeneration):
+        white_mask = maskgeneration.white_mask
+        gray_mask = maskgeneration.gray_mask
+        full_mask = maskgeneration.full_mask
+
+        assert numpy.all(full_mask[gray_mask] == True)
+        assert numpy.all(full_mask[white_mask] == True)
+        assert numpy.all(full_mask[~gray_mask & ~white_mask] == False)

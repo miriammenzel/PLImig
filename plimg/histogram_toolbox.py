@@ -31,9 +31,9 @@ def plateau(hist, bins, direction, start, stop):
 
     hist_roi = hist[roi_start+width:roi_end]
     bin_roi = bins[roi_start+width:roi_end]
-    alpha = numpy.zeros(roi_end - roi_start - 1)
+    alpha = numpy.zeros(len(hist_roi) - 1)
 
-    for i in range(roi_end - roi_start - 2):
+    for i in range(len(alpha)):
         y2 = hist_roi[i] - hist_roi[i + 1]
         y1 = hist_roi[i] - hist_roi[i - 1]
         x2 = bin_roi[i] - bin_roi[i + 1]
