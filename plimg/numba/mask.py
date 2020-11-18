@@ -10,8 +10,9 @@ def gray_mask(transmittance, retardation, t_tra, t_ret, t_max):
 
 
 @numba.jit(nopython=True)
-def white_mask(transmittance, retardation, t_tra, t_ret, t_min):
-    return (transmittance < t_tra) | (retardation > t_ret)
+def white_mask(transmittance, retardation, t_tra, t_ret):
+    return ((transmittance < t_tra) & (transmittance > 0)) | \
+           (retardation > t_ret)
 
 
 @numba.jit(nopython=True)

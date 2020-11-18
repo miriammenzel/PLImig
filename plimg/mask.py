@@ -94,10 +94,12 @@ class MaskGeneration:
     def t_ret(self, t_ret):
         try:
             del self._white_mask
+            self._white_mask = None
         except AttributeError:
             pass
         try:
             del self._gray_mask
+            self._gray_mask = None
         except AttributeError:
             pass
         self._t_ret = t_ret
@@ -112,10 +114,12 @@ class MaskGeneration:
     def t_tra(self, t_tra):
         try:
             del self._white_mask
+            self._white_mask = None
         except AttributeError:
             pass
         try:
             del self._gray_mask
+            self._gray_mask = None
         except AttributeError:
             pass
         self._t_tra = t_tra
@@ -131,10 +135,12 @@ class MaskGeneration:
     def t_min(self, t_min):
         try:
             del self._white_mask
+            self._white_mask = None
         except AttributeError:
             pass
         try:
             del self._gray_mask
+            self._gray_mask = None
         except AttributeError:
             pass
         self._t_min = t_min
@@ -156,10 +162,12 @@ class MaskGeneration:
     def t_max(self, t_max):
         try:
             del self._white_mask
+            self._white_mask = None
         except AttributeError:
             pass
         try:
             del self._gray_mask
+            self._gray_mask = None
         except AttributeError:
             pass
         self._t_max = t_max
@@ -182,8 +190,8 @@ class MaskGeneration:
         if self._white_mask is None:
             self._white_mask = mask.white_mask(self.transmittance,
                                                self.retardation,
-                                               self.t_tra, self.t_ret,
-                                               self.t_min)
+                                               self.t_tra,
+                                               self.t_ret)
         return self._white_mask
 
     @white_mask.setter
