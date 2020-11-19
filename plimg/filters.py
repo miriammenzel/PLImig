@@ -14,7 +14,7 @@ def median(input_image, kernel_size):
     footprint = x * x + y * y <= r * r
 
     filtered_image_cpu = numpy.empty(input_image.shape, dtype=input_image.dtype)
-    input_image = numpy.pad(input_image, (r, r))
+    input_image = numpy.pad(input_image, (r, r), mode='edge')
 
     gpu_free_memory = cupy.cuda.Device(0).mem_info[0] + mempool.free_bytes()
     gpu_needed_memory = input_image.nbytes * 2
