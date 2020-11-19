@@ -63,7 +63,8 @@ def main() -> None:
 
         tqdm_step.set_description('Generating median10Transmittance')
         if 'median10' not in transmittance_path:
-            med_transmittance = plimg.filters.median(transmittance, 10)
+            # med_transmittance = plimg.filters.median(transmittance, 10)
+            med_transmittance = plimg.filters.median_mask(transmittance, 10, numpy.ones(transmittance.shape).astype('bool'))
         else:
             med_transmittance = transmittance
         tqdm_step.update()

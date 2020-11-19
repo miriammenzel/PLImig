@@ -2,6 +2,7 @@ import cupy
 from cupyx.scipy.ndimage import filters
 import numpy
 import tqdm
+from plimg.numba.filters import median_mask as numba_median_mask
 
 mempool = cupy.get_default_memory_pool()
 
@@ -38,3 +39,20 @@ def median(input_image, kernel_size):
     cupy.get_default_pinned_memory_pool().n_free_blocks()
 
     return filtered_image_cpu
+
+import time
+
+def median_mask(input_image, kernel_size, mask):
+    r = kernel_size
+    y, x = numpy.ogrid[-r:r + 1, -r:r + 1]
+    footprint = x * x + y * y <= r * r
+    image_shape = input_image.shape
+
+    input_image = numpy.pad(input_image, (r, r), mode='edge')
+    mask = numpy.pad(mask, (r, r), mode='edge')
+
+    start = time.time()
+    result = numba_median_mask(input_image, footprint, mask, r, image_shape)
+    print(time.time() - start)
+
+    return result
