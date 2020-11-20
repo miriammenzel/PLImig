@@ -1,5 +1,5 @@
 import numpy
-from matplotlib import pyplot as plt
+import pytest
 
 
 class TestMaskGeneration:
@@ -154,6 +154,7 @@ class TestMaskGeneration:
 
         assert numpy.all(expected_white_mask == maskgeneration.white_mask)
 
+    @pytest.mark.skip(reason="no way of currently testing this")
     def test_no_nerve_fiber_mask(self, maskgeneration):
         assert False
 
