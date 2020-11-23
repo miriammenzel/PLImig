@@ -40,7 +40,6 @@ def median(input_image, kernel_size):
 
     return filtered_image_cpu
 
-import time
 
 def median_mask(input_image, kernel_size, mask):
     r = kernel_size
@@ -51,8 +50,6 @@ def median_mask(input_image, kernel_size, mask):
     input_image = numpy.pad(input_image, (r, r), mode='edge')
     mask = numpy.pad(mask, (r, r), mode='edge')
 
-    start = time.time()
     result = numba_median_mask(input_image, footprint, mask, r, image_shape)
-    print(time.time() - start)
 
     return result
