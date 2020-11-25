@@ -3,6 +3,7 @@
 import h5py
 import numpy
 import sys
+import os
 import getpass
 
 
@@ -39,7 +40,10 @@ class HDF5Writer:
     def open(self):
         if self.hdf5_file is not None:
             self.close()
-        self.hdf5_file = h5py.File(self.path, mode='w')
+        if os.path.exists(self.path):
+            self.hdf5_file = h5py.File(self.path, mode='a')
+        else:
+            self.hdf5_file = h5py.File(self.path, mode='w')
 
     def close(self):
         if self.hdf5_file is not None:

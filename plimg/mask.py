@@ -3,9 +3,9 @@ from . import histogram_toolbox
 from .numba import mask
 
 import numpy
+import scipy.special
 from scipy.signal import find_peaks, convolve
-
-from matplotlib import pyplot as plt
+import tqdm
 
 try:
     from functools import cached_property
@@ -13,6 +13,7 @@ except ImportError:
     from cached_property import cached_property
 
 BINS = 256
+NUMBER_OF_SAMPLES = 200
 
 
 class MaskGeneration:
@@ -26,6 +27,7 @@ class MaskGeneration:
         self._t_max = None
         self._white_mask = None
         self._gray_mask = None
+        self._blurred_mask = None
 
     def set_modalities(self, transmittance, retardation):
         try:
@@ -56,6 +58,11 @@ class MaskGeneration:
         try:
             del self._gray_mask
             self._gray_mask = None
+        except AttributeError:
+            pass
+        try:
+            del self._blurred_mask
+            self._blurred_mask = None
         except AttributeError:
             pass
 
@@ -206,3 +213,66 @@ class MaskGeneration:
     @property
     def full_mask(self):
         return mask.full_mask(self.white_mask, self.gray_mask)
+
+    @property
+    def blurred_mask(self):
+        if self._blurred_mask is None:
+            val_s_ret = numpy.empty(NUMBER_OF_SAMPLES)
+            val_s_tra = numpy.empty(NUMBER_OF_SAMPLES)
+            rows, cols = self.transmittance.shape
+            med_transmittance_1D = self.transmittance.reshape(rows * cols)
+            retardation_1D = self.retardation.reshape(rows * cols)
+            for i in tqdm.tqdm(range(NUMBER_OF_SAMPLES), leave=False):
+                # Generate random transmittance based on original data
+                med_transmittance_i = \
+                    numpy.random.choice(med_transmittance_1D,
+                                        size=(rows // 10) * (cols // 10),
+                                        replace=True) \
+                         .reshape((rows // 10, cols // 10))
+                # Generate random retardation based on original data
+                retardation_i = \
+                    numpy.random.choice(retardation_1D,
+                                        size=(rows // 10) * (cols // 10),
+                                        replace=True) \
+                         .reshape((rows // 10, cols // 10))
+                # Generate mask parameters
+                generation_i = MaskGeneration(med_transmittance_i,
+                                              retardation_i)
+                val_s_ret[i] = generation_i.t_ret
+                val_s_tra[i] = generation_i.t_tra
+
+            R_upper_arr = val_s_ret[val_s_ret > self.t_ret]
+            if not R_upper_arr.size == 0:
+                R_upper = 1e-15 #numpy.abs(R_upper_arr.mean() - self.t_ret)
+            else:
+                R_upper = 1e-15
+            R_lower_arr = val_s_ret[val_s_ret < self.t_ret]
+            if not R_lower_arr.size == 0:
+                R_lower = 1e-15 #numpy.abs(R_lower_arr.mean() - self.t_ret)
+            else:
+                R_lower = 1e-15
+
+            T_upper_arr = val_s_tra[val_s_tra > self.t_tra]
+            if not T_upper_arr.size == 0:
+                T_upper = numpy.abs(T_upper_arr.mean() - self.t_tra)
+            else:
+                T_upper = 1e-15
+            T_lower_arr = val_s_tra[val_s_tra < self.t_tra]
+            if not T_lower_arr.size == 0:
+                T_lower = numpy.abs(T_lower_arr.mean() - self.t_tra)
+            else:
+                T_lower = 1e-15
+
+            delta_ret = self.retardation - self.t_ret
+            delta_trans = self.transmittance - self.t_tra
+            delta_ret[delta_ret > 0] /= R_upper
+            delta_ret[delta_ret < 0] /= R_lower
+            delta_trans[delta_trans > 0] /= T_upper
+            delta_trans[delta_trans < 0] /= T_lower
+
+            self._blurred_mask = (-scipy.special.erf(
+                numpy.cos(3 * numpy.pi / 4 -
+                          numpy.arctan2(delta_trans, delta_ret)) *
+                numpy.sqrt(delta_trans ** 2 + delta_ret ** 2) * 2) + 1) / 2
+
+        return self._blurred_mask

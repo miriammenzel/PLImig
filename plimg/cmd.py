@@ -18,6 +18,8 @@ def main() -> None:
                         help='Output folder', required=True)
     parser.add_argument('--detailed',
                         action='store_true')
+    parser.add_argument('--with_blurred',
+                        action='store_true')
     parser.add_argument('--dataset',
                         type=str,
                         required=False,
@@ -37,7 +39,7 @@ def main() -> None:
         os.makedirs(args['output'], exist_ok=True)
 
     tqdm_paths = tqdm.tqdm(paths, leave=True)
-    tqdm_step = tqdm.tqdm(total=8, leave=True)
+    tqdm_step = tqdm.tqdm(total=9, leave=True)
     for path in tqdm_paths:
         transmittance_path = path
         retardation_path = transmittance_path.replace('median10', '')\
@@ -78,35 +80,42 @@ def main() -> None:
         params = numpy.array([generation.t_tra, generation.t_ret,
                                generation.t_min, generation.t_max]) \
                       .reshape((4, 1))
-        writer.set_dataset(dataset="/Image/Params",
+        writer.set_dataset(dataset=args['dataset']+"/Params",
                            content=params,
                            dtype=numpy.float32)
         tqdm_step.update()
 
         tqdm_step.set_description('Generating and writing white mask')
-        writer.set_dataset(dataset="/Image/White",
+        writer.set_dataset(dataset=args['dataset']+"/White",
                            content=generation.white_mask*255,
                            dtype=numpy.uint8)
         tqdm_step.update()
 
         tqdm_step.set_description('Generating and writing gray mask')
-        writer.set_dataset(dataset="/Image/Gray",
+        writer.set_dataset(dataset=args['dataset']+"/Gray",
                            content=generation.gray_mask*255,
                            dtype=numpy.uint8)
         tqdm_step.update()
 
+        if args['with_blurred']:
+            tqdm_step.set_description('Generating and writing difference mask')
+            writer.set_dataset(dataset=args['dataset']+"/Blurred",
+                               content=generation.blurred_mask,
+                               dtype=numpy.float32)
+        tqdm_step.update()
+
         if args['detailed']:
             tqdm_step.set_description('Generating and writing gray mask')
-            writer.set_dataset(dataset="/Image/No_Nerve_Fibers",
+            writer.set_dataset(dataset=args['dataset']+"/No_Nerve_Fibers",
                                content=generation.no_nerve_fiber_mask*255,
                                dtype=numpy.uint8)
-            tqdm_step.update()
 
             if not numpy.all(med_transmittance == transmittance):
                 tqdm_step.set_description('Writing median transmittance')
-                writer.set_dataset(dataset="/Image/med10transmittance",
+                writer.set_dataset(dataset=args['dataset']+"/med10Transmittance",
                                    content=med_transmittance,
                                    dtype=numpy.float32)
+        tqdm_step.update()
         tqdm_step.reset()
 
 
