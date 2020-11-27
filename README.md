@@ -1,60 +1,90 @@
-# PLI Mask Generation (plimg)
+# Minimal C++ Project
 
-## Overview
 - [System Requirements](#system-requirements)
+- [Required programs and packages](#required-programs-and-packages)
+- [Optional programs and packages](#optional-programs-and-packages)
 - [Install instructions](#install-instructions)
+  - [Clone repository](#clone-repository)
+  - [Compile the program](#compile-the-program)
+  - [Install program](#install-program)
+  - [Changing options](#changing-options)
+- [Run the program](#run-the-program)
+  
+# System Requirements
+**Minimal Requirements:**
 
-## System requirements
-- CPU: Intel Core i-Series / AMD Ryzen
-- Memory: 8 GiB (32GiB or more recommended for large measurements)
-- NVIDIA GPU supported by CUDA 9.0+ (GTX 1070 or higher recommended)
+* CPU: [...]
+* Memory: [...]
+* Other things [...]
 
-## Install instructions
-##### How to clone plimg (for further work)
+# Required programs and packages
+* CMake 3.5
+* C++/C compiler (g++, clang or other compiler)
+* Make
+
+# Optional programs and packages
+For testing purposes:
+* gcovr
+* gcov
+* Google Test
+
+# Install instructions
+Install all needed dependencies using your package manager or by compiling them from source.
+
+Example using Ubuntu or Debian:
 ```bash
-git clone git@github.com:3d-pli/SLIX.git
-cd plimg
-
-# A virtual environment is recommended:
-python3 -m venv venv
-source venv/bin/activate
-
-pip3 install -r requirements.txt
+sudo apt-get install -y gcc g++ cmake make build-essential file git gcovr libgtest-dev
+sudo cd /usr/src/gtest
+sudo cmake CMakeLists.txt
+sudo make
+sudo cp ./lib/libgtest*.a /usr/lib
+cd - 
+```
+Example using Manjaro/Arch:
+```bash
+sudo pacman -S gcc cmake make gcovr gtest
 ```
 
-##### How to install plimg as Python package
-```bash
-# Install after cloning locally
-git clone git@github.com:3d-pli/plimg.git
-cd plimg
-pip install .
+## Clone repository
+Clone the repository to your local folder via SSH
+```sh
+git clone git@jugit.fz-juelich.de:j.reuter/minimal-cpp-project.git
+cd FiberConstructor
 ```
 
-##### Run plimg locally
+## Compile the program
+Execute the following commands in the project folder:
 ```bash
-git clone git@github.com:3d-pli/plimg.git
-cd plimg
-python3 main.py [options]
-
-## After installation with pip
-PLImg [options]
+mkdir build
+cd build/
+cmake ..
+make && make test
 ```
 
-## How the execute the program
+If everything ran successful the program is located at `minimal-cpp-project/build/MinimalCppProject` and can be started from there.
 
-### Required Arguments
-| Argument      | Function                                                                    |
-| ------------------- | --------------------------------------------------------------------------- |
-| `-i, --input`  | Input (.tiff, .h5, .nii) normalized transmittance image |
-| `-o, --output` | Output folder used to store the masks as HDF5 file. Will be created if not existing. |
+## Install program
+After a successful compilation running `make install` will install the program and the corresponding headers and libraries at `/usr/local`
 
-### Optional Arguments
-| Argument      | Function                                                                    |
-| -------------- | --------------------------------------------------------------------------- |
-| `--detailed`  | Include median mask if the input transmittance were not filtered. Also include a mask indicating all regions without any fibers. |
-| `--dataset` | HDF5 dataset which PLImg will read from (default: "/Image") |
+## Changing options
+By default the following options are set:
+```
+BUILD_TESTING = ON
+CMAKE_BUILD_TYPE = Debug
+CMAKE_INSTALL_PREFIX = /usr/local
+```
+You are able to change this options with `ccmake` or by defining them when calling `cmake`.
 
-### Example
+# Run the program
+Starting the program is possible via command line by typing `./MinimalCppProject` in a terminal inside the build folder.
+
+## Example
 ```bash
-PLImg -i ~/AktuelleArbeit/PE-2018-00516-R_00_s0*_PM_Complete_NTransmittance_Stitched_Flat_v000.h5 -o ~/AktuelleArbeit/Masks/
+[3d-pli@Linux minimal-python-project]$ MinimalMain
+```
+
+**Output**:
+```
+Hello World
+Hello Fiber Architecture Group
 ```
