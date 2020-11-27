@@ -19,6 +19,7 @@ before_script:
     - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" libhdf5-dev
     - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" libopencv-dev
     - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" git
+    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" nvidia-cuda-toolkit
     - git submodule update --init --recursive
 
 
