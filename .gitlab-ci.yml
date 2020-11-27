@@ -1,53 +1,71 @@
 stages:
+    - build
     - test
-    - install
-    - pack
+
+
+variables:
+  APT_CACHE_DIR: $CI_PROJECT_DIR/apt
+
+
+cache:
+    paths:
+      - apt/
+
 
 before_script:
+    - export DEBIAN_FRONTEND=noninteractive
     - apt-get update -qq && apt-get upgrade -y
-    - apt-get install -y python3 python3-pip libgl1-mesa-glx libglib2.0-0
-    - /usr/bin/python3 -m pip install --upgrade pip
+    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" gcc g++ cmake make build-essential file
+    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" libhdf5-dev
+    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" libopencv-dev
+    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" git
+    - git submodule update --init --recursive
 
-lint:python3:
-    stage: test
-    allow_failure: true
-    image: cupy/cupy:v8.0.0
+
+build:
+    stage: build
+    image: nvidia/cuda:latest
     script:
-        - pip3 install flake8
-        - flake8 plimg/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        - flake8 plimg/ --count --exit-zero --max-complexity=10 --statistics
+        - mkdir build/
+        - cd build/
+        - cmake ..
+        - make -j4
     tags:
         - docker
         - gpu
-
-test:python3:
-    stage: test
-    image: cupy/cupy:v8.0.0
-    script:
-        - pip3 install tifffile numpy nibabel h5py pillow numba matplotlib pytest pytest-cov opencv-python
-        - pytest --cov=plimg --cov-config=.coveragerc tests --cov-report=html
     artifacts:
-            paths:
-                - htmlcov/
+        paths:
+            - build/
+        expire_in: 20 minutes
+
+
+test:
+    stage: test
+    image: nvidia/cuda:latest
+    script:
+        - cd build/
+        - make test
     tags:
         - docker
-        - gpu 
-        
-install:python3:
-    stage: install
-    image: cupy/cupy:v8.0.0
-    script:
-        - pip3 install .
-    tags:
-    - docker
-    - gpu 
+        - gpu
+    dependencies:
+        - build:ubuntu
 
-pack:python3:
-    stage: pack
-    image: cupy/cupy:v8.0.0
+
+coverage:
+    stage: coverage
+    # Docker image which will be used for this repository
+    image: ubuntu:latest
     script:
-        - pip3 install pep517
-        - python3 -m pep517.build --source --binary --out-dir dist/ .
+        - cd build/
+        - make coverage
     tags:
-    - docker
-    - gpu 
+        - docker
+        - gpu
+    dependencies:
+        - test
+    artifacts:
+        paths:
+            - build/coverage
+
+
