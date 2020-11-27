@@ -1,7 +1,7 @@
 stages:
     - build
     - test
-
+    - coverage
 
 variables:
   APT_CACHE_DIR: $CI_PROJECT_DIR/apt
