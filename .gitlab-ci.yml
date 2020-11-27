@@ -49,13 +49,18 @@ test:
         - docker
         - gpu
     dependencies:
-        - build:ubuntu
+        - build
+    artifacts:
+        paths:
+            - build/
+        expire_in: 20 minutes
+
 
 
 coverage:
     stage: coverage
     # Docker image which will be used for this repository
-    image: ubuntu:latest
+    image: nvidia/cuda:latest
     script:
         - cd build/
         - make coverage
