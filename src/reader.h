@@ -10,10 +10,11 @@
 #include <opencv2/hdf/hdf5.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <sys/stat.h>
+#include <tiffio.h>
 
 namespace PLImg {
-    inline bool fileExists(std::string filename);
-    cv::Mat imread(std::string filename, std::string dataset="/Image");
+    inline bool fileExists(const std::string& filename);
+    cv::Mat imread(const std::string& filename, const std::string& dataset="/Image");
 }
 
 

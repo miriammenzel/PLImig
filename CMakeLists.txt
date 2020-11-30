@@ -43,6 +43,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 find_package(OpenCV REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C CXX)
 find_package(CUDAToolkit REQUIRED)
+find_package(TIFF REQUIRED)
 
 # Add headers to project
 add_subdirectory(extern/CLI11)

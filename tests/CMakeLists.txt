@@ -8,12 +8,12 @@ find_package(CUDAToolkit REQUIRED)
 include_directories(${CUDAToolkit_INCLUDE_DIRS})
 include_directories(src/)
 
-#add_executable(test_reader test_reader.cpp)
-#target_link_libraries(test_reader GTest::GTest)
-#gtest_discover_tests(test_reader TEST_PREFIX new:)
+add_executable(test_reader test_reader.cpp ${PROJECT_SOURCE_DIR}/src/reader.cpp)
+target_link_libraries(test_reader GTest::GTest ${OpenCV_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES})
+gtest_discover_tests(test_reader TEST_PREFIX new:)
 
 add_executable(test_writer test_writer.cpp ${PROJECT_SOURCE_DIR}/src/writer.cpp)
-target_link_libraries(test_writer GTest::GTest ${OpenCV_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(test_writer GTest::GTest ${OpenCV_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES})
 gtest_discover_tests(test_writer TEST_PREFIX new:)
 
 #add_executable(test_toolbox test_toolbox.cpp)
