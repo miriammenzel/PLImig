@@ -1,11 +1,35 @@
 find_package(GTest)
 
-#add_executable(test_hello_world test_hello_world.cpp)
-#target_link_libraries(test_hello_world GTest::GTest)
-#gtest_discover_tests(test_hello_world TEST_PREFIX new:)
+# Search for required packages and load them
+find_package(OpenCV REQUIRED)
+find_package(HDF5 REQUIRED COMPONENTS C CXX)
+find_package(CUDAToolkit REQUIRED)
+
+include_directories(${CUDAToolkit_INCLUDE_DIRS})
+include_directories(src/)
+
+#add_executable(test_reader test_reader.cpp)
+#target_link_libraries(test_reader GTest::GTest)
+#gtest_discover_tests(test_reader TEST_PREFIX new:)
+
+add_executable(test_writer test_writer.cpp ${PROJECT_SOURCE_DIR}/src/writer.cpp)
+target_link_libraries(test_writer GTest::GTest ${OpenCV_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES})
+gtest_discover_tests(test_writer TEST_PREFIX new:)
+
+#add_executable(test_toolbox test_toolbox.cpp)
+#target_link_libraries(test_toolbox GTest::GTest)
+#gtest_discover_tests(test_toolbox TEST_PREFIX new:)
+
+#add_executable(test_maskgeneration test_maskgeneration.cpp)
+#target_link_libraries(test_maskgeneration GTest::GTest)
+#gtest_discover_tests(test_maskgeneration TEST_PREFIX new:)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-    #target_link_libraries(test_hello_world gcov )
+    #target_link_libraries(test_reader gcov)
+    target_link_libraries(test_writer gcov)
+    #target_link_libraries(test_toolbox gcov)
+    #target_link_libraries(test_maskgeneration gcov)
+
     include(CodeCoverage)
     set(COVERAGE_EXCLUDES "extern/*/*/*" "extern/*/*")
     APPEND_COVERAGE_COMPILER_FLAGS()

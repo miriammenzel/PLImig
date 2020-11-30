@@ -55,9 +55,7 @@ add_executable(PLImg main.cpp src/reader.cpp src/writer.cpp src/maskgeneration.c
 target_link_libraries(PLImg ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES}
                             CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu)
 
-# Optional: Enable tests
-option(PACKAGE_TESTS "Build the tests" ON)
-if(PACKAGE_TESTS)
+if(BUILD_TESTING)
    enable_testing()
    add_subdirectory(tests)
 endif()
