@@ -83,6 +83,14 @@ TEST(WriterTest, TestWriteDataset) {
     }
 }
 
+TEST(WriterTest, TestCreateGroup) {
+    PLImg::HDF5Writer writer;
+    writer.set_path("output/writer_test_3.h5");
+    writer.create_group("/demogroup");
+    auto file = cv::hdf::open( "output/writer_test_3.h5" );
+    ASSERT_TRUE(file->hlexists("/demogroup"));
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
