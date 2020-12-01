@@ -20,15 +20,15 @@ add_executable(test_toolbox test_toolbox.cpp ${PROJECT_SOURCE_DIR}/src/toolbox.c
 target_link_libraries(test_toolbox GTest::GTest ${OpenCV_LIBRARIES} CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu)
 gtest_discover_tests(test_toolbox TEST_PREFIX new:)
 
-#add_executable(test_maskgeneration test_maskgeneration.cpp)
-#target_link_libraries(test_maskgeneration GTest::GTest)
-#gtest_discover_tests(test_maskgeneration TEST_PREFIX new:)
+add_executable(test_maskgeneration test_maskgeneration.cpp ${PROJECT_SOURCE_DIR}/src/toolbox.cpp ${PROJECT_SOURCE_DIR}/src/maskgeneration.cpp)
+target_link_libraries(test_maskgeneration GTest::GTest ${OpenCV_LIBRARIES} CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu)
+gtest_discover_tests(test_maskgeneration TEST_PREFIX new:)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-    #target_link_libraries(test_reader gcov)
+    target_link_libraries(test_reader gcov)
     target_link_libraries(test_writer gcov)
-    #target_link_libraries(test_toolbox gcov)
-    #target_link_libraries(test_maskgeneration gcov)
+    target_link_libraries(test_toolbox gcov)
+    target_link_libraries(test_maskgeneration gcov)
 
     include(CodeCoverage)
     set(COVERAGE_EXCLUDES "extern/*/*/*" "extern/*/*")
