@@ -44,16 +44,18 @@ find_package(OpenCV REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C CXX)
 find_package(CUDAToolkit REQUIRED)
 find_package(TIFF REQUIRED)
+find_package(NIFTI REQUIRED)
 
 # Add headers to project
 add_subdirectory(extern/CLI11)
 include_directories(extern/CLI11/include)
 include_directories(${CUDAToolkit_INCLUDE_DIRS})
+include_directories(${NIFTI_INCLUDE_DIRS})
 include_directories(src/)
 
 # Generate executable file
 add_executable(PLImg main.cpp src/reader.cpp src/writer.cpp src/maskgeneration.cpp src/toolbox.cpp)
-target_link_libraries(PLImg ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES}
+target_link_libraries(PLImg ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
                             CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu)
 
 if(BUILD_TESTING)

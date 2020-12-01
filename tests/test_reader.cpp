@@ -8,18 +8,27 @@
 #include "reader.h"
 
 TEST(ReaderTest, TestFileExists) {
-    ASSERT_TRUE(PLImg::fileExists("../../tests/files/demo.h5"));
-    ASSERT_TRUE(PLImg::fileExists("../../tests/files/demo.tiff"));
-    ASSERT_TRUE(PLImg::fileExists("../../tests/files/demo.nii"));
+    ASSERT_TRUE(PLImg::reader::fileExists("../../tests/files/demo.h5"));
+    ASSERT_TRUE(PLImg::reader::fileExists("../../tests/files/demo.tiff"));
+    ASSERT_TRUE(PLImg::reader::fileExists("../../tests/files/demo.nii"));
 }
 
-TEST(ReaderTest, TestImageRead) {
-    auto image = PLImg::imread("../../tests/files/demo.h5", "/pyramid/06");
+TEST(ReaderTest, TestImageReadHDF5) {
+    auto image = PLImg::reader::imread("../../tests/files/demo.h5", "/pyramid/06");
     ASSERT_EQ(image.rows, 195);
     ASSERT_EQ(image.cols, 150);
     ASSERT_EQ(image.type(), CV_32FC1);
+}
 
-    image = PLImg::imread("../../tests/files/demo.tiff", "/pyramid/06");
+TEST(ReaderTest, TestImageReadTiff) {
+    auto image = PLImg::reader::imread("../../tests/files/demo.tiff");
+    ASSERT_EQ(image.rows, 195);
+    ASSERT_EQ(image.cols, 150);
+    ASSERT_EQ(image.type(), CV_32FC1);
+}
+
+TEST(ReaderTest, TestImageReadNIFTI) {
+    auto image = PLImg::reader::imread("../../tests/files/demo.nii");
     ASSERT_EQ(image.rows, 195);
     ASSERT_EQ(image.cols, 150);
     ASSERT_EQ(image.type(), CV_32FC1);

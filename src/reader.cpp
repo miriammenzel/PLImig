@@ -4,26 +4,60 @@
 
 #include "reader.h"
 
-bool PLImg::fileExists(const std::string& filename) {
+bool PLImg::reader::fileExists(const std::string& filename) {
     struct stat buffer{};
     return (stat (filename.c_str(), &buffer) == 0);
 }
 
-cv::Mat PLImg::imread(const std::string& filename, const std::string& dataset) {
-    cv::Mat image;
+cv::Mat PLImg::reader::imread(const std::string& filename, const std::string& dataset) {
     if(fileExists(filename)) {
         if(filename.substr(filename.size()-2) == "h5") {
-            cv::Ptr<cv::hdf::HDF5> h5io = cv::hdf::open( filename );
-            h5io->dsread(image, dataset);
-            h5io->close();
+            return readHDF5(filename, dataset);
         } else if(filename.substr(filename.size()-3) == "nii"){
-            //image = cv::imread(filename, cv::IMREAD_GRAYSCALE);
-            throw std::filesystem::filesystem_error(".nii files aren't supported yet.", std::error_code(11, std::generic_category()));
+            return readNIFTI(filename);
         } else {
-            image = cv::imread(filename, cv::IMREAD_ANYDEPTH);
+            return readTiff(filename);
         }
     } else {
         throw std::filesystem::filesystem_error("File not found: " + filename, std::error_code(10, std::generic_category()));
     }
+}
+
+cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &dataset) {
+    cv::Mat image;
+    cv::Ptr<cv::hdf::HDF5> h5io = cv::hdf::open( filename );
+    h5io->dsread(image, dataset);
+    h5io->close();
     return image;
+}
+
+cv::Mat PLImg::reader::readNIFTI(const std::string &filename) {
+    nifti_image * img = nifti_image_read(filename.c_str(), 1);
+    uint width = img->nx;
+    uint height = img->ny;
+    uint datatype = img->datatype;
+    uint cv_type;
+    switch(datatype) {
+        case 16:
+            cv_type = CV_32FC1;
+            break;
+        case 8:
+            cv_type = CV_32SC1;
+            break;
+        case 4:
+            cv_type = CV_16SC1;
+            break;
+        case 2:
+            cv_type = CV_8SC1;
+        default:
+            throw std::runtime_error("Did expect 32-bit floating point or 8/16/32-bit integer image!");
+    }
+
+    cv::Mat image(height, width, cv_type);
+    image.data = (uchar*) img->data;
+    return image;
+}
+
+cv::Mat PLImg::reader::readTiff(const std::string &filename) {
+    return cv::imread(filename, cv::IMREAD_ANYDEPTH);
 }

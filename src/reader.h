@@ -11,10 +11,19 @@
 #include <opencv2/imgcodecs.hpp>
 #include <sys/stat.h>
 #include <tiffio.h>
+#include <nifti/nifti1_io.h>
 
 namespace PLImg {
-    inline bool fileExists(const std::string& filename);
-    cv::Mat imread(const std::string& filename, const std::string& dataset="/Image");
+    class reader {
+    public:
+        static inline bool fileExists(const std::string& filename);
+        static cv::Mat imread(const std::string& filename, const std::string& dataset="/Image");
+    private:
+        static cv::Mat readHDF5(const std::string& filename, const std::string& dataset="/Image");
+        static cv::Mat readTiff(const std::string& filename);
+        static cv::Mat readNIFTI(const std::string& filename);
+    };
+
 }
 
 
