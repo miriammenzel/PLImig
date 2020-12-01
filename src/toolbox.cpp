@@ -54,7 +54,6 @@ float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float
 
     auto minIterator = std::min_element(alphaAngle.begin<float>()+1, alphaAngle.end<float>()-1);
     int minPos = std::distance(alphaAngle.begin<float>(), minIterator);
-
     return histLow + float(roiStart + minPos) * stepSize;
 }
 
@@ -75,6 +74,8 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
         pixelSum += uint(hist.at<float>(front_bin));
         --front_bin;
     }
+
+    std::vector<float> histArr(hist.begin<float>(), hist.end<float>());
 
     uint maxLabel, maxArea;
     cv::Mat labelImage, statImage, centroidImage;
