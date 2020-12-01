@@ -33,8 +33,10 @@ cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &
 
 cv::Mat PLImg::reader::readNIFTI(const std::string &filename) {
     nifti_image * img = nifti_image_read(filename.c_str(), 1);
+    // Get image dimensions
     uint width = img->nx;
     uint height = img->ny;
+    // Convert NIFTI datatype to OpenCV datatype
     uint datatype = img->datatype;
     uint cv_type;
     switch(datatype) {
@@ -52,7 +54,7 @@ cv::Mat PLImg::reader::readNIFTI(const std::string &filename) {
         default:
             throw std::runtime_error("Did expect 32-bit floating point or 8/16/32-bit integer image!");
     }
-
+    // Create OpenCV image with the image data
     cv::Mat image(height, width, cv_type);
     image.data = (uchar*) img->data;
     return image;

@@ -97,6 +97,7 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
             return labelImage == maxLabel;
         }
     }
+    return cv::Mat();
 }
 
 bool PLImg::filters::runCUDAchecks() {

@@ -16,8 +16,8 @@ add_executable(test_writer test_writer.cpp ${PROJECT_SOURCE_DIR}/src/writer.cpp)
 target_link_libraries(test_writer GTest::GTest ${OpenCV_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES})
 gtest_discover_tests(test_writer TEST_PREFIX new:)
 
-add_executable(test_toolbox test_toolbox.cpp)
-target_link_libraries(test_toolbox GTest::GTest)
+add_executable(test_toolbox test_toolbox.cpp ${PROJECT_SOURCE_DIR}/src/toolbox.cpp)
+target_link_libraries(test_toolbox GTest::GTest ${OpenCV_LIBRARIES} CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu)
 gtest_discover_tests(test_toolbox TEST_PREFIX new:)
 
 #add_executable(test_maskgeneration test_maskgeneration.cpp)
