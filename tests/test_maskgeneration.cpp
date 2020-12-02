@@ -143,19 +143,132 @@ TEST(TestMaskgeneration, TestSetGet) {
 }
 
 TEST(TestMaskgeneration, TestWhiteMask) {
+    cv::Mat retardation(30, 30, CV_32FC1);
+    cv::Mat transmittance(30, 30, CV_32FC1);
 
+    for(uint i = 0; i < retardation.rows; ++i) {
+        for(uint j = 0; j < retardation.cols; ++j) {
+            if(j < 15) {
+                retardation.at<float>(i, j) = 0.05f;
+            } else {
+                retardation.at<float>(i, j) = 0.15f;
+            }
+
+            if(i < 10) {
+                transmittance.at<float>(i, j) = 0.05f;
+            } else if (i < 20) {
+                transmittance.at<float>(i, j) = 0.80f;
+            } else {
+                transmittance.at<float>(i, j) = 1.00f;
+            }
+        }
+    }
+
+    auto retPtr = std::make_shared<cv::Mat>(retardation);
+    auto traPtr = std::make_shared<cv::Mat>(transmittance);
+    PLImg::MaskGeneration generation(retPtr, traPtr);
+
+    generation.set_tTra(0.5f);
+    generation.set_tRet(0.1f);
+    generation.set_tMin(-1.0f);
+    generation.set_tMax(-1.0f);
+
+    std::shared_ptr<cv::Mat> mask = generation.whiteMask();
+    for(uint i = 0; i < mask->rows; ++i) {
+        for(uint j = 0; j < mask->cols; ++j) {
+            if(i < 10 && j >= 15) {
+                ASSERT_TRUE(mask->at<bool>(i, j));
+            } else {
+                ASSERT_FALSE(mask->at<bool>(i, j));
+            }
+        }
+    }
 }
 
 TEST(TestMaskgeneration, TestGrayMask) {
+    cv::Mat retardation(30, 30, CV_32FC1);
+    cv::Mat transmittance(30, 30, CV_32FC1);
 
+    for(uint i = 0; i < retardation.rows; ++i) {
+        for(uint j = 0; j < retardation.cols; ++j) {
+            if(j < 15) {
+                retardation.at<float>(i, j) = 0.05f;
+            } else {
+                retardation.at<float>(i, j) = 0.15f;
+            }
+
+            if(i < 10) {
+                transmittance.at<float>(i, j) = 0.05f;
+            } else if (i < 20) {
+                transmittance.at<float>(i, j) = 0.80f;
+            } else {
+                transmittance.at<float>(i, j) = 1.00f;
+            }
+        }
+    }
+
+    auto retPtr = std::make_shared<cv::Mat>(retardation);
+    auto traPtr = std::make_shared<cv::Mat>(transmittance);
+    PLImg::MaskGeneration generation(retPtr, traPtr);
+
+    generation.set_tTra(0.5f);
+    generation.set_tRet(0.1f);
+    generation.set_tMin(-1.0f);
+    generation.set_tMax(0.9f);
+
+    std::shared_ptr<cv::Mat> mask = generation.grayMask();
+    for(uint i = 0; i < mask->rows; ++i) {
+        for(uint j = 0; j < mask->cols; ++j) {
+            if(i > 10 && i < 20 && j < 15) {
+                ASSERT_TRUE(mask->at<bool>(i, j));
+            } else {
+                ASSERT_FALSE(mask->at<bool>(i, j));
+            }
+        }
+    }
 }
 
 TEST(TestMaskgeneration, TestFullMask) {
+    cv::Mat retardation(30, 30, CV_32FC1);
+    cv::Mat transmittance(30, 30, CV_32FC1);
 
-}
+    for(uint i = 0; i < retardation.rows; ++i) {
+        for(uint j = 0; j < retardation.cols; ++j) {
+            if(j < 15) {
+                retardation.at<float>(i, j) = 0.05f;
+            } else {
+                retardation.at<float>(i, j) = 0.15f;
+            }
 
-TEST(TestMaskgeneration, TestNoNerveFiberMask) {
+            if(i < 10) {
+                transmittance.at<float>(i, j) = 0.05f;
+            } else if (i < 20) {
+                transmittance.at<float>(i, j) = 0.80f;
+            } else {
+                transmittance.at<float>(i, j) = 1.00f;
+            }
+        }
+    }
 
+    auto retPtr = std::make_shared<cv::Mat>(retardation);
+    auto traPtr = std::make_shared<cv::Mat>(transmittance);
+    PLImg::MaskGeneration generation(retPtr, traPtr);
+
+    generation.set_tTra(0.5f);
+    generation.set_tRet(0.1f);
+    generation.set_tMin(-1.0f);
+    generation.set_tMax(0.9f);
+
+    auto whiteMask = generation.whiteMask();
+    auto grayMask = generation.grayMask();
+    auto fullMask = generation.fullMask();
+
+    for(uint i = 0; i < fullMask->rows; ++i) {
+        for (uint j = 0; j < fullMask->cols; ++j) {
+            ASSERT_TRUE(fullMask->at<bool>(i, j) == whiteMask->at<bool>(i, j) |
+                                fullMask->at<bool>(i, j) == grayMask->at<bool>(i, j));
+        }
+    }
 }
 
 TEST(TestMaskgeneration, TestBlurredMask) {
