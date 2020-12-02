@@ -4,7 +4,6 @@
 
 #include "toolbox.h"
 #include <iostream>
-#include <unistd.h>
 
 int PLImg::histogramPeakWidth(cv::Mat hist, int peakPosition, float direction, float targetHeight) {
     float height = hist.at<float>(peakPosition) * targetHeight;
@@ -51,7 +50,7 @@ float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float
         alphaAngle.at<float>(i) = std::abs(90 - std::acos((y1 * y2 + x1 * x2) /
                 std::max(1e-15f, std::sqrt(x1*x1 + y1*y1) * std::sqrt(x2*x2 + y2*y2))) * 180 / M_PI);
     }
-
+    
     auto minIterator = std::min_element(alphaAngle.begin<float>()+1, alphaAngle.end<float>()-1);
     int minPos = std::distance(alphaAngle.begin<float>(), minIterator);
     return histLow + float(roiStart + minPos) * stepSize;

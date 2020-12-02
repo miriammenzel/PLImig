@@ -57,19 +57,18 @@ float PLImg::MaskGeneration::tRet() {
         // Generate histogram
         cv::Mat hist;
         cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
-        cv::normalize(hist, hist, 0, hist.rows, cv::NORM_MINMAX, CV_32F);
-        hist.convertTo(hist, CV_32FC1, 1.f/255);
 
         // Create kernel for convolution of histogram
         int kernelSize = histSize/20;
         cv::Mat kernel(kernelSize, 1, CV_32FC1);
         kernel.setTo(cv::Scalar(1.0f/float(kernelSize)));
         cv::filter2D(hist, hist, -1, kernel, cv::Point(-1, -1), 0, cv::BORDER_REPLICATE);
+        cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
         // TODO: Peaksuche
 
-        this->m_tRet = std::make_unique<float>(histogramPlateau(hist, -kernelSize / (2 * NUMBER_OF_BINS),
-                                                                1.0f - kernelSize / (2 * NUMBER_OF_BINS),
+        this->m_tRet = std::make_unique<float>(histogramPlateau(hist, -kernelSize / (2.0f * NUMBER_OF_BINS),
+                                                                1.0f - kernelSize / (2.0f * NUMBER_OF_BINS),
                                                                 1, 0, NUMBER_OF_BINS/2));
     }
     return *this->m_tRet;
@@ -87,14 +86,14 @@ float PLImg::MaskGeneration::tMin() {
 float PLImg::MaskGeneration::tMax() {
     if(!m_tMax) {
         int channels[] = {0};
-        float histBounds[] = {0.0f, 1.0f};
+        float histBounds[] = {0.0f, 1.0f+1e-15f};
         const float* histRange = { histBounds };
         int histSize = NUMBER_OF_BINS;
 
         cv::Mat hist;
         cv::calcHist(&(*m_transmittance), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
-        cv::normalize(hist, hist, 0, hist.rows, cv::NORM_MINMAX);
-        hist.convertTo(hist, CV_32FC1, 1.f/255);
+        std::vector<float> histVal(hist.begin<float>(), hist.end<float>());
+        cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
         this->m_tMax = std::make_unique<float>(histogramPlateau(hist,0.0f, 1.0f, -1, NUMBER_OF_BINS/2, NUMBER_OF_BINS));
     }
     return *this->m_tMax;

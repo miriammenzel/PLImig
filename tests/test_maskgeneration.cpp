@@ -12,30 +12,34 @@
 // Test function for histogram generation
 void f(std::vector<float>& x) {
     for(float & i : x) {
-        i = 1000.0f * exp(-2*i-5) + 1;
+        i = 11.0f / (i + 1.0f) + std::pow(4.0f, -i + 4.0f);
     }
 }
 
 TEST(TestMaskgeneration, TestTRet) {
-    auto x = std::vector<float>(128 / 0.01);
+    auto x = std::vector<float>(256*256);
     for(int i = 0; i < x.size(); ++i) {
-        x.at(i) = i * 0.01;
+        x.at(i) = float(i)/256.0f;
     }
 
-    auto y = std::vector<float>(128 / 0.01);
+    auto y = std::vector<float>(x.size());
     std::copy(x.begin(), x.end(), y.begin());
     f(y);
 
-    int sum = int(std::accumulate(y.begin(), y.end(), 0));
+    float sum = 0;
+    for(float i : y) {
+        sum += std::ceil(i);
+    }
     cv::Mat image(sum, 1, CV_32FC1);
 
-    // Fill image with random data
+    // Fill image with data
     unsigned current_index = 0;
-    float current_sum = 0;
+    unsigned current_sum = 0;
     for(int i = 0; i < image.rows; ++i) {
         image.at<float>(i) = x.at(current_index);
+
         ++current_sum;
-        if(current_sum > y.at(current_index)) {
+        if(current_sum > unsigned(y.at(current_index))) {
             ++current_index;
             current_sum = 0;
         }
@@ -44,7 +48,7 @@ TEST(TestMaskgeneration, TestTRet) {
 
     auto shared_ret = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(shared_ret, nullptr);
-    ASSERT_FLOAT_EQ(mask.tRet(), 10.0f * (1.0f/256.0f));
+    ASSERT_FLOAT_EQ(mask.tRet(), 4.0f * (1.0f/256.0f));
 }
 
 TEST(TestMaskgeneration, TestTTra) {
@@ -92,7 +96,38 @@ TEST(TestMaskgeneration, TestTMin) {
 }
 
 TEST(TestMaskgeneration, TestTMax) {
+    auto x = std::vector<float>(256*256);
+    for(int i = 0; i < x.size(); ++i) {
+        x.at(i) = float(i)/256.0f;
+    }
 
+    auto y = std::vector<float>(x.size());
+    std::copy(x.begin(), x.end(), y.begin());
+    f(y);
+    std::reverse(y.begin(), y.end());
+
+    float sum = 0;
+    for(float i : y) {
+        sum += std::ceil(i);
+    }
+    cv::Mat image(sum, 1, CV_32FC1);
+
+    // Fill image with data
+    unsigned current_index = 0;
+    unsigned current_sum = 0;
+    for(int i = 0; i < image.rows; ++i) {
+        image.at<float>(i) = x.at(current_index);
+
+        ++current_sum;
+        if(current_sum > unsigned(y.at(current_index))) {
+            ++current_index;
+            current_sum = 0;
+        }
+    }
+    cv::normalize(image, image, 0, 1, cv::NORM_MINMAX);
+    auto shared_tra = std::make_shared<cv::Mat>(image);
+    auto mask = PLImg::MaskGeneration(nullptr, shared_tra);
+    ASSERT_FLOAT_EQ(mask.tMax(), 250.0f * (1.0f/256.0f));
 }
 
 TEST(TestMaskgeneration, TestSetGet) {
