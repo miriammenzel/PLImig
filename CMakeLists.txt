@@ -45,6 +45,7 @@ find_package(HDF5 REQUIRED COMPONENTS C CXX)
 find_package(CUDAToolkit REQUIRED)
 find_package(TIFF REQUIRED)
 find_package(NIFTI REQUIRED)
+find_package(OpenMP REQUIRED)
 
 # Add headers to project
 add_subdirectory(extern/CLI11)
@@ -53,10 +54,38 @@ include_directories(${CUDAToolkit_INCLUDE_DIRS})
 include_directories(${NIFTI_INCLUDE_DIRS})
 include_directories(src/)
 
+set(SOURCE
+        src/inclination.cpp
+        src/maskgeneration.cpp
+        src/reader.cpp
+        src/toolbox.cpp
+        src/writer.cpp)
+
+set(HEADER
+        src/inclination.h
+        src/maskgeneration.h
+        src/reader.h
+        src/toolbox.h
+        src/writer.h)
+
 # Generate executable file
-add_executable(PLImg main.cpp src/reader.cpp src/writer.cpp src/maskgeneration.cpp src/toolbox.cpp)
+add_library(PLImg SHARED ${SOURCE})
 target_link_libraries(PLImg ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
-                            CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu)
+        CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu
+        OpenMP::OpenMP_CXX OpenMP::OpenMP_C)
+
+add_executable(PLIMaskGeneration PLImg.cpp)
+target_link_libraries(PLIMaskGeneration PLImg)
+add_executable(PLIInclination CalcIncl.cpp)
+target_link_libraries(PLIInclination PLImg)
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    install(TARGETS PLImg LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION lib)
+    install(TARGETS PLIMaskGeneration LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION bin)
+    install(TARGETS PLIInclination LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE DESTINATION bin)
+    install(DIRECTORY DESTINATION include/PLImg)
+    install(FILES ${HEADER} DESTINATION include/PLImg PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+endif()
 
 if(BUILD_TESTING)
    enable_testing()

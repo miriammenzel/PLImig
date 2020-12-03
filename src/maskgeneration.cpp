@@ -3,7 +3,6 @@
 //
 
 #include "maskgeneration.h"
-#include <iostream>
 
 PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) :
     m_retardation(std::move(retardation)), m_transmittance(std::move(transmittance)), m_tMin(nullptr), m_tMax(nullptr),
@@ -131,7 +130,97 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
     if(!m_blurredMask) {
-        m_blurredMask = std::make_shared<cv::Mat>();
+        m_blurredMask = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
+        std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(m_retardation->rows/10, m_retardation->cols/10, CV_32FC1);
+        std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(m_transmittance->rows/10, m_transmittance->cols/10, CV_32FC1);
+        MaskGeneration generation(small_retardation, small_transmittance);
+        int numPixels = m_retardation->rows * m_retardation->cols;
+        uint num_threads;
+        #pragma omp parallel default(shared)
+        num_threads = omp_get_num_threads();
+
+        std::vector<std::random_device> devices(num_threads);
+        std::vector<std::mt19937> random_engines(num_threads);
+        #pragma omp parallel for default(shared) schedule(static)
+        for(unsigned i = 0; i < num_threads; ++i) {
+            random_engines.at(i) = std::mt19937(devices.at(i)());
+        }
+        std::uniform_int_distribution<int> distribution(0, numPixels);
+        int selected_element;
+
+        std::vector<float> above_tRet;
+        std::vector<float> below_tRet;
+        std::vector<float> above_tTra;
+        std::vector<float> below_tTra;
+        above_tRet.reserve(BLURRED_MASK_ITERATIONS);
+        below_tRet.reserve(BLURRED_MASK_ITERATIONS);
+        above_tTra.reserve(BLURRED_MASK_ITERATIONS);
+        below_tTra.reserve(BLURRED_MASK_ITERATIONS);
+
+        float t_ret, t_tra;
+
+
+        for(unsigned i = 0; i < BLURRED_MASK_ITERATIONS; ++i) {
+            // Fill transmittance and retardation with random pixels from our base images
+            #pragma omp parallel for firstprivate(distribution, selected_element) schedule(static) default(shared)
+            for(int y = 0; y < small_retardation->rows; ++y) {
+                for (int x = 0; x < small_retardation->cols; ++x) {
+                    selected_element = distribution(random_engines.at(omp_get_thread_num()));
+                    small_retardation->at<float>(y, x) = m_retardation->at<float>(
+                            selected_element / m_retardation->cols, selected_element % m_retardation->cols);
+                    small_transmittance->at<float>(y, x) = m_transmittance->at<float>(
+                            selected_element / m_transmittance->cols, selected_element % m_transmittance->cols);
+                }
+            }
+
+            t_ret = generation.tRet();
+            if(t_ret > this->tRet()) {
+                above_tRet.push_back(t_ret);
+            } else if(t_ret < this->tRet()) {
+                below_tRet.push_back(t_ret);
+            }
+
+            t_tra = generation.tTra();
+            if(t_tra > this->tTra()) {
+                above_tTra.push_back(t_tra);
+            } else if(t_tra < this->tTra()) {
+                below_tTra.push_back(t_tra);
+            }
+        }
+
+        small_transmittance = nullptr;
+        small_retardation = nullptr;
+        generation.setModalities(nullptr, nullptr);
+
+        float diff_tRet_p = abs(std::accumulate(above_tRet.begin(), above_tRet.end(), 0) / fmax(1, above_tRet.size()) - tRet());
+        float diff_tRet_m = abs(std::accumulate(below_tRet.begin(), below_tRet.end(), 0) / fmax(1,below_tRet.size()) - tRet());
+        float diff_tTra_p = abs(std::accumulate(above_tTra.begin(), above_tTra.end(), 0) / fmax(1,above_tTra.size()) - tTra());
+        float diff_tTra_m = abs(std::accumulate(below_tTra.begin(), below_tTra.end(), 0) / fmax(1,below_tTra.size()) - tTra());
+
+        float diffTra, diffRet;
+        float tmpVal;
+        #pragma omp parallel for private(diffTra, diffRet, tmpVal) default(shared) schedule(static)
+        for(int y = 0; y < m_retardation->rows; ++y) {
+            for (int x = 0; x < m_retardation->cols; ++x) {
+                tmpVal = m_transmittance->at<float>(y, x) - tTra();
+                if(tmpVal > 0) {
+                    tmpVal = tmpVal / diff_tTra_p;
+                } else {
+                    tmpVal = tmpVal / diff_tTra_m;
+                }
+                diffTra = tmpVal;
+                tmpVal = m_retardation->at<float>(y, x) - tRet();
+                if(tmpVal > 0) {
+                    tmpVal = tmpVal / diff_tRet_p;
+                } else {
+                    tmpVal = tmpVal / diff_tRet_m;
+                }
+                diffRet = tmpVal;
+
+                m_blurredMask->at<float>(y, x) = (-erf(cos(3.0f*M_PI/4.0f - atan2(diffTra, diffRet)) *
+                        sqrt(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
+            }
+        }
     }
     return m_blurredMask;
 }
