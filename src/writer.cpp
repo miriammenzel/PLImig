@@ -85,7 +85,7 @@ void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) 
         std::error_code err;
         std::filesystem::create_directory(folder_name, err);
         if(err.value() != 0) {
-            throw std::runtime_error("Output folder could not be created! Please check your path and permissions");
+            throw std::runtime_error("Output folder " + folder_name + " could not be created! Please check your path and permissions");
         }
     }
 }
