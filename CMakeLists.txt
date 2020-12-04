@@ -41,7 +41,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 # Search for required packages and load them
 find_package(OpenCV REQUIRED)
-find_package(HDF5 REQUIRED COMPONENTS C CXX)
+find_package(HDF5 REQUIRED COMPONENTS C CXX HL)
 find_package(CUDAToolkit REQUIRED)
 find_package(TIFF REQUIRED)
 find_package(NIFTI REQUIRED)
@@ -52,6 +52,7 @@ add_subdirectory(extern/CLI11)
 include_directories(extern/CLI11/include)
 include_directories(${CUDAToolkit_INCLUDE_DIRS})
 include_directories(${NIFTI_INCLUDE_DIRS})
+include_directories(${HDF5_INCLUDE_DIR})
 include_directories(src/)
 
 set(SOURCE

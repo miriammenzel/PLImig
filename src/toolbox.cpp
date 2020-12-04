@@ -132,22 +132,32 @@ std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::
     // Convert image to NPP compatible datatype
     auto* hostNPPimage = (Npp32f*)image->data;
 
+    // Error objects
+    cudaError_t err;
+    NppStatus errCode;
+
     // Reserve memory on GPU for image and result image
     // Image
     Npp32f* deviceNPPimage;
-    cudaMalloc(&deviceNPPimage, image->rows * image->cols * sizeof(Npp32f));
+    err = cudaMalloc((void**) &deviceNPPimage, image->rows * image->cols * sizeof(Npp32f));
+    if(err != cudaSuccess) {
+        std::cerr << "Could not allocate enough memory for original transmittance \n";
+        std::cerr << cudaGetErrorName(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
     // Length of columns
     Npp32s nSrcStep = sizeof(Npp32f) * image->cols;
 
     // Result
     Npp32f* deviceNPPresult;
-    cudaMalloc(&deviceNPPresult, image->rows * image->cols * sizeof(Npp32f));
+    err = cudaMalloc((void **) &deviceNPPresult, image->rows * image->cols * sizeof(Npp32f));
+    if(err != cudaSuccess) {
+        std::cerr << "Could not allocate enough memory for median transmittance \n";
+        std::cerr << cudaGetErrorName(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
     // Length of columns
     Npp32s nDstStep = nSrcStep;
-
-    // Error objects
-    cudaError_t err;
-    NppStatus errCode;
 
     // Copy image from CPU to GPU
     err = cudaMemcpy(deviceNPPimage, hostNPPimage, image->rows * image->cols * sizeof(Npp32f), cudaMemcpyHostToDevice);
