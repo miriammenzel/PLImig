@@ -15,8 +15,6 @@ int main(int argc, char** argv) {
     std::vector<std::string> mask_files;
     std::string output_folder;
     std::string dataset;
-    bool detailed = false;
-    bool blurred = false;
 
     app.add_option("--itra, itra", transmittance_files, "Input transmittance files")
             ->required()
@@ -32,8 +30,6 @@ int main(int argc, char** argv) {
             ->check(CLI::ExistingDirectory);
     app.add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
             ->default_val("/Image");
-    app.add_flag("--detailed", detailed);
-    app.add_flag("--with_blurred", blurred);
 
     CLI11_PARSE(app, argc, argv);
 
@@ -44,7 +40,7 @@ int main(int argc, char** argv) {
     bool retardation_found, mask_found;
 
     PLImg::filters::runCUDAchecks();
-    for(auto transmittance_path : transmittance_files) {
+    for(const auto& transmittance_path : transmittance_files) {
         std::cout << transmittance_path << std::endl;
 
         transmittance_basename = transmittance_path.substr(transmittance_path.find_last_of('/')+1);
@@ -60,10 +56,10 @@ int main(int argc, char** argv) {
             retardation_basename = retardation_basename.replace(retardation_basename.find("Transmittance"), 13, "Retardation");
         }
         retardation_found = false;
-        for(unsigned i = 0; i < retardation_files.size(); ++i) {
-            if(retardation_files.at(i).find(retardation_basename) != std::string::npos) {
+        for(auto & retardation_file : retardation_files) {
+            if(retardation_file.find(retardation_basename) != std::string::npos) {
                 retardation_found = true;
-                retardation_path = retardation_files.at(i);
+                retardation_path = retardation_file;
                 break;
             }
         }
@@ -73,10 +69,10 @@ int main(int argc, char** argv) {
             mask_basename = mask_basename.replace(mask_basename.find("Retardation"), 11, "Mask");
         }
         mask_found = false;
-        for(unsigned i = 0; i < mask_files.size(); ++i) {
-            if(mask_files.at(i).find(mask_basename) != std::string::npos) {
+        for(auto & mask_file : mask_files) {
+            if(mask_file.find(mask_basename) != std::string::npos) {
                 mask_found = true;
-                mask_path = mask_files.at(i);
+                mask_path = mask_file;
                 break;
             }
         }
@@ -120,7 +116,7 @@ int main(int argc, char** argv) {
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
             writer.create_group(dataset);
             writer.write_dataset(dataset+"/Inclination", *inclination.inclination());
-            std::cout << "White mask generated and written" << std::endl;
+            std::cout << "Inclination generated and written" << std::endl;
 
             writer.close();
             std::cout << std::endl;

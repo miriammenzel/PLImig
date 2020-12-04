@@ -10,15 +10,19 @@
 int main(int argc, char** argv) {
     CLI::App app;
 
-    std::vector<std::string> input_files;
+    std::vector<std::string> transmittance_files;
+    std::vector<std::string> retardation_files;
     std::string output_folder;
     std::string dataset;
     bool detailed = false;
     bool blurred = false;
 
-    app.add_option("-i, --input, ifile", input_files, "Input transmittance files")
-                    ->required()
-                    ->check(CLI::ExistingFile);
+    app.add_option("--itra, itra", transmittance_files, "Input transmittance files")
+            ->required()
+            ->check(CLI::ExistingFile);
+    app.add_option("--iret, iret", retardation_files, "Input retardation files")
+            ->required()
+            ->check(CLI::ExistingFile);
     app.add_option("-o, --output, ofolder", output_folder, "Output folder")
                     ->required()
                     ->check(CLI::ExistingDirectory);
@@ -32,73 +36,90 @@ int main(int argc, char** argv) {
     PLImg::HDF5Writer writer;
     PLImg::MaskGeneration generation;
 
+    std::string transmittance_basename, retardation_basename, mask_basename, inclination_basename;
+    std::string retardation_path, mask_path;
+    bool retardation_found, mask_found;
+
     PLImg::filters::runCUDAchecks();
-    for(auto file : input_files) {
-        std::cout << file << std::endl;
+    for(const auto& transmittance_path : transmittance_files) {
+        std::cout << transmittance_path << std::endl;
 
+        transmittance_basename = transmittance_path.substr(transmittance_path.find_last_of('/')+1);
+        transmittance_basename = transmittance_basename.substr(0, transmittance_basename.find_last_of('.'));
         // Get name of retardation and check if transmittance has median filer applied.
-        auto retardation_path = file;
-        if (retardation_path.find("median10") != std::string::npos) {
-            retardation_path = file.replace(file.find("median10"), 8, "");
+        retardation_basename = std::string(transmittance_basename);
+        if (retardation_basename.find("median10") != std::string::npos) {
+            retardation_basename = retardation_basename.replace(retardation_basename.find("median10"), 8, "");
         }
-        if (retardation_path.find("NTransmittance") != std::string::npos) {
-            retardation_path = retardation_path.replace(retardation_path.find("NTransmittance"), 14, "Retardation");
+        if (retardation_basename.find("NTransmittance") != std::string::npos) {
+            retardation_basename = retardation_basename.replace(retardation_basename.find("NTransmittance"), 14, "Retardation");
         }
-        if (retardation_path.find("Transmittance") != std::string::npos) {
-            retardation_path = retardation_path.replace(retardation_path.find("Transmittance"), 13, "Retardation");
+        if (retardation_basename.find("Transmittance") != std::string::npos) {
+            retardation_basename = retardation_basename.replace(retardation_basename.find("Transmittance"), 13, "Retardation");
         }
-        auto basename = retardation_path.substr(retardation_path.find_last_of('/')+1);
-        if (basename.find("Retardation") != std::string::npos) {
-            basename = basename.replace(basename.find("Retardation"), 11, "Mask");
-            basename = basename.substr(0, basename.find_last_of('.'));
+        retardation_found = false;
+        for(auto & retardation_file : retardation_files) {
+            if(retardation_file.find(retardation_basename) != std::string::npos) {
+                retardation_found = true;
+                retardation_path = retardation_file;
+                break;
+            }
         }
+        if(retardation_found) {
+            mask_basename = std::string(retardation_basename);
+            if (mask_basename.find("Retardation") != std::string::npos) {
+                mask_basename = mask_basename.replace(mask_basename.find("Retardation"), 11, "Mask");
+            }
 
-        std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(PLImg::reader::imread(file, dataset));
-        std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(PLImg::reader::imread(retardation_path, dataset));
-        std::cout << "Files read" << std::endl;
+            std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(
+                    PLImg::reader::imread(transmittance_path, dataset));
+            std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(
+                    PLImg::reader::imread(retardation_path, dataset));
+            std::cout << "Files read" << std::endl;
 
-        std::shared_ptr<cv::Mat> medTransmittance = transmittance;
-        if (file.find("median10") == std::string::npos) {
-            // Generate med10Transmittance
-            medTransmittance = PLImg::filters::medianFilter(transmittance, 10);
-            // Write it to a file
-            std::string medTraName(basename);
-            medTraName.replace(basename.find("Mask"), 4, "median10NTransmittance");
-            // Set file
-            writer.set_path(output_folder+ "/" + medTraName + ".h5");
-            // Set dataset
-            std::string group = dataset.substr(0, dataset.find_last_of('/'));
-            // Create group and dataset
-            writer.create_group(group);
-            writer.write_dataset(dataset+"/", *medTransmittance);
+            std::shared_ptr<cv::Mat> medTransmittance = transmittance;
+            if (transmittance_path.find("median10") == std::string::npos) {
+                // Generate med10Transmittance
+                medTransmittance = PLImg::filters::medianFilter(transmittance, 10);
+                // Write it to a file
+                std::string medTraName(mask_basename);
+                medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittance");
+                // Set file
+                writer.set_path(output_folder + "/" + medTraName + ".h5");
+                // Set dataset
+                std::string group = dataset.substr(0, dataset.find_last_of('/'));
+                // Create group and dataset
+                writer.create_group(group);
+                writer.write_dataset(dataset + "/", *medTransmittance);
+                writer.close();
+            } else {
+                medTransmittance = transmittance;
+            }
+            transmittance = nullptr;
+            std::cout << "Med10Transmittance generated" << std::endl;
+
+            generation.setModalities(retardation, medTransmittance);
+            writer.set_path(output_folder + "/" + mask_basename + ".h5");
+            writer.create_group(dataset);
+            writer.write_attributes("/", generation.tTra(), generation.tRet(), generation.tMin(), generation.tMax());
+            std::cout << "Attributes generated and written" << std::endl;
+            writer.write_dataset(dataset + "/White", *generation.whiteMask());
+            std::cout << "White mask generated and written" << std::endl;
+            writer.write_dataset(dataset + "/Gray", *generation.grayMask());
+            std::cout << "Gray mask generated and written" << std::endl;
+
+            if (blurred) {
+                writer.write_dataset(dataset + "/Blurred", *generation.blurredMask());
+                std::cout << "Blurred mask generated and written" << std::endl;
+            }
+            if (detailed) {
+                writer.write_dataset(dataset + "/Full", *generation.fullMask());
+                writer.write_dataset(dataset + "/NoNerveFibers", *generation.noNerveFiberMask());
+                std::cout << "Detailed masks generated and written" << std::endl;
+            }
             writer.close();
-        } else {
-            medTransmittance = transmittance;
+            std::cout << std::endl;
         }
-        transmittance = nullptr;
-        std::cout << "Med10Transmittance generated" << std::endl;
-
-        generation.setModalities(retardation, medTransmittance);
-        writer.set_path(output_folder+ "/" + basename + ".h5");
-        writer.create_group(dataset);
-        writer.write_attributes("/", generation.tTra(), generation.tRet(), generation.tMin(), generation.tMax());
-        std::cout << "Attributes generated and written" << std::endl;
-        writer.write_dataset(dataset+"/White", *generation.whiteMask());
-        std::cout << "White mask generated and written" << std::endl;
-        writer.write_dataset(dataset+"/Gray", *generation.grayMask());
-        std::cout << "Gray mask generated and written" << std::endl;
-
-        if (blurred) {
-            writer.write_dataset(dataset+"/Blurred", *generation.blurredMask());
-            std::cout << "Blurred mask generated and written" << std::endl;
-        }
-        if (detailed) {
-            writer.write_dataset(dataset+"/Full", *generation.fullMask());
-            writer.write_dataset(dataset+"/NoNerveFibers", *generation.noNerveFiberMask());
-            std::cout << "Detailed masks generated and written" << std::endl;
-        }
-        writer.close();
-        std::cout << std::endl;
     }
 
     return EXIT_SUCCESS;
