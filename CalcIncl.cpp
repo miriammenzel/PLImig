@@ -15,21 +15,29 @@ int main(int argc, char** argv) {
     std::vector<std::string> mask_files;
     std::string output_folder;
     std::string dataset;
+    float im, ic, rmaxWhite, rmaxGray;
 
-    app.add_option("--itra, itra", transmittance_files, "Input transmittance files")
+    auto required = app.add_option_group("Required parameters");
+    required->add_option("--itra, itra", transmittance_files, "Input transmittance files")
             ->required()
             ->check(CLI::ExistingFile);
-    app.add_option("--iret, iret", retardation_files, "Input retardation files")
+    required->add_option("--iret, iret", retardation_files, "Input retardation files")
             ->required()
             ->check(CLI::ExistingFile);
-    app.add_option("--imask, imask", mask_files, "Input mask files from PLImg")
+    required->add_option("--imask, imask", mask_files, "Input mask files from PLImg")
             ->required()
             ->check(CLI::ExistingFile);
-    app.add_option("-o, --output, ofolder", output_folder, "Output folder")
+    required->add_option("-o, --output, ofolder", output_folder, "Output folder")
             ->required()
             ->check(CLI::ExistingDirectory);
-    app.add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
+
+    auto optional = app.add_option_group("Optional parameters");
+    optional->add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
             ->default_val("/Image");
+    optional->add_option("--im", im)->default_val(-1);
+    optional->add_option("--ic", ic)->default_val(-1);
+    optional->add_option("--rmaxWhite", rmaxWhite)->default_val(-1);
+    optional->add_option("--rmaxGray", rmaxGray)->default_val(-1);
 
     CLI11_PARSE(app, argc, argv);
 
@@ -83,6 +91,7 @@ int main(int argc, char** argv) {
                 inclination_basename = inclination_basename.replace(inclination_basename.find("Mask"), 4, "Inclination");
             }
 
+            // Read all files.
             std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(PLImg::reader::imread(transmittance_path, dataset));
             std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(PLImg::reader::imread(retardation_path, dataset));
             std::shared_ptr<cv::Mat> whiteMask = std::make_shared<cv::Mat>(PLImg::reader::imread(mask_path, dataset+"/White"));
@@ -91,6 +100,7 @@ int main(int argc, char** argv) {
             std::cout << "Files read" << std::endl;
 
             std::shared_ptr<cv::Mat> medTransmittance;
+            // If our given transmittance isn't already median filtered (based on it's file name)
             if (transmittance_path.find("median10") == std::string::npos) {
                 // Generate med10Transmittance
                 medTransmittance = PLImg::filters::medianFilter(transmittance, 10);
@@ -112,7 +122,22 @@ int main(int argc, char** argv) {
             transmittance = nullptr;
             std::cout << "Med10Transmittance generated" << std::endl;
 
+            // Set our read parameters
             inclination.setModalities(medTransmittance, retardation, blurredMask, whiteMask, grayMask);
+            // If manual parameters were given, apply them here
+            if(im >= 0) {
+                inclination.set_im(im);
+            }
+            if(ic >= 0) {
+                inclination.set_ic(ic);
+            }
+            if(rmaxWhite >= 0) {
+                inclination.set_rmaxWhite(rmaxWhite);
+            }
+            if(rmaxGray >= 0) {
+                inclination.set_im(rmaxGray);
+            }
+            // Create file and dataset. Write the inclination afterwards.
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
             writer.create_group(dataset);
             writer.write_dataset(dataset+"/Inclination", *inclination.inclination());
