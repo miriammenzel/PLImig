@@ -17,20 +17,33 @@ int main(int argc, char** argv) {
     bool detailed = false;
     bool blurred = false;
 
-    app.add_option("--itra, itra", transmittance_files, "Input transmittance files")
+    float tmin, tmax, tret, ttra;
+
+    auto required = app.add_option_group("Required parameters");
+    required->add_option("--itra, itra", transmittance_files, "Input transmittance files")
             ->required()
             ->check(CLI::ExistingFile);
-    app.add_option("--iret, iret", retardation_files, "Input retardation files")
+    required->add_option("--iret, iret", retardation_files, "Input retardation files")
             ->required()
             ->check(CLI::ExistingFile);
-    app.add_option("-o, --output, ofolder", output_folder, "Output folder")
+    required->add_option("-o, --output, ofolder", output_folder, "Output folder")
                     ->required()
                     ->check(CLI::ExistingDirectory);
-    app.add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
-                    ->default_val("/Image");
-    app.add_flag("--detailed", detailed);
-    app.add_flag("--with_blurred", blurred);
 
+    auto optional = app.add_option_group("Optional parameters");
+    optional->add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
+                    ->default_val("/Image");
+    optional->add_flag("--detailed", detailed);
+    optional->add_flag("--with_blurred", blurred);
+    auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
+    parameters->add_option("--ttra", ttra, "Average transmittance value of brightest retardation values")
+              ->default_val(-1);
+    parameters->add_option("--tret", tret, "Plateau in retardation histogram")
+              ->default_val(-1);
+    parameters->add_option("--tmin", tmin, "Average transmittance value of brightest retardation values")
+              ->default_val(-1);
+    parameters->add_option("--tmax", tmax, "Separator of gray matter and background")
+              ->default_val(-1);
     CLI11_PARSE(app, argc, argv);
 
     PLImg::HDF5Writer writer;
@@ -99,6 +112,18 @@ int main(int argc, char** argv) {
             std::cout << "Med10Transmittance generated" << std::endl;
 
             generation.setModalities(retardation, medTransmittance);
+            if(ttra >= 0) {
+                generation.set_tTra(ttra);
+            }
+            if(tret >= 0) {
+                generation.set_tRet(tret);
+            }
+            if(tmin >= 0) {
+                generation.set_tMin(tmin);
+            }
+            if(tmax >= 0) {
+                generation.set_tMax(tmax);
+            }
             writer.set_path(output_folder + "/" + mask_basename + ".h5");
             writer.create_group(dataset);
             writer.write_attributes("/", generation.tTra(), generation.tRet(), generation.tMin(), generation.tMax());
