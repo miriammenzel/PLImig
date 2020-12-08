@@ -5,6 +5,7 @@
 #ifndef PLIMG_TOOLBOX_H
 #define PLIMG_TOOLBOX_H
 
+#include "cuda/toolbox.cuh"
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
@@ -23,8 +24,7 @@ namespace PLImg {
     namespace filters {
         bool runCUDAchecks();
         std::shared_ptr<cv::Mat> medianFilter(const std::shared_ptr<cv::Mat>& image, int radius);
-        std::shared_ptr<cv::Mat> medianFilterMasked(std::shared_ptr<cv::Mat> image, std::shared_ptr<cv::Mat> mask,
-                                                    float radius);
+        std::shared_ptr<cv::Mat> medianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
     }
 }
 

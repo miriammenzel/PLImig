@@ -219,13 +219,13 @@ std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::
     // Remove padding added at the top of the function
     cv::Mat croppedImage = cv::Mat(result, cv::Rect(radius, radius, result.cols - 2 * radius, result.rows - 2 * radius));
     croppedImage.copyTo(result);
-    croppedImage = cv::Mat(*image, cv::Rect(radius, radius, result.cols - 2 * radius, result.rows - 2 * radius));
+    croppedImage = cv::Mat(*image, cv::Rect(radius, radius, image->cols - 2 * radius, image->rows - 2 * radius));
     croppedImage.copyTo(*image);
 
     return std::make_shared<cv::Mat>(result);
 }
 
-std::shared_ptr<cv::Mat> PLImg::filters::medianFilterMasked(std::shared_ptr<cv::Mat> image,
-                                                            std::shared_ptr<cv::Mat> mask, float radius) {
-    return std::make_shared<cv::Mat>();
+std::shared_ptr<cv::Mat> PLImg::filters::medianFilterMasked(const std::shared_ptr<cv::Mat>& image,
+                                                            const std::shared_ptr<cv::Mat>& mask) {
+    return callCUDAmedianFilterMasked(image, mask);
 }

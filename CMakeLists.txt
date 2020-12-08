@@ -38,6 +38,9 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+if(NOT DEFINED ${CMAKE_CUDA_ARCHITECTURES})
+    set(CMAKE_CUDA_ARCHITECTURES 60 61 70 75 80)
+endif()
 
 # Search for required packages and load them
 find_package(OpenCV REQUIRED)
@@ -60,14 +63,16 @@ set(SOURCE
         src/maskgeneration.cpp
         src/reader.cpp
         src/toolbox.cpp
-        src/writer.cpp)
+        src/writer.cpp
+        src/cuda/toolbox.cu)
 
 set(HEADER
         src/inclination.h
         src/maskgeneration.h
         src/reader.h
         src/toolbox.h
-        src/writer.h)
+        src/writer.h
+        src/cuda/toolbox.cuh)
 
 # Generate executable file
 add_library(PLImg SHARED ${SOURCE})

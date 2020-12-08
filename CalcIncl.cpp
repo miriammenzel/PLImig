@@ -2,6 +2,7 @@
 #include "writer.h"
 #include "inclination.h"
 #include "CLI/CLI.hpp"
+#include <opencv2/core.hpp>
 
 #include <vector>
 #include <string>
@@ -99,22 +100,25 @@ int main(int argc, char** argv) {
             std::shared_ptr<cv::Mat> blurredMask = std::make_shared<cv::Mat>(PLImg::reader::imread(mask_path, dataset+"/Blurred"));;
             std::cout << "Files read" << std::endl;
 
+            std::shared_ptr<cv::Mat> medTransmittanceWhite;
             std::shared_ptr<cv::Mat> medTransmittance;
             // If our given transmittance isn't already median filtered (based on it's file name)
             if (transmittance_path.find("median10") == std::string::npos) {
                 // Generate med10Transmittance
-                medTransmittance = PLImg::filters::medianFilter(transmittance, 10);
+                medTransmittance = PLImg::filters::medianFilterMasked(transmittance, grayMask);
+                medTransmittanceWhite = PLImg::filters::medianFilterMasked(transmittance, whiteMask);
+                cv::add(*medTransmittance, *medTransmittanceWhite, *medTransmittance, *whiteMask, CV_32FC1);
+                medTransmittanceWhite = nullptr;
                 // Write it to a file
                 std::string medTraName(mask_basename);
-                std::cout << mask_basename << std::endl;
-                medTraName.replace(medTraName.find("Mask"), 4, "median10NTransmittance");
+                medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittanceMasked");
                 // Set file
-                writer.set_path(output_folder+ "/" + medTraName + ".h5");
+                writer.set_path(output_folder + "/" + medTraName + ".h5");
                 // Set dataset
                 std::string group = dataset.substr(0, dataset.find_last_of('/'));
                 // Create group and dataset
                 writer.create_group(group);
-                writer.write_dataset(dataset+"/", *medTransmittance);
+                writer.write_dataset(dataset + "/", *medTransmittance);
                 writer.close();
             } else {
                 medTransmittance = transmittance;
