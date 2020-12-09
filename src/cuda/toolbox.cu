@@ -63,60 +63,33 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride, i
 }
 
 std::shared_ptr<cv::Mat> PLImg::filters::callCUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask) {
-    cv::copyMakeBorder(*image, *image, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
-    cv::copyMakeBorder(*mask, *mask, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
+    // Copy the result back to the CPU
+    cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
 
     // Error objects
     cudaError_t err;
 
-    float* deviceImage;
-    err = cudaMalloc((void**) &deviceImage, image->total() * image->elemSize());
+    uint numberOfChunks = 1;
+    uint chunksPerDim;
+    ulong freeMem;
+    err = cudaMemGetInfo(&freeMem, nullptr);
     if(err != cudaSuccess) {
-        std::cerr << "Could not allocate enough memory for original transmittance \n";
+        std::cerr << "Could not get free memory! \n";
         std::cerr << cudaGetErrorName(err) << std::endl;
         exit(EXIT_FAILURE);
     }
-    // Length of columns
-    ulong nSrcStep = image->cols;
+    if(double(image->total()) * image->elemSize() * 3.1 > double(freeMem)) {
+        numberOfChunks = fmax(1, ceil(log(image->total()) * image->elemSize() * 2.1 / double(freeMem)) / log(4));
+    }
+    chunksPerDim = fmax(1, numberOfChunks/2);
 
+    float* deviceImage, *deviceResult;
     uchar* deviceMask;
-    err = cudaMalloc((void**) &deviceMask, mask->total() * mask->elemSize());
-    if(err != cudaSuccess) {
-        std::cerr << "Could not allocate enough memory for mask \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
-    // Length of columns
-    ulong nMaskStep = mask->cols;
-
-    float* deviceResult;
-    err = cudaMalloc((void**) &deviceResult, image->total() * image->elemSize());
-    if(err != cudaSuccess) {
-        std::cerr << "Could not allocate enough memory for resulting image \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
-    // Length of columns
-    ulong nResStep = image->cols;
-
-    // Copy image from CPU to GPU
-    err = cudaMemcpy(deviceImage, image->data, image->total() * image->elemSize(), cudaMemcpyHostToDevice);
-    if(err != cudaSuccess) {
-        std::cerr << "Could not copy image from host to device \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaMemcpy(deviceMask, mask->data, mask->total() * mask->elemSize(), cudaMemcpyHostToDevice);
-    if(err != cudaSuccess) {
-        std::cerr << "Could not copy mask from host to device \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
+    uint xMin, xMax, yMin, yMax;
+    ulong nSrcStep, nMaskStep, nResStep;
     // Apply median filter
     // Set size where median filter will be applied
-    int2 roi = {image->cols - 2 * KERNEL_SIZE, image->rows - 2 * KERNEL_SIZE};
+    int2 roi;
     // Median kernel
     int2 anchor = {KERNEL_SIZE / 2, KERNEL_SIZE / 2};
     // Calculate offsets for image and result. Starting at the edge would result in errors because we would
@@ -124,40 +97,96 @@ std::shared_ptr<cv::Mat> PLImg::filters::callCUDAmedianFilterMasked(const std::s
     int2 pSrcOffset = {KERNEL_SIZE, KERNEL_SIZE};
     int2 pResultOffset = {KERNEL_SIZE, KERNEL_SIZE};
     int2 pMaskOffset = {KERNEL_SIZE, KERNEL_SIZE};
+    dim3 threadsPerBlock, numBlocks;
 
-    // Apply median filter
-    dim3 threadsPerBlock(NUM_THREADS, NUM_THREADS);
-    dim3 numBlocks(roi.x / threadsPerBlock.x, roi.y / threadsPerBlock.y);
+    cv::Mat subImage, subMask, subResult, croppedImage;
+    for(uint it = 0; it < numberOfChunks; ++it) {
+        // Calculate image boarders
+        xMin = (it % chunksPerDim) * image->cols / chunksPerDim;
+        xMax = fmin((it % chunksPerDim + 1) * image->cols / chunksPerDim, image->cols);
+        yMin = (it / chunksPerDim) * image->rows / chunksPerDim;
+        yMax = fmin((it / chunksPerDim + 1) * image->rows / chunksPerDim, image->rows);
 
-    // Run median filter
-    medianFilterMaskedKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep, pSrcOffset,
-                                                             deviceResult, nResStep, pResultOffset,
-                                                             deviceMask, nMaskStep, pMaskOffset,
-                                                             roi, anchor);
+        croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subImage);
+        croppedImage = cv::Mat(*mask, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subMask);
+        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subResult);
 
-    // Copy the result back to the CPU
-    cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
-    err = cudaMemcpy(result.data, deviceResult, image->total() * image->elemSize(), cudaMemcpyDeviceToHost);
-    if(err != cudaSuccess) {
-        std::cerr << "Could not copy image from device to host \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
+        cv::copyMakeBorder(subImage, subImage, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
+        cv::copyMakeBorder(subResult, subResult, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
+        cv::copyMakeBorder(subMask, subMask, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
+
+        err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for original transmittance \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        // Length of columns
+        nSrcStep = subImage.cols;
+
+        err = cudaMalloc((void **) &deviceMask, subMask.total() * subMask.elemSize());
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for mask \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        // Length of columns
+        nMaskStep = subMask.cols;
+
+        err = cudaMalloc((void **) &deviceResult, subImage.total() * subImage.elemSize());
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for resulting image \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        // Length of columns
+        nResStep = subResult.cols;
+
+        // Copy image from CPU to GPU
+        err = cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not copy image from host to device \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        err = cudaMemcpy(deviceMask, subMask.data, subMask.total() * subMask.elemSize(), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not copy mask from host to device \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // Apply median filter
+        roi = {subImage.cols - 2 * KERNEL_SIZE, subImage.rows - 2 * KERNEL_SIZE};
+        threadsPerBlock = dim3(NUM_THREADS, NUM_THREADS);
+        numBlocks = dim3(roi.x / threadsPerBlock.x, roi.y / threadsPerBlock.y);
+        // Run median filter
+        medianFilterMaskedKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep, pSrcOffset,
+                                                                 deviceResult, nResStep, pResultOffset,
+                                                                 deviceMask, nMaskStep, pMaskOffset,
+                                                                 roi, anchor);
+
+        err = cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not copy image from device to host \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // Free reserved memory
+        cudaFree(deviceImage);
+        cudaFree(deviceResult);
+        cudaFree(deviceMask);
+
+        cv::Rect srcRect = cv::Rect(KERNEL_SIZE, KERNEL_SIZE, subResult.cols - 2*KERNEL_SIZE, subResult.rows - 2*KERNEL_SIZE);
+        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+
+        subResult(srcRect).copyTo(result(dstRect));
     }
-
-    // Free reserved memory
-    cudaFree(deviceImage);
-    cudaFree(deviceResult);
-    cudaFree(deviceMask);
-
-    // Convert result data to OpenCV image for further calculations
-    // Remove padding added at the top of the function
-    cv::Mat croppedImage = cv::Mat(result, cv::Rect(KERNEL_SIZE, KERNEL_SIZE, result.cols - 2 * KERNEL_SIZE, result.rows - 2 * KERNEL_SIZE));
-    croppedImage.copyTo(result);
-    croppedImage = cv::Mat(*image, cv::Rect(KERNEL_SIZE, KERNEL_SIZE, image->cols - 2 * KERNEL_SIZE, image->rows - 2 * KERNEL_SIZE));
-    croppedImage.copyTo(*image);
-    croppedImage = cv::Mat(*mask, cv::Rect(KERNEL_SIZE, KERNEL_SIZE, mask->cols - 2 * KERNEL_SIZE, mask->rows - 2 * KERNEL_SIZE));
-    croppedImage.copyTo(*mask);
-
     return std::make_shared<cv::Mat>(result);
 }
 

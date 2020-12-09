@@ -21,8 +21,14 @@ namespace PLImg {
 
     cv::Mat imageRegionGrowing(const cv::Mat& image, float percentPixels = 0.05f);
 
-    namespace filters {
+
+    namespace cuda {
         bool runCUDAchecks();
+        ulong getTotalMemory();
+        ulong getFreeMemory();
+    }
+
+    namespace filters {
         std::shared_ptr<cv::Mat> medianFilter(const std::shared_ptr<cv::Mat>& image, int radius);
         std::shared_ptr<cv::Mat> medianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
     }

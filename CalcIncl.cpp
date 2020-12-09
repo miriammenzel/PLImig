@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
     std::string retardation_path, mask_path;
     bool retardation_found, mask_found;
 
-    PLImg::filters::runCUDAchecks();
+    PLImg::cuda::runCUDAchecks();
     for(const auto& transmittance_path : transmittance_files) {
         std::cout << transmittance_path << std::endl;
 

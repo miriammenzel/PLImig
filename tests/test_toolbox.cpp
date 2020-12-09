@@ -16,7 +16,7 @@ void f(std::vector<float>& x) {
 }
 
 TEST(TestToolbox, TestRunCudaChecks) {
-    ASSERT_TRUE(PLImg::filters::runCUDAchecks());
+    ASSERT_TRUE(PLImg::cuda::runCUDAchecks());
 }
 
 TEST(TestToolbox, TestHistogramPeakWidth) {
