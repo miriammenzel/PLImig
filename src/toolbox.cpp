@@ -100,7 +100,7 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
     return cv::Mat();
 }
 
-bool PLImg::filters::runCUDAchecks() {
+bool PLImg::cuda::runCUDAchecks() {
     printf("Checking if CUDA is running as expected.\n");
     const NppLibraryVersion *libVer = nppGetLibVersion();
 
@@ -126,99 +126,149 @@ bool PLImg::filters::runCUDAchecks() {
 
 }
 
+ulong PLImg::cuda::getFreeMemory() {
+    ulong free;
+    cudaError_t err;
+    err = cudaMemGetInfo(&free, nullptr);
+    if(err != cudaSuccess) {
+        std::cerr << "Could not get total memory! \n";
+        std::cerr << cudaGetErrorName(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    return free;
+}
+
+ulong PLImg::cuda::getTotalMemory() {
+    ulong total;
+    cudaError_t err;
+    err = cudaMemGetInfo(nullptr, &total);
+    if(err != cudaSuccess) {
+        std::cerr << "Could not get total memory! \n";
+        std::cerr << cudaGetErrorName(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    return total;
+}
+
 std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::Mat>& image, int radius) {
     // Add padding to image
-    cv::copyMakeBorder(*image, *image, radius, radius, radius, radius, cv::BORDER_REPLICATE);
+    cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
 
     // Error objects
     cudaError_t err;
     NppStatus errCode;
 
-    // Reserve memory on GPU for image and result image
-    // Image
-    Npp32f* deviceNPPimage;
-    err = cudaMalloc((void**) &deviceNPPimage, image->total() * image->elemSize());
-    if(err != cudaSuccess) {
-        std::cerr << "Could not allocate enough memory for original transmittance \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
+    Npp32u numberOfChunks = 1;
+    Npp32u chunksPerDim;
+    if(double(image->total()) * image->elemSize() * 2.1 > double(PLImg::cuda::getFreeMemory())) {
+        numberOfChunks = fmax(1, ceil(log(image->total()) * image->elemSize() * 2.1 / double(PLImg::cuda::getFreeMemory())) / log(4));
     }
-    // Length of columns
-    Npp32s nSrcStep = sizeof(Npp32f) * image->cols;
+    chunksPerDim = fmax(1, numberOfChunks/2);
 
-    // Result
-    Npp32f* deviceNPPresult;
-    err = cudaMalloc((void **) &deviceNPPresult, image->total() * image->elemSize());
-    if(err != cudaSuccess) {
-        std::cerr << "Could not allocate enough memory for median transmittance \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
+    Npp32f *deviceImage, *deviceResult;
+    Npp8u *deviceBuffer;
+    Npp32s nSrcStep, nDstStep;
+    Npp32u bufferSize, pSrcOffset, pDstOffset;
+    NppiSize roi, mask;
+    NppiPoint anchor;
+    Npp32u xMin, xMax, yMin, yMax;
+    cv::Mat subImage, subResult, croppedImage;
+    for(Npp32u it = 0; it < numberOfChunks; ++it) {
+        // Calculate image boarders
+        xMin = (it % chunksPerDim) * image->cols / chunksPerDim;
+        xMax = fmin((it % chunksPerDim + 1) * image->cols / chunksPerDim, image->cols);
+        yMin = (it / chunksPerDim) * image->rows / chunksPerDim;
+        yMax = fmin((it / chunksPerDim + 1) * image->rows / chunksPerDim, image->rows);
+
+        croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subImage);
+        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subResult);
+
+        cv::copyMakeBorder(subImage, subImage, radius, radius, radius, radius, cv::BORDER_REPLICATE);
+        cv::copyMakeBorder(subResult, subResult, radius, radius, radius, radius, cv::BORDER_REPLICATE);
+
+        // Reserve memory on GPU for image and result image
+        // Image
+        err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for original transmittance \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        // Length of columns
+        nSrcStep = sizeof(Npp32f) * subImage.cols;
+
+        // Result
+        err = cudaMalloc((void **) &deviceResult, subImage.total() * subImage.elemSize());
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for median transmittance \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        // Length of columns
+        nDstStep = nSrcStep;
+
+        // Copy image from CPU to GPU
+        err = cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not copy image from host to device \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // Apply median filter
+        // Set size where median filter will be applied
+        roi = {subImage.cols - 2 * radius, subImage.rows - 2 * radius};
+        // Median kernel
+        mask = {radius, radius};
+        anchor = {radius / 2, radius / 2};
+        // Calculate offsets for image and result. Starting at the edge would result in errors because we would
+        // go out of bounds.
+        pSrcOffset = radius + radius * nSrcStep / sizeof(Npp32f);
+        pDstOffset = radius + radius * nDstStep / sizeof(Npp32f);
+
+        // Get buffer size for median filter and allocate memory accordingly
+        errCode = nppiFilterMedianGetBufferSize_32f_C1R(roi, mask, &bufferSize);
+        if (errCode != NPP_SUCCESS) {
+            printf("NPP error: Could not get buffer size : %d\n", errCode);
+            exit(EXIT_FAILURE);
+        }
+
+        err = cudaMalloc((void **) &deviceBuffer, bufferSize);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not generate buffer for median filter application. Error code is: ";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // Apply median filter
+        errCode = nppiFilterMedian_32f_C1R((Npp32f *) (deviceImage + pSrcOffset), nSrcStep,
+                                           (Npp32f *) (deviceResult + pDstOffset), nDstStep, roi, mask, anchor,
+                                           deviceBuffer);
+        if (errCode != NPP_SUCCESS) {
+            printf("NPP error: Couldn't calculate median filtered image : %d\n", errCode);
+            exit(EXIT_FAILURE);
+        }
+
+        // Copy the result back to the CPU
+        err = cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not copy image from device to host \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // Free reserved memory
+        cudaFree(deviceImage);
+        cudaFree(deviceResult);
+        cudaFree(deviceBuffer);
+
+        cv::Rect srcRect = cv::Rect(radius, radius, subResult.cols - 2*radius, subResult.rows - 2*radius);
+        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+
+        subResult(srcRect).copyTo(result(dstRect));
     }
-    // Length of columns
-    Npp32s nDstStep = nSrcStep;
-
-    // Copy image from CPU to GPU
-    err = cudaMemcpy(deviceNPPimage, image->data, image->total() * image->elemSize(), cudaMemcpyHostToDevice);
-    if(err != cudaSuccess) {
-        std::cerr << "Could not copy image from host to device \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    // Apply median filter
-    // Set size where median filter will be applied
-    NppiSize roi = {image->cols - 2 * radius, image->rows - 2 * radius};
-    // Median kernel
-    NppiSize mask = {radius, radius};
-    NppiPoint anchor = {radius / 2, radius / 2};
-    // Calculate offsets for image and result. Starting at the edge would result in errors because we would
-    // go out of bounds.
-    uint pSrcOffset = radius + radius * nSrcStep / sizeof(Npp32f);
-    uint pResultOffset = radius + radius * nDstStep / sizeof(Npp32f);
-
-    // Get buffer size for median filter and allocate memory accordingly
-    Npp32u bufferSize;
-    errCode = nppiFilterMedianGetBufferSize_32f_C1R(roi, mask, &bufferSize);
-    if(errCode != NPP_SUCCESS) {
-        printf("NPP error: Could not get buffer size : %d\n", errCode);
-        exit(EXIT_FAILURE);
-    }
-    Npp8u* deviceBuffer = nullptr;
-    err = cudaMalloc((void**) &deviceBuffer, bufferSize);
-    if(err != cudaSuccess) {
-        std::cerr << "Could not generate buffer for median filter application. Error code is: ";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    // Apply median filter
-    errCode = nppiFilterMedian_32f_C1R((Npp32f*)(deviceNPPimage+pSrcOffset), nSrcStep, (Npp32f*)(deviceNPPresult+pResultOffset), nDstStep, roi, mask, anchor, deviceBuffer);
-    if(errCode != NPP_SUCCESS) {
-        printf("NPP error: Couldn't calculate median filtered image : %d\n", errCode);
-        exit(EXIT_FAILURE);
-    }
-
-    // Copy the result back to the CPU
-    cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
-    err = cudaMemcpy(result.data, deviceNPPresult, image->total() * image->elemSize(), cudaMemcpyDeviceToHost);
-    if(err != cudaSuccess) {
-        std::cerr << "Could not copy image from device to host \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    // Free reserved memory
-    cudaFree(deviceNPPimage);
-    cudaFree(deviceNPPresult);
-    cudaFree(deviceBuffer);
-
-    // Convert result data to OpenCV image for further calculations
-    // Remove padding added at the top of the function
-    cv::Mat croppedImage = cv::Mat(result, cv::Rect(radius, radius, result.cols - 2 * radius, result.rows - 2 * radius));
-    croppedImage.copyTo(result);
-    croppedImage = cv::Mat(*image, cv::Rect(radius, radius, image->cols - 2 * radius, image->rows - 2 * radius));
-    croppedImage.copyTo(*image);
-
     return std::make_shared<cv::Mat>(result);
 }
 
