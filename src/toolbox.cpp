@@ -131,7 +131,7 @@ ulong PLImg::cuda::getFreeMemory() {
     cudaError_t err;
     err = cudaMemGetInfo(&free, nullptr);
     if(err != cudaSuccess) {
-        std::cerr << "Could not get total memory! \n";
+        std::cerr << "Could not get free memory! \n";
         std::cerr << cudaGetErrorName(err) << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -151,7 +151,6 @@ ulong PLImg::cuda::getTotalMemory() {
 }
 
 std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::Mat>& image, int radius) {
-    // Add padding to image
     cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
 
     // Error objects
