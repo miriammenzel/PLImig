@@ -23,6 +23,7 @@ PLImg::Inclination::Inclination(sharedMat transmittance, sharedMat retardation,
     m_rmaxGray = nullptr;
     m_regionGrowingMask = nullptr;
     m_inclination = nullptr;
+    m_saturation = nullptr;
 }
 
 void PLImg::Inclination::setModalities(sharedMat transmittance, sharedMat retardation,
@@ -39,6 +40,7 @@ void PLImg::Inclination::setModalities(sharedMat transmittance, sharedMat retard
     m_rmaxGray = nullptr;
     m_regionGrowingMask = nullptr;
     m_inclination = nullptr;
+    m_saturation = nullptr;
 }
 
 void PLImg::Inclination::set_ic(float ic) {
@@ -173,4 +175,33 @@ sharedMat PLImg::Inclination::inclination() {
         }
     }
     return m_inclination;
+}
+
+sharedMat PLImg::Inclination::saturation() {
+    if(!m_saturation) {
+        m_saturation = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
+        float inc_val;
+        #pragma omp parallel for default(shared) private(inc_val)
+        for(uint y = 0; y < m_saturation->rows; ++y) {
+            for(uint x = 0; x < m_saturation->cols; ++x) {
+                inc_val = m_inclination->at<float>(y, x);
+                if(inc_val <= 0 | inc_val >= 90) {
+                    if (inc_val <= 0) {
+                       if (m_retardation->at<float>(y, x) > rmaxWhite()) {
+                           m_saturation->at<float>(y, x) = 1;
+                       } else {
+                           m_saturation->at<float>(y, x) = 3;
+                       }
+                    } else {
+                        if (m_retardation->at<float>(y, x) > rmaxWhite()) {
+                            m_saturation->at<float>(y, x) = 2;
+                        } else {
+                            m_saturation->at<float>(y, x) = 4;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return m_saturation;
 }

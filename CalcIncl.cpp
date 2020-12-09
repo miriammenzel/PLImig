@@ -17,6 +17,7 @@ int main(int argc, char** argv) {
     std::string output_folder;
     std::string dataset;
     float im, ic, rmaxWhite, rmaxGray;
+    bool detailed = false;
 
     auto required = app.add_option_group("Required parameters");
     required->add_option("--itra, itra", transmittance_files, "Input transmittance files")
@@ -35,6 +36,7 @@ int main(int argc, char** argv) {
     auto optional = app.add_option_group("Optional parameters");
     optional->add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
             ->default_val("/Image");
+    optional->add_flag("--detailed", detailed);
     optional->add_option("--im", im)->default_val(-1);
     optional->add_option("--ic", ic)->default_val(-1);
     optional->add_option("--rmaxWhite", rmaxWhite)->default_val(-1);
@@ -143,13 +145,18 @@ int main(int argc, char** argv) {
                 inclination.set_rmaxWhite(rmaxWhite);
             }
             if(rmaxGray >= 0) {
-                inclination.set_im(rmaxGray);
+                inclination.set_rmaxGray(rmaxGray);
             }
             // Create file and dataset. Write the inclination afterwards.
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
             writer.create_group(dataset);
             writer.write_dataset(dataset+"/Inclination", *inclination.inclination());
             std::cout << "Inclination generated and written" << std::endl;
+
+            if(detailed) {
+                writer.write_dataset(dataset+"/Saturation", *inclination.saturation());
+                std::cout << "Saturation image generated and written" << std::endl;
+            }
 
             writer.close();
             std::cout << std::endl;

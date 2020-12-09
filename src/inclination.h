@@ -33,10 +33,11 @@ namespace PLImg {
         void set_rmaxWhite(float rmaxWhite);
 
         sharedMat inclination();
+        sharedMat saturation();
     private:
         std::unique_ptr<float> m_im, m_ic, m_rmaxGray, m_rmaxWhite;
         std::unique_ptr<cv::Mat> m_regionGrowingMask;
-        sharedMat m_transmittance, m_retardation, m_inclination;
+        sharedMat m_transmittance, m_retardation, m_inclination, m_saturation;
         sharedMat m_blurredMask, m_whiteMask, m_grayMask;
 
     };

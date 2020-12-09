@@ -129,8 +129,6 @@ bool PLImg::filters::runCUDAchecks() {
 std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::Mat>& image, int radius) {
     // Add padding to image
     cv::copyMakeBorder(*image, *image, radius, radius, radius, radius, cv::BORDER_REPLICATE);
-    // Convert image to NPP compatible datatype
-    auto* hostNPPimage = (Npp32f*)image->data;
 
     // Error objects
     cudaError_t err;
@@ -139,7 +137,7 @@ std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::
     // Reserve memory on GPU for image and result image
     // Image
     Npp32f* deviceNPPimage;
-    err = cudaMalloc((void**) &deviceNPPimage, image->rows * image->cols * sizeof(Npp32f));
+    err = cudaMalloc((void**) &deviceNPPimage, image->total() * image->elemSize());
     if(err != cudaSuccess) {
         std::cerr << "Could not allocate enough memory for original transmittance \n";
         std::cerr << cudaGetErrorName(err) << std::endl;
@@ -150,7 +148,7 @@ std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::
 
     // Result
     Npp32f* deviceNPPresult;
-    err = cudaMalloc((void **) &deviceNPPresult, image->rows * image->cols * sizeof(Npp32f));
+    err = cudaMalloc((void **) &deviceNPPresult, image->total() * image->elemSize());
     if(err != cudaSuccess) {
         std::cerr << "Could not allocate enough memory for median transmittance \n";
         std::cerr << cudaGetErrorName(err) << std::endl;
@@ -160,7 +158,7 @@ std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::
     Npp32s nDstStep = nSrcStep;
 
     // Copy image from CPU to GPU
-    err = cudaMemcpy(deviceNPPimage, hostNPPimage, image->rows * image->cols * sizeof(Npp32f), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(deviceNPPimage, image->data, image->total() * image->elemSize(), cudaMemcpyHostToDevice);
     if(err != cudaSuccess) {
         std::cerr << "Could not copy image from host to device \n";
         std::cerr << cudaGetErrorName(err) << std::endl;
@@ -202,8 +200,7 @@ std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::
 
     // Copy the result back to the CPU
     cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
-    auto* hostNPPresult = (Npp32f*) result.data;
-    err = cudaMemcpy(hostNPPresult, deviceNPPresult, image->rows * image->cols * sizeof(Npp32f), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(result.data, deviceNPPresult, image->total() * image->elemSize(), cudaMemcpyDeviceToHost);
     if(err != cudaSuccess) {
         std::cerr << "Could not copy image from device to host \n";
         std::cerr << cudaGetErrorName(err) << std::endl;
