@@ -6,8 +6,8 @@
 #define PLIMG_READER_H
 
 #include <filesystem>
+#include <hdf5.h>
 #include <opencv2/core.hpp>
-#include <opencv2/hdf/hdf5.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <sys/stat.h>
 #include <tiffio.h>
