@@ -3,9 +3,8 @@
 //
 
 #include "reader.h"
-#include <iostream>
 
-inline bool PLImg::reader::fileExists(const std::string& filename) {
+bool PLImg::reader::fileExists(const std::string& filename) {
     struct stat buffer{};
     return (stat (filename.c_str(), &buffer) == 0);
 }
@@ -42,8 +41,7 @@ cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &
     } else if(H5Tequal(type, H5T_NATIVE_INT)) {
         matType = CV_32SC1;
     } else {
-        std::cout << "Datatype is currently not supported. Please contact the maintainer of the program!" << std::endl;
-        exit(EXIT_FAILURE);
+        throw std::runtime_error("Datatype is currently not supported. Please contact the maintainer of the program!");
     }
     cv::Mat image(dims[0], dims[1], matType);
     H5Dread(dset, type, dspace, H5S_ALL, H5S_ALL, image.data);

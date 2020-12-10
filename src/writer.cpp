@@ -7,7 +7,7 @@
 
 PLImg::HDF5Writer::HDF5Writer() {
     /* Save old error handler */
-    H5Eget_auto(H5E_DEFAULT, &errorFunction, &errorFunctionData);
+    m_filename = "";
 }
 
 std::string PLImg::HDF5Writer::path() {
@@ -26,125 +26,109 @@ void PLImg::HDF5Writer::write_attributes(std::string dataset, float t_tra, float
         dataset = dataset.substr(0, dataset.size()-1);
     }
 
-    hid_t attrSpace;
-    hid_t attrHandle;
-    hid_t groupHandle = H5Gopen1(m_hdf5File, "/");
-    switchHDF5ErrorHandling(false);
+    hsize_t dims[1] = {1};
+    H5::Attribute attr;
+    H5::DataSpace space(1, dims);
+    if(!m_hdf5file.attrExists(dataset+"t_tra")) {
+        attr = m_hdf5file.createAttribute(dataset + "t_tra", H5::PredType::NATIVE_FLOAT, space);
+    } else {
+        attr = m_hdf5file.openAttribute(dataset + "t_tra");
+    }
+    attr.write(H5::PredType::NATIVE_FLOAT, &t_tra);
+    attr.close();
 
-    H5Adelete(m_hdf5File, (dataset+"t_tra").c_str());
-    attrSpace = H5Screate(H5S_SCALAR);
-    attrHandle = H5Acreate1(groupHandle, "t_tra", H5T_IEEE_F32LE, attrSpace, H5P_DEFAULT);
-    H5Awrite(attrHandle, H5T_IEEE_F32LE, &t_tra);
-    H5Sclose(attrSpace);
-    H5Aclose(attrHandle);
+    if(!m_hdf5file.attrExists(dataset+"t_ret")) {
+        attr = m_hdf5file.createAttribute(dataset + "t_ret", H5::PredType::NATIVE_FLOAT, space);
+    } else {
+        attr = m_hdf5file.openAttribute(dataset + "t_ret");
+    }
+    attr.write(H5::PredType::NATIVE_FLOAT, &t_ret);
+    attr.close();
 
-    H5Adelete(m_hdf5File, (dataset+"t_ret").c_str());
-    attrSpace = H5Screate(H5S_SCALAR);
-    attrHandle = H5Acreate1(groupHandle, "t_ret", H5T_IEEE_F32LE, attrSpace, H5P_DEFAULT);
-    H5Awrite(attrHandle, H5T_IEEE_F32LE, &t_ret);
-    H5Sclose(attrSpace);
-    H5Aclose(attrHandle);
+    if(!m_hdf5file.attrExists(dataset+"t_min")) {
+        attr = m_hdf5file.createAttribute(dataset + "t_min", H5::PredType::NATIVE_FLOAT, space);
+    } else {
+        attr = m_hdf5file.openAttribute(dataset + "t_min");
+    }
+    attr.write(H5::PredType::NATIVE_FLOAT, &t_min);
+    attr.close();
 
-    H5Adelete(m_hdf5File, (dataset+"t_min").c_str());
-    attrSpace = H5Screate(H5S_SCALAR);
-    attrHandle = H5Acreate1(groupHandle, "t_min", H5T_IEEE_F32LE, attrSpace, H5P_DEFAULT);
-    H5Awrite(attrHandle, H5T_IEEE_F32LE, &t_min);
-    H5Sclose(attrSpace);
-    H5Aclose(attrHandle);
-
-    H5Adelete(m_hdf5File, (dataset+"t_max").c_str());
-    attrSpace = H5Screate(H5S_SCALAR);
-    attrHandle = H5Acreate1(groupHandle, "t_max", H5T_IEEE_F32LE, attrSpace, H5P_DEFAULT);
-    H5Awrite(attrHandle, H5T_IEEE_F32LE, &t_max);
-    H5Sclose(attrSpace);
-    H5Aclose(attrHandle);
-
-    switchHDF5ErrorHandling(true);
-    H5Gclose(groupHandle);
+    if(!m_hdf5file.attrExists(dataset+"t_max")) {
+        attr = m_hdf5file.createAttribute(dataset + "t_max", H5::PredType::NATIVE_FLOAT, space);
+    } else {
+        attr = m_hdf5file.openAttribute(dataset + "t_max");
+    }
+    attr.write(H5::PredType::NATIVE_FLOAT, &t_max);
+    attr.close();
 }
 
 void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat& image) {
-    hid_t dataHandle, spaceHandle;
-    hid_t dtype, memType;
-    switchHDF5ErrorHandling(false);
-    dataHandle = H5Dopen(m_hdf5File, dataset.c_str(), H5P_DEFAULT);
-    if(H5Eget_current_stack() >= 0) {
-        hsize_t dims[2] = {static_cast<hsize_t>(image.cols), static_cast<hsize_t>(image.rows)};
-        spaceHandle = H5Screate_simple(2, dims, nullptr);
+    H5::DataSet dset;
+    H5::DataSpace dataSpace;
+    hsize_t dims[2];
+    if(m_hdf5file.exists(dataset)) {
+        dset = m_hdf5file.openDataSet(dataset);
+        dataSpace = dset.getSpace();
+        dataSpace.getSimpleExtentDims(dims);
+        if(dims[0] == image.rows && dims[1] == image.cols) {
+            dset.write(image.data, dset.getDataType(), dataSpace);
+        } else {
+            throw std::runtime_error("Selected path is not empty and colums or rows do not match. Please check your path!");
+        }
+        dataSpace.close();
+        dset.close();
+    } else {
+        H5::DataType dtype;
         switch(image.type()) {
             case CV_32FC1:
-                dtype = H5T_IEEE_F32LE;
-                memType = H5T_NATIVE_FLOAT;
+                dtype = H5::PredType::NATIVE_FLOAT;
                 break;
             case CV_32SC1:
-                dtype = H5T_STD_I32LE;
-                memType = H5T_NATIVE_INT;
+                dtype = H5::PredType::NATIVE_INT;
                 break;
             case CV_8UC1:
-                dtype = H5T_STD_U8LE;
-                memType = H5T_NATIVE_UCHAR;
+                dtype = H5::PredType::NATIVE_UINT8;
                 break;
-            default:
-                std::cout << "Datatype is currently not supported. Please contact the maintainer of the program!" << std::endl;
-                exit(EXIT_FAILURE);
         }
-        // This means that no dataset with this name is present
-        dataHandle = H5Dcreate(m_hdf5File, dataset.c_str(), dtype, spaceHandle, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        H5Dwrite(dataHandle, memType, H5S_ALL, H5S_ALL, H5P_DEFAULT, image.data);
+        dims[0] = static_cast<hsize_t>(image.rows);
+        dims[1] = static_cast<hsize_t>(image.cols);
+        dataSpace = H5::DataSpace(2, dims);
+        dset = m_hdf5file.createDataSet(dataset, dtype, dataSpace);
+        dset.write(image.data, dtype);
 
-        H5Sclose(spaceHandle);
-        H5Dclose(dataHandle);
-    } else {
-        // This means that a dataset is already present. We'll try to override the data if the image dimensions are the same.
+        dset.close();
+        dataSpace.close();
+        dtype.close();
     }
-    switchHDF5ErrorHandling(true);
 }
 
 void PLImg::HDF5Writer::create_group(const std::string& group) {
     std::stringstream ss(group);
     std::string token;
     std::string groupString;
-    herr_t status;
-    switchHDF5ErrorHandling(false);
+
+    H5::Group gr;
     while (std::getline(ss, token, '/')) {
         groupString.append("/").append(token);
         if(!token.empty()) {
-            status = H5Gget_objinfo(m_hdf5File, groupString.c_str(), 0, nullptr);
-            if (status != 0) {
-                if(H5Gcreate1(m_hdf5File, groupString.c_str(), 0) != 0) {
-                    H5Eprint2(H5Eget_current_stack(), stderr);
-                    std::cerr << "Could not create group " << groupString << "! Exiting..." << std::endl;
-                    exit(EXIT_FAILURE);
-                }
+            if(!m_hdf5file.exists(groupString)) {
+                gr = m_hdf5file.createGroup(groupString);
+                gr.close();
             }
         }
     }
-    switchHDF5ErrorHandling(true);
-
 }
 
 void PLImg::HDF5Writer::close() {
-    switchHDF5ErrorHandling(true);
-    H5Fclose(m_hdf5File);
+    m_hdf5file.close();
 }
 
 void PLImg::HDF5Writer::open() {
     createDirectoriesIfMissing(m_filename);
     if(PLImg::reader::fileExists(m_filename)) {
-        m_hdf5File = H5Fopen(m_filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+        m_hdf5file = H5::H5File(m_filename, H5F_ACC_RDWR);
     } else {
-        m_hdf5File = H5Fcreate(m_filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    }
-    // first we need to create the parent group
-    herr_t status = H5Gget_objinfo(m_hdf5File, "/", 0, nullptr);
-    if(status != 0) {
-        switchHDF5ErrorHandling(false);
-        if (H5Gcreate1(m_hdf5File, "/", 0) != 0) {
-            H5Eprint2(H5Eget_current_stack(), stderr);
-            std::cerr << "Could not create group " << "/" << "! Exiting..." << std::endl;
-            exit(EXIT_FAILURE);
-        }
-        switchHDF5ErrorHandling(true);
+        m_hdf5file = H5::H5File(m_filename, H5F_ACC_TRUNC);
     }
 }
 
@@ -158,17 +142,6 @@ void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) 
         if(err.value() != 0) {
             throw std::runtime_error("Output folder " + folder_name + " could not LE created! Please check your path and permissions");
         }
-    }
-}
-
-void PLImg::HDF5Writer::switchHDF5ErrorHandling(bool on) {
-    if(on) {
-        H5Eset_auto(H5E_DEFAULT, errorFunction, errorFunctionData);
-    } else {
-        /* Save old error handler */
-        H5Eget_auto(H5E_DEFAULT, &errorFunction, &errorFunctionData);
-        /* Turn off error handling */
-        H5Eset_auto(H5E_DEFAULT, nullptr, nullptr);
     }
 }
 

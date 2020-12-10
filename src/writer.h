@@ -6,7 +6,7 @@
 #define PLIMG_WRITER_H
 
 #include <filesystem>
-#include <hdf5.h>
+#include <H5Cpp.h>
 #include <opencv2/core.hpp>
 #include "reader.h"
 
@@ -23,12 +23,9 @@ namespace PLImg {
     private:
         void open();
         static void createDirectoriesIfMissing(const std::string& filename);
-        void switchHDF5ErrorHandling(bool on);
 
         std::string m_filename;
-        hid_t m_hdf5File;
-        H5E_auto2_t errorFunction;
-        void* errorFunctionData;
+        H5::H5File m_hdf5file;
     };
 }
 
