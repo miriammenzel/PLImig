@@ -70,7 +70,6 @@ std::shared_ptr<cv::Mat> PLImg::filters::callCUDAmedianFilterMasked(const std::s
     cudaError_t err;
 
     uint numberOfChunks = 1;
-    uint chunksPerDim;
     ulong freeMem;
     err = cudaMemGetInfo(&freeMem, nullptr);
     if(err != cudaSuccess) {
@@ -81,7 +80,7 @@ std::shared_ptr<cv::Mat> PLImg::filters::callCUDAmedianFilterMasked(const std::s
     if(double(image->total()) * image->elemSize() * 3.1 > double(freeMem)) {
         numberOfChunks = fmax(1, ceil(log(image->total()) * image->elemSize() * 2.1 / double(freeMem)) / log(4));
     }
-    chunksPerDim = fmax(1, numberOfChunks/2);
+    uint chunksPerDim = fmax(1, numberOfChunks/2);
 
     float* deviceImage, *deviceResult;
     uchar* deviceMask;
