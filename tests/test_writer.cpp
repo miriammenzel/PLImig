@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include "H5Cpp.h"
 #include <opencv2/core.hpp>
+#include <opencv2/hdf.hpp>
 #include "writer.h"
 
 

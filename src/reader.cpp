@@ -47,6 +47,12 @@ cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &
     }
     cv::Mat image(dims[0], dims[1], matType);
     H5Dread(dset, type, dspace, H5S_ALL, H5S_ALL, image.data);
+
+    H5Tclose(type);
+    H5Sclose(dspace);
+    H5Dclose(dset);
+    H5Fclose(file);
+
     return image;
 }
 
