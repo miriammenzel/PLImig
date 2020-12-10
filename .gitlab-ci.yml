@@ -3,23 +3,18 @@ stages:
     - test
     - coverage
 
-variables:
-  APT_CACHE_DIR: $CI_PROJECT_DIR/apt
-
-
-cache:
-    paths:
-      - apt/
-
 
 before_script:
     - export DEBIAN_FRONTEND=noninteractive
     - apt-get update -qq && apt-get upgrade -y
-    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" gcc g++ cmake make build-essential file
-    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" libhdf5-dev
-    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" libopencv-dev
-    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" git
-    - apt-get install -y -o dir::cache::archives="$APT_CACHE_DIR" nvidia-cuda-toolkit
+    - apt-get install -y gcc g++ cmake make build-essential file git gcovr
+    - apt-get install -y libgtest-dev
+    - apt-get install -y libopencv-dev libhdf5-dev libnifti-dev
+    - cd /usr/src/gtest
+    - cmake CMakeLists.txt
+    - make
+    - cp ./lib/libgtest*.a /usr/lib
+    - cd -
     - git submodule update --init --recursive
 
 
