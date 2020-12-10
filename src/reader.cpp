@@ -4,7 +4,7 @@
 
 #include "reader.h"
 
-inline bool PLImg::reader::fileExists(const std::string& filename) {
+bool PLImg::reader::fileExists(const std::string& filename) {
     struct stat buffer{};
     return (stat (filename.c_str(), &buffer) == 0);
 }
@@ -24,10 +24,33 @@ cv::Mat PLImg::reader::imread(const std::string& filename, const std::string& da
 }
 
 cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &dataset) {
-    cv::Mat image;
-    cv::Ptr<cv::hdf::HDF5> h5io = cv::hdf::open( filename );
-    h5io->dsread(image, dataset);
-    h5io->close();
+    hid_t file, dspace, dset;
+    hsize_t dims[2];
+
+    file = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    dset = H5Dopen(file, dataset.c_str(), H5P_DEFAULT);
+    dspace = H5Dget_space(dset);
+    H5Sget_simple_extent_dims(dspace, dims, nullptr);
+
+    hid_t type = H5Dget_type(dset);
+    int matType;
+    if(H5Tequal(type, H5T_NATIVE_UCHAR)) {
+        matType = CV_8UC1;
+    } else if(H5Tequal(type, H5T_NATIVE_FLOAT)) {
+        matType = CV_32FC1;
+    } else if(H5Tequal(type, H5T_NATIVE_INT)) {
+        matType = CV_32SC1;
+    } else {
+        throw std::runtime_error("Datatype is currently not supported. Please contact the maintainer of the program!");
+    }
+    cv::Mat image(dims[0], dims[1], matType);
+    H5Dread(dset, type, dspace, H5S_ALL, H5S_ALL, image.data);
+
+    H5Tclose(type);
+    H5Sclose(dspace);
+    H5Dclose(dset);
+    H5Fclose(file);
+
     return image;
 }
 

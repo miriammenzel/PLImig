@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include "H5Cpp.h"
 #include <opencv2/core.hpp>
+#include <opencv2/hdf.hpp>
 #include "writer.h"
 
 
@@ -25,7 +26,7 @@ TEST(WriterTest, TestWriteAttributes) {
 
     auto file = H5::H5File("output/writer_test_1.h5", H5F_ACC_RDONLY);
 
-    double rtra, rret, rmin, rmax;
+    float rtra, rret, rmin, rmax;
 
     auto attr = file.openAttribute("t_tra");
     auto datatype = attr.getDataType();
