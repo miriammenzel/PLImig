@@ -66,8 +66,15 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
     H5::DataSet dset;
     H5::DataSpace dataSpace;
     hsize_t dims[2];
-    if(m_hdf5file.exists(dataset)) {
+    H5::Exception::dontPrint();
+    bool dataSetFound;
+    try {
         dset = m_hdf5file.openDataSet(dataset);
+        dataSetFound = true;
+    } catch (...) {
+        dataSetFound = false;
+    }
+    if(dataSetFound) {
         dataSpace = dset.getSpace();
         dataSpace.getSimpleExtentDims(dims);
         if(dims[0] == image.rows && dims[1] == image.cols) {
@@ -107,14 +114,15 @@ void PLImg::HDF5Writer::create_group(const std::string& group) {
     std::string token;
     std::string groupString;
 
+    H5::Exception::dontPrint();
     H5::Group gr;
     while (std::getline(ss, token, '/')) {
         groupString.append("/").append(token);
         if(!token.empty()) {
-            if(!m_hdf5file.exists(groupString)) {
+            try {
                 gr = m_hdf5file.createGroup(groupString);
                 gr.close();
-            }
+            } catch(...){}
         }
     }
 }
