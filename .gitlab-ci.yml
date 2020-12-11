@@ -7,6 +7,10 @@ stages:
 before_script:
     - export DEBIAN_FRONTEND=noninteractive
     - apt-get update -qq && apt-get upgrade -y
+    - apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+    - wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+    - apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main'
+    - apt-get update -qq
     - apt-get install -y gcc g++ cmake make build-essential file git gcovr
     - apt-get install -y libgtest-dev
     - apt-get install -y libopencv-dev libhdf5-dev libnifti-dev
