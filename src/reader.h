@@ -6,8 +6,8 @@
 #define PLIMG_READER_H
 
 #include <filesystem>
+#include <hdf5.h>
 #include <opencv2/core.hpp>
-#include <opencv2/hdf/hdf5.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <sys/stat.h>
 #include <tiffio.h>
@@ -16,7 +16,7 @@
 namespace PLImg {
     class reader {
     public:
-        static inline bool fileExists(const std::string& filename);
+        static bool fileExists(const std::string& filename);
         static cv::Mat imread(const std::string& filename, const std::string& dataset="/Image");
     private:
         static cv::Mat readHDF5(const std::string& filename, const std::string& dataset="/Image");
