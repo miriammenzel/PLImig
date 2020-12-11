@@ -160,7 +160,7 @@ std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::
     Npp32u numberOfChunks = 1;
     Npp32u chunksPerDim;
     if(double(image->total()) * image->elemSize() * 2.1 > double(PLImg::cuda::getFreeMemory())) {
-        numberOfChunks = fmax(1, ceil(log(image->total()) * image->elemSize() * 2.1 / double(PLImg::cuda::getFreeMemory())) / log(4));
+        numberOfChunks = fmax(1, pow(4, ceil(log(image->total() * image->elemSize() * 2.1 / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
     chunksPerDim = fmax(1, numberOfChunks/2);
 

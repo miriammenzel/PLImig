@@ -78,7 +78,7 @@ std::shared_ptr<cv::Mat> PLImg::filters::callCUDAmedianFilterMasked(const std::s
         exit(EXIT_FAILURE);
     }
     if(double(image->total()) * image->elemSize() * 3.1 > double(freeMem)) {
-        numberOfChunks = fmax(1, ceil(log(image->total()) * image->elemSize() * 2.1 / double(freeMem)) / log(4));
+        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 3.1 / double(freeMem)) / log(4))));
     }
     uint chunksPerDim = fmax(1, numberOfChunks/2);
 
