@@ -34,7 +34,7 @@ namespace PLImg {
 
         namespace labeling {
             cv::Mat connectedComponents (const cv::Mat& image);
-            cv::Mat largestComponent(const cv::Mat& connectedComponentsImage);
+            std::pair<cv::Mat, int> largestComponent(const cv::Mat& connectedComponentsImage);
         }
     }
 }

@@ -74,23 +74,22 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
         --front_bin;
     }
 
-    std::vector<float> histArr(hist.begin<float>(), hist.end<float>());
-
-    uint maxLabel, maxArea;
-    cv::Mat labelImage, statImage, centroidImage;
-
+    cv::Mat mask, labels;
+    std::pair<cv::Mat, int> component;
     while(front_bin > 0) {
-        cv::Mat mask = image > 0.15f;
-        cv::Mat labels = PLImg::cuda::labeling::connectedComponents(mask);
-        mask = PLImg::cuda::labeling::largestComponent(labels);
-        exit(EXIT_SUCCESS);
-        if(maxArea < pixelThreshold) {
+        mask = image > float(front_bin)/NUMBER_OF_BINS;
+        labels = PLImg::cuda::labeling::connectedComponents(mask);
+        mask.release();
+        component = PLImg::cuda::labeling::largestComponent(labels);
+        labels.release();
+
+        if(component.second < pixelThreshold) {
             --front_bin;
         } else {
-            return labelImage == maxLabel;
+            return component.first;
         }
     }
-    return cv::Mat();
+    return cv::Mat::ones(image.rows, image.cols, CV_8UC1);
 }
 
 bool PLImg::cuda::runCUDAchecks() {
@@ -369,7 +368,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         nextLabelNumber = nextLabelNumber + maxLabelNumber;
         errCode = nppiLabelMarkers_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, 0, nppiNormInf, &maxLabelNumber, deviceBuffer);
         if (errCode != NPP_SUCCESS) {
-            printf("NPP error: Could not get buffer size : %d\n", errCode);
+            printf("NPP error: Could not create labeling : %d\n", errCode);
             exit(EXIT_FAILURE);
         }
 
@@ -400,7 +399,6 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         bool somethingDidChange = true;
         int minVal;
         while(somethingDidChange) {
-            std::cout << "Hi" << std::endl;
             somethingDidChange = false;
             for (uint chunk = 0; chunk < numberOfChunks; ++chunk) {
                 xMin = (chunk % chunksPerDim) * image.cols / chunksPerDim;
@@ -455,6 +453,24 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     return result;
 }
 
-cv::Mat PLImg::cuda::labeling::largestComponent(const cv::Mat &connectedComponentsImage) {
-    return connectedComponentsImage;
+std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &connectedComponentsImage) {
+    double maxValue = 0;
+    cv::minMaxIdx(connectedComponentsImage, nullptr, &maxValue);
+    if(maxValue > 0) {
+        std::vector<int> occurences(int(maxValue) + 1);
+
+        #pragma omp declare reduction(vec_plus : std::vector<int> : std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<>())) initializer(omp_priv = omp_orig)
+        #pragma omp parallel for reduction(vec_plus : occurences) default(shared)
+        for(uint x = 0; x < connectedComponentsImage.cols; ++x) {
+            for(uint y = 0; y < connectedComponentsImage.rows; ++y) {
+                occurences.at(connectedComponentsImage.at<int>(y, x)) += 1;
+            }
+        }
+
+        maxValue = std::max_element(occurences.begin()+1, occurences.end()) - occurences.begin();
+        return std::pair<cv::Mat, int>(connectedComponentsImage == int(maxValue), occurences.at(maxValue));
+    } else {
+        return std::pair<cv::Mat, int>(cv::Mat(), 0);
+    }
+
 }

@@ -198,7 +198,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
             t_tra = generation.tTra();
             if(t_tra > this->tTra()) {
                 above_tTra.push_back(t_tra);
-            } else if(t_tra < this->tTra()) {
+            } else if(t_tra < this->tTra() && t_tra > 0) {
                 below_tTra.push_back(t_tra);
             }
         }
