@@ -82,9 +82,8 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
     while(front_bin > 0) {
         cv::Mat mask = image > 0.15f;
         cv::Mat labels = PLImg::cuda::labeling::connectedComponents(mask);
-        cv::imwrite("/tmp/labels.tiff", labels);
+        mask = PLImg::cuda::labeling::largestComponent(labels);
         exit(EXIT_SUCCESS);
-
         if(maxArea < pixelThreshold) {
             --front_bin;
         } else {
@@ -162,7 +161,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_pt
     if(double(image->total()) * image->elemSize() * 2.1 > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(1, pow(4, ceil(log(image->total() * image->elemSize() * 2.1 / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
-    chunksPerDim = fmax(1, numberOfChunks/2);
+    chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
 
     Npp32f *deviceImage, *deviceResult;
     Npp8u *deviceBuffer;
@@ -277,7 +276,6 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
 }
 
 cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
-    std::cout << image.type() << std::endl;
     PLImg::cuda::runCUDAchecks();
     cv::Mat result = cv::Mat(image.rows, image.cols, CV_32SC1);
 
@@ -285,21 +283,25 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     cudaError_t err;
     NppStatus errCode;
 
+    // Calculate the number of chunks for the Connected Components algorithm
     Npp32u numberOfChunks = 1;
     Npp32u chunksPerDim;
-    if(double(image.total()) * image.elemSize() * 2.1 > double(PLImg::cuda::getFreeMemory())) {
+    if(double(image.total()) * double(image.elemSize() + sizeof(Npp32u)) * 1.1 > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(1, pow(4, ceil(log(image.total() * image.elemSize() * 2.1 / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
-    numberOfChunks = 4;
-    chunksPerDim = fmax(1, numberOfChunks/2);
+    chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
 
+    // Chunked connected components algorithm.
+    // Labels right on the edges will be wrong. This will be fixed in the next step.
     Npp32u *deviceResult;
     Npp8u *deviceBuffer, *deviceImage;
     Npp32s nSrcStep, nDstStep, pSrcOffset, pDstOffset;
-    Npp32s bufferSize, maxLabelNumber;
+    Npp32s bufferSize;
     NppiSize roi;
-    Npp32u xMin, xMax, yMin, yMax;
-    cv::Mat subImage, subResult, croppedImage;
+    Npp32s xMin, xMax, yMin, yMax;
+    Npp32s nextLabelNumber = 0;
+    Npp32s maxLabelNumber = 0;
+    cv::Mat subImage, subResult, subMask, croppedImage;
     for(Npp32u it = 0; it < numberOfChunks; ++it) {
         // Calculate image boarders
         xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
@@ -311,6 +313,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         croppedImage.copyTo(subImage);
         croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
         croppedImage.copyTo(subResult);
+        croppedImage.release();
 
         cv::copyMakeBorder(subImage, subImage, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
         cv::copyMakeBorder(subResult, subResult, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
@@ -363,13 +366,12 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
             exit(EXIT_FAILURE);
         }
 
-        errCode = nppiLabelMarkers_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, 0, nppiNormL1, &maxLabelNumber, deviceBuffer);
+        nextLabelNumber = nextLabelNumber + maxLabelNumber;
+        errCode = nppiLabelMarkers_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, 0, nppiNormInf, &maxLabelNumber, deviceBuffer);
         if (errCode != NPP_SUCCESS) {
             printf("NPP error: Could not get buffer size : %d\n", errCode);
             exit(EXIT_FAILURE);
         }
-
-        std::cout << maxLabelNumber << std::endl;
 
         // Copy the result back to the CPU
         err = cudaMemcpy(subResult.data, deviceResult, subImage.total() * sizeof(Npp32u), cudaMemcpyDeviceToHost);
@@ -378,6 +380,10 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
             std::cerr << cudaGetErrorName(err) << std::endl;
             exit(EXIT_FAILURE);
         }
+        // Increase label number according to the previous chunk. Set background back to 0
+        subMask = subResult == 0;
+        subResult = subResult + cv::Scalar(nextLabelNumber, 0, 0);
+        subResult.setTo(0, subMask);
 
         // Free reserved memory
         cudaFree(deviceImage);
@@ -386,12 +392,69 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
 
         cv::Rect srcRect = cv::Rect(1, 1, subResult.cols - 2, subResult.rows - 2);
         cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
-        cv::imwrite("/tmp/"+std::to_string(it)+".tiff", subResult);
         subResult(srcRect).copyTo(result(dstRect));
+    }
+    // Iterate along the borders of each chunk to check if any labels overlap there. If that's the case
+    // replace the higher numbered label by the lower numbered label. Only apply if more than one chunk is present.
+    if(numberOfChunks > 1) {
+        bool somethingDidChange = true;
+        int minVal;
+        while(somethingDidChange) {
+            std::cout << "Hi" << std::endl;
+            somethingDidChange = false;
+            for (uint chunk = 0; chunk < numberOfChunks; ++chunk) {
+                xMin = (chunk % chunksPerDim) * image.cols / chunksPerDim;
+                xMax = fmin((chunk % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
+                yMin = (chunk / chunksPerDim) * image.rows / chunksPerDim;
+                yMax = fmin((chunk / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
+
+                // Check upper and lower border
+                for (uint x = xMin; x < xMax; ++x) {
+                    if (result.at<int>(yMin, x) > 0 && yMin - 1 >= 0) {
+                        if (result.at<int>(yMin - 1, x) > 0 && result.at<int>(yMin, x) != result.at<int>(yMin - 1, x)) {
+                            minVal = fmin(result.at<int>(yMin, x), result.at<int>(yMin - 1, x));
+                            result.setTo(minVal, result == result.at<int>(yMin, x));
+                            result.setTo(minVal, result == result.at<int>(yMin - 1, x));
+                            somethingDidChange = true;
+                        }
+                    }
+
+                    if (result.at<int>(yMax, x) > 0 && yMax + 1 < result.rows) {
+                        if (result.at<int>(yMax + 1, x) > 0 && result.at<int>(yMax, x) != result.at<int>(yMax + 1, x)) {
+                            minVal = fmin(result.at<int>(yMax, x), result.at<int>(yMax + 1, x));
+                            result.setTo(minVal, result == result.at<int>(yMax, x));
+                            result.setTo(minVal, result == result.at<int>(yMax + 1, x));
+                            somethingDidChange = true;
+                        }
+                    }
+                }
+
+                // Check left and right border
+                for (uint y = yMin; y < yMax; ++y) {
+                    if (result.at<int>(y, xMin) > 0 && xMin - 1 >= 0) {
+                        if (result.at<int>(y, xMin - 1) > 0 && result.at<int>(y, xMin) != result.at<int>(y, xMin - 1)) {
+                            minVal = fmin(result.at<int>(y, xMin),result.at<int>(y, xMin - 1));
+                            result.setTo(minVal, result == result.at<int>(y, xMin));
+                            result.setTo(minVal, result == result.at<int>(y, xMin - 1));
+                            somethingDidChange = true;
+                        }
+                    }
+
+                    if (result.at<int>(y, xMax) > 0 && xMax + 1 < result.cols) {
+                        if (result.at<int>(y, xMax+1) > 0 && result.at<int>(y, xMax+1) != result.at<int>(y, xMax)) {
+                            minVal = fmin(result.at<int>(y, xMax), result.at<int>(y, xMax+1));
+                            result.setTo(minVal, result == result.at<int>(y, xMax));
+                            result.setTo(minVal, result == result.at<int>(y, xMax+1));
+                            somethingDidChange = true;
+                        }
+                    }
+                }
+            }
+        }
     }
     return result;
 }
 
 cv::Mat PLImg::cuda::labeling::largestComponent(const cv::Mat &connectedComponentsImage) {
-
+    return connectedComponentsImage;
 }
