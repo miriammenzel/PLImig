@@ -81,15 +81,8 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
 
     while(front_bin > 0) {
         cv::Mat mask = image > float(front_bin)/NUMBER_OF_BINS;
-        cv::connectedComponentsWithStats(mask, labelImage, statImage, centroidImage);
-        maxArea = 0;
-        for(uint label = 1; label < statImage.rows; ++label) {
-            uint area = statImage.at<uint>(label, cv::CC_STAT_AREA);
-            if(area > maxArea) {
-                maxArea = area;
-                maxLabel = label;
-            }
-        }
+
+
 
         if(maxArea < pixelThreshold) {
             --front_bin;
@@ -127,6 +120,7 @@ bool PLImg::cuda::runCUDAchecks() {
 }
 
 ulong PLImg::cuda::getFreeMemory() {
+    PLImg::cuda::runCUDAchecks();
     ulong free;
     cudaError_t err;
     err = cudaMemGetInfo(&free, nullptr);
@@ -139,6 +133,7 @@ ulong PLImg::cuda::getFreeMemory() {
 }
 
 ulong PLImg::cuda::getTotalMemory() {
+    PLImg::cuda::runCUDAchecks();
     ulong total;
     cudaError_t err;
     err = cudaMemGetInfo(nullptr, &total);
@@ -150,7 +145,8 @@ ulong PLImg::cuda::getTotalMemory() {
     return total;
 }
 
-std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::Mat>& image, int radius) {
+std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_ptr<cv::Mat>& image, int radius) {
+    PLImg::cuda::runCUDAchecks();
     cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
 
     // Error objects
@@ -271,7 +267,7 @@ std::shared_ptr<cv::Mat> PLImg::filters::medianFilter(const std::shared_ptr<cv::
     return std::make_shared<cv::Mat>(result);
 }
 
-std::shared_ptr<cv::Mat> PLImg::filters::medianFilterMasked(const std::shared_ptr<cv::Mat>& image,
+std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::shared_ptr<cv::Mat>& image,
                                                             const std::shared_ptr<cv::Mat>& mask) {
     return callCUDAmedianFilterMasked(image, mask);
 }

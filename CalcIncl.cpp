@@ -118,9 +118,9 @@ int main(int argc, char** argv) {
                 writer.create_group(dataset);
 
                 // Generate med10Transmittance
-                medTransmittance = PLImg::filters::medianFilterMasked(transmittance, grayMask);
+                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, grayMask);
                 writer.write_dataset(dataset + "/Gray", *medTransmittance);
-                medTransmittanceWhite = PLImg::filters::medianFilterMasked(transmittance, whiteMask);
+                medTransmittanceWhite = PLImg::cuda::filters::medianFilterMasked(transmittance, whiteMask);
                 writer.write_dataset(dataset + "/White", *medTransmittanceWhite);
                 cv::add(*medTransmittance, *medTransmittanceWhite, *medTransmittance, *whiteMask, CV_32FC1);
                 writer.write_dataset(dataset + "/Full", *medTransmittance);

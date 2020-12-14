@@ -145,7 +145,7 @@ TEST(TestToolbox, TestMedianFilter) {
     test_img.data = (uchar*) test_arr.data();
 
     auto test_img_ptr = std::make_shared<cv::Mat>(test_img);
-    auto result_img = PLImg::filters::medianFilter(test_img_ptr, 1);
+    auto result_img = PLImg::cuda::filters::medianFilter(test_img_ptr, 1);
 
     std::vector<float> expected_arr = {1, 1, 3, 3, 3, 3, 2, 2, 3};
     cv::Mat expected_img(3, 3, CV_32FC1);

@@ -26,11 +26,11 @@ namespace PLImg {
         bool runCUDAchecks();
         ulong getTotalMemory();
         ulong getFreeMemory();
-    }
 
-    namespace filters {
-        std::shared_ptr<cv::Mat> medianFilter(const std::shared_ptr<cv::Mat>& image, int radius);
-        std::shared_ptr<cv::Mat> medianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
+        namespace filters {
+            std::shared_ptr<cv::Mat> medianFilter(const std::shared_ptr<cv::Mat>& image, int radius);
+            std::shared_ptr<cv::Mat> medianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
+        }
     }
 }
 
