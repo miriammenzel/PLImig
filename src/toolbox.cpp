@@ -80,9 +80,10 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
     cv::Mat labelImage, statImage, centroidImage;
 
     while(front_bin > 0) {
-        cv::Mat mask = image > float(front_bin)/NUMBER_OF_BINS;
-
-
+        cv::Mat mask = image > 0.15f;
+        cv::Mat labels = PLImg::cuda::labeling::connectedComponents(mask);
+        cv::imwrite("/tmp/labels.tiff", labels);
+        exit(EXIT_SUCCESS);
 
         if(maxArea < pixelThreshold) {
             --front_bin;
@@ -94,27 +95,30 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
 }
 
 bool PLImg::cuda::runCUDAchecks() {
-    printf("Checking if CUDA is running as expected.\n");
-    const NppLibraryVersion *libVer = nppGetLibVersion();
+    static bool didRunCudaChecks = false;
+    if(!didRunCudaChecks) {
+        printf("Checking if CUDA is running as expected.\n");
+        const NppLibraryVersion *libVer = nppGetLibVersion();
 
-    printf("NPP  Library Version: %d.%d.%d\n", libVer->major, libVer->minor,
-           libVer->build);
+        printf("NPP  Library Version: %d.%d.%d\n", libVer->major, libVer->minor,
+               libVer->build);
 
-    int driverVersion, runtimeVersion;
-    cudaDriverGetVersion(&driverVersion);
-    cudaRuntimeGetVersion(&runtimeVersion);
+        int driverVersion, runtimeVersion;
+        cudaDriverGetVersion(&driverVersion);
+        cudaRuntimeGetVersion(&runtimeVersion);
 
-    printf("CUDA Driver  Version: %d.%d\n", driverVersion / 1000,
-           (driverVersion % 100) / 10);
-    printf("CUDA Runtime Version: %d.%d\n", runtimeVersion / 1000,
-           (runtimeVersion % 100) / 10);
+        printf("CUDA Driver  Version: %d.%d\n", driverVersion / 1000,
+               (driverVersion % 100) / 10);
+        printf("CUDA Runtime Version: %d.%d\n", runtimeVersion / 1000,
+               (runtimeVersion % 100) / 10);
 
-    // Min spec is SM 1.0 devices
-    cudaDeviceProp deviceProperties{};
-    cudaGetDeviceProperties(&deviceProperties, 0);
-    printf("Compute capability: %d,%d\n", deviceProperties.major, deviceProperties.minor);
-    printf("Total memory: %.3f MiB\n", deviceProperties.totalGlobalMem / 1024.0 / 1024.0);
-
+        // Min spec is SM 1.0 devices
+        cudaDeviceProp deviceProperties{};
+        cudaGetDeviceProperties(&deviceProperties, 0);
+        printf("Compute capability: %d,%d\n", deviceProperties.major, deviceProperties.minor);
+        printf("Total memory: %.3f MiB\n", deviceProperties.totalGlobalMem / 1024.0 / 1024.0);
+        didRunCudaChecks = true;
+    }
     return true;
 
 }
@@ -270,4 +274,124 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_pt
 std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::shared_ptr<cv::Mat>& image,
                                                             const std::shared_ptr<cv::Mat>& mask) {
     return callCUDAmedianFilterMasked(image, mask);
+}
+
+cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
+    std::cout << image.type() << std::endl;
+    PLImg::cuda::runCUDAchecks();
+    cv::Mat result = cv::Mat(image.rows, image.cols, CV_32SC1);
+
+    // Error objects
+    cudaError_t err;
+    NppStatus errCode;
+
+    Npp32u numberOfChunks = 1;
+    Npp32u chunksPerDim;
+    if(double(image.total()) * image.elemSize() * 2.1 > double(PLImg::cuda::getFreeMemory())) {
+        numberOfChunks = fmax(1, pow(4, ceil(log(image.total() * image.elemSize() * 2.1 / double(PLImg::cuda::getFreeMemory())) / log(4))));
+    }
+    numberOfChunks = 4;
+    chunksPerDim = fmax(1, numberOfChunks/2);
+
+    Npp32u *deviceResult;
+    Npp8u *deviceBuffer, *deviceImage;
+    Npp32s nSrcStep, nDstStep, pSrcOffset, pDstOffset;
+    Npp32s bufferSize, maxLabelNumber;
+    NppiSize roi;
+    Npp32u xMin, xMax, yMin, yMax;
+    cv::Mat subImage, subResult, croppedImage;
+    for(Npp32u it = 0; it < numberOfChunks; ++it) {
+        // Calculate image boarders
+        xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
+        xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
+        yMin = (it / chunksPerDim) * image.rows / chunksPerDim;
+        yMax = fmin((it / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
+
+        croppedImage = cv::Mat(image, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subImage);
+        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subResult);
+
+        cv::copyMakeBorder(subImage, subImage, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
+        cv::copyMakeBorder(subResult, subResult, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
+
+        // Reserve memory on GPU for image and result image
+        // Image
+        err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for original mask \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        // Length of columns
+        nSrcStep = sizeof(Npp8u) * subImage.cols;
+
+        // Result
+        err = cudaMalloc((void **) &deviceResult, subImage.total() * sizeof(Npp32u));
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for result \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        // Length of columns
+        nDstStep = sizeof(Npp32u) * subImage.cols;
+
+        // Copy image from CPU to GPU
+        err = cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not copy image from host to device \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        roi = {subImage.cols - 2, subImage.rows - 2};
+        // Calculate offsets for image and result. Starting at the edge would result in errors because we would
+        // go out of bounds.
+        pSrcOffset = 1 + 1 * nSrcStep / sizeof(Npp8u);
+        pDstOffset = 1 + 1 * nDstStep / sizeof(Npp32u);
+
+        errCode = nppiLabelMarkersGetBufferSize_8u32u_C1R(roi, &bufferSize);
+        if (errCode != NPP_SUCCESS) {
+            printf("NPP error: Could not get buffer size : %d\n", errCode);
+            exit(EXIT_FAILURE);
+        }
+
+        err = cudaMalloc((void **) &deviceBuffer, bufferSize);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not generate buffer for Connected Components application. Error code is: ";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        errCode = nppiLabelMarkers_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, 0, nppiNormL1, &maxLabelNumber, deviceBuffer);
+        if (errCode != NPP_SUCCESS) {
+            printf("NPP error: Could not get buffer size : %d\n", errCode);
+            exit(EXIT_FAILURE);
+        }
+
+        std::cout << maxLabelNumber << std::endl;
+
+        // Copy the result back to the CPU
+        err = cudaMemcpy(subResult.data, deviceResult, subImage.total() * sizeof(Npp32u), cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not copy image from device to host \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // Free reserved memory
+        cudaFree(deviceImage);
+        cudaFree(deviceResult);
+        cudaFree(deviceBuffer);
+
+        cv::Rect srcRect = cv::Rect(1, 1, subResult.cols - 2, subResult.rows - 2);
+        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+        cv::imwrite("/tmp/"+std::to_string(it)+".tiff", subResult);
+        subResult(srcRect).copyTo(result(dstRect));
+    }
+    return result;
+}
+
+cv::Mat PLImg::cuda::labeling::largestComponent(const cv::Mat &connectedComponentsImage) {
+
 }
