@@ -44,6 +44,7 @@ void PLImg::MaskGeneration::set_tTra(float tTra) {
 
 float PLImg::MaskGeneration::tTra() {
     if(!m_tTra) {
+        std::cout << __PRETTY_FUNCTION__ << std::endl;
         this->m_tTra = std::make_unique<float>(tMin());
     }
     return *this->m_tTra;
@@ -51,6 +52,7 @@ float PLImg::MaskGeneration::tTra() {
 
 float PLImg::MaskGeneration::tRet() {
     if(!m_tRet) {
+        std::cout << __PRETTY_FUNCTION__ << std::endl;
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f};
         const float* histRange = { histBounds };
@@ -78,6 +80,7 @@ float PLImg::MaskGeneration::tRet() {
 
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
+        std::cout << __PRETTY_FUNCTION__ << std::endl;
         cv::Mat mask = imageRegionGrowing(*m_retardation);
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
@@ -87,6 +90,7 @@ float PLImg::MaskGeneration::tMin() {
 
 float PLImg::MaskGeneration::tMax() {
     if(!m_tMax) {
+        std::cout << __PRETTY_FUNCTION__ << std::endl;
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f+1e-15f};
         const float* histRange = { histBounds };
