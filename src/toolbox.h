@@ -6,11 +6,13 @@
 #define PLIMG_TOOLBOX_H
 
 #include "cuda/toolbox.cuh"
+#include <npp.h>
+#include <numeric>
+#include <omp.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include <vector>
-#include <npp.h>
 
 #define NUMBER_OF_BINS 256
 

@@ -58,8 +58,15 @@ include_directories(extern/CLI11/include)
 include_directories(${CUDAToolkit_INCLUDE_DIRS})
 include_directories(${NIFTI_INCLUDE_DIRS})
 include_directories(${HDF5_INCLUDE_DIR})
+include_directories(${OPENMP_C_INCLUDE_DIRS})
+include_directories(${OPENMP_CXX_INCLUDE_DIRS})
 include_directories(src/)
 
+# Set CXX and C flags for OpenMP
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
+set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} ${OPENMP_C_FLAGS})
+
+# Set source files
 set(SOURCE
         src/inclination.cpp
         src/maskgeneration.cpp
@@ -68,6 +75,7 @@ set(SOURCE
         src/writer.cpp
         src/cuda/toolbox.cu)
 
+# Set header files
 set(HEADER
         src/inclination.h
         src/maskgeneration.h
@@ -79,7 +87,7 @@ set(HEADER
 # Generate executable file
 add_library(PLImg SHARED ${SOURCE})
 target_link_libraries(PLImg ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
-        CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu
+        CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu CUDA::nppist
         OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem)
 
 add_executable(PLIMaskGeneration PLImg.cpp)

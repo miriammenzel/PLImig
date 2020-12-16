@@ -18,7 +18,7 @@ void f(std::vector<float>& x) {
 
 TEST(TestMaskgeneration, TestTRet) {
     auto x = std::vector<float>(256*256);
-    for(int i = 0; i < x.size(); ++i) {
+    for(ulong i = 0; i < x.size(); ++i) {
         x.at(i) = float(i)/256.0f;
     }
 
@@ -97,7 +97,7 @@ TEST(TestMaskgeneration, TestTMin) {
 
 TEST(TestMaskgeneration, TestTMax) {
     auto x = std::vector<float>(256*256);
-    for(int i = 0; i < x.size(); ++i) {
+    for(ulong i = 0; i < x.size(); ++i) {
         x.at(i) = float(i)/256.0f;
     }
 
@@ -146,8 +146,8 @@ TEST(TestMaskgeneration, TestWhiteMask) {
     cv::Mat retardation(30, 30, CV_32FC1);
     cv::Mat transmittance(30, 30, CV_32FC1);
 
-    for(uint i = 0; i < retardation.rows; ++i) {
-        for(uint j = 0; j < retardation.cols; ++j) {
+    for(int i = 0; i < retardation.rows; ++i) {
+        for(int j = 0; j < retardation.cols; ++j) {
             if(j < 15) {
                 retardation.at<float>(i, j) = 0.05f;
             } else {
@@ -174,12 +174,12 @@ TEST(TestMaskgeneration, TestWhiteMask) {
     generation.set_tMax(-1.0f);
 
     std::shared_ptr<cv::Mat> mask = generation.whiteMask();
-    for(uint i = 0; i < mask->rows; ++i) {
-        for(uint j = 0; j < mask->cols; ++j) {
-            if(i < 10 && j >= 15) {
-                ASSERT_TRUE(mask->at<bool>(i, j));
+    for(int i = 0; i < mask->rows; ++i) {
+        for(int j = 0; j < mask->cols; ++j) {
+            if(i < 10 | j >= 15) {
+                ASSERT_TRUE(mask->at<bool>(i, j));// << "i = " << i << ", j = " << j;
             } else {
-                ASSERT_FALSE(mask->at<bool>(i, j));
+                ASSERT_FALSE(mask->at<bool>(i, j));// << "i = " << i << ", j = " << j;
             }
         }
     }
@@ -189,15 +189,15 @@ TEST(TestMaskgeneration, TestGrayMask) {
     cv::Mat retardation(30, 30, CV_32FC1);
     cv::Mat transmittance(30, 30, CV_32FC1);
 
-    for(uint i = 0; i < retardation.rows; ++i) {
-        for(uint j = 0; j < retardation.cols; ++j) {
+    for(int i = 0; i < retardation.rows; ++i) {
+        for(int j = 0; j < retardation.cols; ++j) {
             if(j < 15) {
                 retardation.at<float>(i, j) = 0.05f;
             } else {
                 retardation.at<float>(i, j) = 0.15f;
             }
 
-            if(i < 10) {
+            if(i <= 10) {
                 transmittance.at<float>(i, j) = 0.05f;
             } else if (i < 20) {
                 transmittance.at<float>(i, j) = 0.80f;
@@ -217,12 +217,12 @@ TEST(TestMaskgeneration, TestGrayMask) {
     generation.set_tMax(0.9f);
 
     std::shared_ptr<cv::Mat> mask = generation.grayMask();
-    for(uint i = 0; i < mask->rows; ++i) {
-        for(uint j = 0; j < mask->cols; ++j) {
+    for(int i = 0; i < mask->rows; ++i) {
+        for(int j = 0; j < mask->cols; ++j) {
             if(i > 10 && i < 20 && j < 15) {
                 ASSERT_TRUE(mask->at<bool>(i, j));
             } else {
-                ASSERT_FALSE(mask->at<bool>(i, j));
+                ASSERT_FALSE(mask->at<bool>(i, j)) << "i = " << i << ", j = " << j;
             }
         }
     }
@@ -232,8 +232,8 @@ TEST(TestMaskgeneration, TestFullMask) {
     cv::Mat retardation(30, 30, CV_32FC1);
     cv::Mat transmittance(30, 30, CV_32FC1);
 
-    for(uint i = 0; i < retardation.rows; ++i) {
-        for(uint j = 0; j < retardation.cols; ++j) {
+    for(int i = 0; i < retardation.rows; ++i) {
+        for(int j = 0; j < retardation.cols; ++j) {
             if(j < 15) {
                 retardation.at<float>(i, j) = 0.05f;
             } else {
@@ -263,8 +263,8 @@ TEST(TestMaskgeneration, TestFullMask) {
     auto grayMask = generation.grayMask();
     auto fullMask = generation.fullMask();
 
-    for(uint i = 0; i < fullMask->rows; ++i) {
-        for (uint j = 0; j < fullMask->cols; ++j) {
+    for(int i = 0; i < fullMask->rows; ++i) {
+        for (int j = 0; j < fullMask->cols; ++j) {
             ASSERT_TRUE(fullMask->at<bool>(i, j) == whiteMask->at<bool>(i, j) |
                                 fullMask->at<bool>(i, j) == grayMask->at<bool>(i, j));
         }

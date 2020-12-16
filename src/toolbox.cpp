@@ -83,12 +83,17 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
         component = PLImg::cuda::labeling::largestComponent(labels);
         labels.release();
 
+        std::cout << "\r" << component.second << " " << pixelThreshold;
+        std::flush(std::cout);
+
         if(component.second < pixelThreshold) {
             --front_bin;
         } else {
+            std::cout << std::endl;
             return component.first;
         }
     }
+    std::cout << std::endl;
     return cv::Mat::ones(image.rows, image.cols, CV_8UC1);
 }
 
@@ -157,9 +162,11 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_pt
 
     Npp32u numberOfChunks = 1;
     Npp32u chunksPerDim;
-    if(double(image->total()) * image->elemSize() * 2.1 > double(PLImg::cuda::getFreeMemory())) {
-        numberOfChunks = fmax(1, pow(4, ceil(log(image->total() * image->elemSize() * 2.1 / double(PLImg::cuda::getFreeMemory())) / log(4))));
+    Npp32f predictedMemoryUsage = double(image->total()) * image->elemSize() * 2.1;
+    if(predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
+        numberOfChunks = fmax(1, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
+    numberOfChunks = 4;
     chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
 
     Npp32f *deviceImage, *deviceResult;
@@ -285,8 +292,9 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     // Calculate the number of chunks for the Connected Components algorithm
     Npp32u numberOfChunks = 1;
     Npp32u chunksPerDim;
-    if(double(image.total()) * double(image.elemSize() + sizeof(Npp32u)) * 1.1 > double(PLImg::cuda::getFreeMemory())) {
-        numberOfChunks = fmax(1, pow(4, ceil(log(image.total() * image.elemSize() * 2.1 / double(PLImg::cuda::getFreeMemory())) / log(4))));
+    Npp32f predictedMemoryUsage = float(image.total()) * float(image.elemSize() + 2 * sizeof(Npp32u));
+    if(predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
+        numberOfChunks = fmax(1, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
     chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
 
@@ -401,10 +409,10 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         while(somethingDidChange) {
             somethingDidChange = false;
             for (uint chunk = 0; chunk < numberOfChunks; ++chunk) {
-                xMin = (chunk % chunksPerDim) * image.cols / chunksPerDim;
-                xMax = fmin((chunk % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
+                xMin = (chunk % chunksPerDim) * result.cols / chunksPerDim;
+                xMax = fmin((chunk % chunksPerDim + 1) * result.cols / chunksPerDim, result.cols-1);
                 yMin = (chunk / chunksPerDim) * image.rows / chunksPerDim;
-                yMax = fmin((chunk / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
+                yMax = fmin((chunk / chunksPerDim + 1) * result.rows / chunksPerDim, result.rows-1);
 
                 // Check upper and lower border
                 for (uint x = xMin; x < xMax; ++x) {
@@ -454,23 +462,167 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
 }
 
 std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &connectedComponentsImage) {
-    double maxValue = 0;
-    cv::minMaxIdx(connectedComponentsImage, nullptr, &maxValue);
-    if(maxValue > 0) {
-        std::vector<int> occurences(int(maxValue) + 1);
+    PLImg::cuda::runCUDAchecks();
 
-        #pragma omp declare reduction(vec_plus : std::vector<int> : std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<>())) initializer(omp_priv = omp_orig)
-        #pragma omp parallel for reduction(vec_plus : occurences) default(shared)
-        for(uint x = 0; x < connectedComponentsImage.cols; ++x) {
-            for(uint y = 0; y < connectedComponentsImage.rows; ++y) {
-                occurences.at(connectedComponentsImage.at<int>(y, x)) += 1;
-            }
+    // Get max label
+    uint numLabels = 0;
+    #pragma omp parallel reduction(max:numLabels) shared(connectedComponentsImage)
+    {
+        uint numThreads = omp_get_num_threads();
+        uint myThread = omp_get_thread_num();
+        uint numElements = std::distance(connectedComponentsImage.begin<int>(), connectedComponentsImage.end<int>());
+        uint myStart = numElements / numThreads * myThread;
+        uint myEnd = fmin(numElements, numElements / numThreads * (myThread + 1));
+        numLabels = *std::max_element(connectedComponentsImage.begin<int>() + myStart, connectedComponentsImage.begin<int>() + myEnd);
+    }
+
+    if(numLabels > 1) {
+        // Error objects
+        cudaError_t err;
+        NppStatus errCode;
+
+        // Calculate the number of chunks for the Connected Components algorithm
+        Npp32u numberOfChunks = 1;
+        Npp32u chunksPerDim;
+        Npp32f predictedMemoryUsage =
+                1.1f * float(connectedComponentsImage.total()) * float(connectedComponentsImage.elemSize());
+        if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
+            numberOfChunks = fmax(1, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) /
+                                                 log(4))));
+        }
+        chunksPerDim = fmax(1, numberOfChunks / sqrt(numberOfChunks));
+
+        // Setup histograms and bins for nppi execution
+        std::vector<Npp32s> localHist = std::vector<Npp32s>(numLabels, 0);
+        std::vector<Npp32s> globalHist = std::vector<Npp32s>(numLabels, 0);
+        std::vector<Npp32f> bins = std::vector<float>(numLabels + 1, 1);
+
+        std::iota(bins.begin(), bins.end(), 0);
+
+        Npp32s *histBuffer;
+        Npp32f *binBuffer;
+        Npp32s xMin, xMax, yMin, yMax;
+        cv::Mat subImage, croppedImage;
+        Npp32f *deviceImage;
+        Npp8u *deviceBuffer;
+        NppiSize deviceROI;
+        Npp32s nSrcStep, bufferSize;
+        err = cudaMalloc((void **) &binBuffer, bins.size() * sizeof(Npp32f));
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for bins of histogram \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        // Copy bins from CPU to GPU
+        err = cudaMemcpy(binBuffer, bins.data(), bins.size() * sizeof(Npp32f), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not copy bins from host to device \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        err = cudaMalloc((void **) &histBuffer, localHist.size() * sizeof(Npp32s));
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory bins of histogram \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
         }
 
-        maxValue = std::max_element(occurences.begin()+1, occurences.end()) - occurences.begin();
-        return std::pair<cv::Mat, int>(connectedComponentsImage == int(maxValue), occurences.at(maxValue));
+        for (Npp32u it = 0; it < numberOfChunks; ++it) {
+            // Calculate image boarders
+            xMin = (it % chunksPerDim) * connectedComponentsImage.cols / chunksPerDim;
+            xMax = fmin((it % chunksPerDim + 1) * connectedComponentsImage.cols / chunksPerDim,
+                        connectedComponentsImage.cols);
+            yMin = (it / chunksPerDim) * connectedComponentsImage.rows / chunksPerDim;
+            yMax = fmin((it / chunksPerDim + 1) * connectedComponentsImage.rows / chunksPerDim,
+                        connectedComponentsImage.rows);
+
+            croppedImage = cv::Mat(connectedComponentsImage, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+            croppedImage.copyTo(subImage);
+            croppedImage.release();
+            subImage.convertTo(subImage, CV_32FC1);
+
+            // Reserve memory on GPU for image and result image
+            // Image
+            err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
+            if (err != cudaSuccess) {
+                std::cerr << "Could not allocate enough memory for original image \n";
+                std::cerr << cudaGetErrorName(err) << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            // Copy image from CPU to GPU
+            err = cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(),
+                             cudaMemcpyHostToDevice);
+            if (err != cudaSuccess) {
+                std::cerr << "Could not copy image from host to device \n";
+                std::cerr << cudaGetErrorName(err) << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            // Length of columns
+            nSrcStep = sizeof(Npp32f) * subImage.cols;
+            deviceROI = {subImage.cols, subImage.rows};
+
+            nppiHistogramRangeGetBufferSize_32f_C1R(deviceROI, numLabels + 1, &bufferSize);
+            err = cudaMalloc(&deviceBuffer, bufferSize);
+            if (err != cudaSuccess) {
+                std::cerr << "Could not allocate enough memory for buffer \n";
+                std::cerr << cudaGetErrorName(err) << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            errCode = nppiHistogramRange_32f_C1R(deviceImage, nSrcStep, deviceROI, histBuffer, binBuffer, numLabels + 1,
+                                                 deviceBuffer);
+            if (errCode != NPP_SUCCESS) {
+                printf("NPP error: Could not calculate histogram : %d\n", errCode);
+                exit(EXIT_FAILURE);
+            }
+
+            // Copy image from CPU to GPU
+            err = cudaMemcpy(localHist.data(), histBuffer, localHist.size() * sizeof(Npp32s), cudaMemcpyDeviceToHost);
+            if (err != cudaSuccess) {
+                std::cerr << "Could not copy image from device to host \n";
+                std::cerr << cudaGetErrorName(err) << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            #pragma omp parallel for default(shared)
+            for (uint i = 0; i < globalHist.size(); ++i) {
+                globalHist.at(i) += localHist.at(i);
+            }
+            cudaFree(deviceImage);
+            cudaFree(deviceBuffer);
+        }
+        cudaFree(binBuffer);
+        cudaFree(histBuffer);
+
+        int maxLabel = 0;
+        // Get number of threads for next step
+        uint numThreads;
+        #pragma omp parallel
+        numThreads = omp_get_num_threads();
+        // Create vector of maxima to get the maximum of maxima
+        std::vector<std::pair<int, int>> threadMaxLabels(numThreads);
+        #pragma omp parallel private(maxLabel)
+        {
+            uint myThread = omp_get_thread_num();
+            uint numElements = globalHist.end() - globalHist.begin() - 1;
+            uint myStart = numElements / numThreads * myThread;
+            uint myEnd = fmin(numElements, numElements / numThreads * (myThread + 1));
+            maxLabel = std::distance(globalHist.begin(), std::max_element(globalHist.begin()+1+myStart, globalHist.begin()+1+myEnd));
+            std::pair<int, int> myMaxLabel = std::pair<int, int>(maxLabel, globalHist.at(maxLabel));
+            threadMaxLabels.at(myThread) = myMaxLabel;
+        }
+        for(uint i = 0; i < numThreads; ++i) {
+            if(threadMaxLabels.at(i).second >= threadMaxLabels.at(maxLabel).second) {
+                maxLabel = i;
+            }
+        }
+        maxLabel = threadMaxLabels.at(maxLabel).first;
+        return std::pair<cv::Mat, int>(connectedComponentsImage == maxLabel, globalHist.at(maxLabel));
+    } else if(numLabels == 1){
+        return std::pair<cv::Mat, int>(connectedComponentsImage == 1, cv::countNonZero(connectedComponentsImage));
     } else {
         return std::pair<cv::Mat, int>(cv::Mat(), 0);
     }
-
 }

@@ -121,7 +121,7 @@ TEST(TestToolbox, TestImageRegionGrowing) {
     for(uint i = 0; i < 100; ++i) {
         for(uint j = 0; j < 100; ++j) {
             if(i > 10 && i < 20 && j > 10 && j < 15) {
-                test_retardation.at<float>(i, j) = 0.99f;
+                test_retardation.at<float>(i, j) = 0.975f;
                 test_transmittance.at<float>(i, j) = 0.3456f;
             } else {
                 test_retardation.at<float>(i, j) = 0.0f;
