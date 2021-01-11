@@ -3,23 +3,35 @@
 //
 
 #include "toolbox.cuh"
-#include <unistd.h>
+#include <chrono>
 
-__device__ void sortArray(float* array, uint minIdx, uint maxIdx, uint stopIdx) {
-    __shared__ float swap, minVal;
-    __shared__ int minPos;
-    for(uint i = minIdx; i < stopIdx; ++i) {
-        swap = array[i];
-        minVal = swap;
-        minPos = minIdx;
-        for(uint j = i+1; j < maxIdx; ++j) {
-            if(array[j] < minVal) {
-                minVal = array[j];
-                minPos = j;
+__device__ void shellSort(float* array, uint low, uint high) {
+    if(low < high) {
+        float* subArr = array + low;
+        uint n = high - low;
+        // Start with a big gap, then reduce the gap
+        for (uint gap = n/2; gap > 0; gap /= 2)
+        {
+            // Do a gapped insertion sort for this gap size.
+            // The first gap elements a[0..gap-1] are already in gapped order
+            // keep adding one more element until the entire array is
+            // gap sorted
+            for (uint i = gap; i < n; i += 1)
+            {
+                // add a[i] to the elements that have been gap sorted
+                // save a[i] in temp and make a hole at position i
+                float temp = subArr[i];
+
+                // shift earlier gap-sorted elements up until the correct
+                // location for a[i] is found
+                uint j;
+                for (j = i; j >= gap && subArr[j - gap] > temp; j -= gap)
+                    subArr[j] = subArr[j - gap];
+
+                //  put temp (the original a[i]) in its correct location
+                subArr[j] = temp;
             }
         }
-        array[minPos] = swap;
-        array[i] = minVal;
     }
 }
 
@@ -34,27 +46,22 @@ __global__ void medianFilterKernel(const float* image, int image_stride, int2 im
     uint rx = thread_x - anchor.x + result_offset.x;
     uint ry = thread_y - anchor.y + result_offset.y;
 
-    float buffer[4 * KERNEL_SIZE * KERNEL_SIZE];
     uint validValues = 0;
+    int cy_bound;
+
+    float buffer[4 * KERNEL_SIZE * KERNEL_SIZE];
 
     if(x > KERNEL_SIZE && x < roi.x && y > KERNEL_SIZE && y < roi.y) {
         // Transfer image pixels to our kernel for median filtering application
-        for (int cx = -KERNEL_SIZE; cx < KERNEL_SIZE; ++cx) {
-            for (int cy = -KERNEL_SIZE; cy < KERNEL_SIZE; ++cy) {
-                if(cx * cx + cy * cy < KERNEL_SIZE * KERNEL_SIZE) {
-                    buffer[validValues] = image[x + cx + (y + cy) * image_stride];
-                    ++validValues;
-                }
+        for (int cx = -KERNEL_SIZE; cx <= KERNEL_SIZE; ++cx) {
+            cy_bound = sqrtf(KERNEL_SIZE * KERNEL_SIZE - cx * cx);
+            for (int cy = -cy_bound; cy <= cy_bound; ++cy) {
+                buffer[validValues] = image[x + cx + (y + cy) * image_stride];
+                ++validValues;
             }
         }
-        if (validValues > 1) {
-            sortArray(buffer, 0, validValues, validValues / 2 + 1);
-            result_image[rx + ry * result_image_stride] = buffer[validValues / 2];
-        } else if (validValues == 1) {
-            result_image[rx + ry * result_image_stride] = buffer[0];
-        } else {
-            result_image[rx + ry * result_image_stride] = 0;
-        }
+        shellSort(buffer, 0, validValues);
+        result_image[rx + ry * result_image_stride] = buffer[validValues / 2];
     } else {
         result_image[rx + ry * result_image_stride] = 0;
     }
@@ -90,7 +97,7 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride, i
                 }
             }
             if (validValues > 1) {
-                sortArray(buffer, 0, validValues, validValues / 2 + 1);
+                shellSort(buffer, 0, validValues);
                 result_image[rx + ry * result_image_stride] = buffer[validValues / 2];
             } else if (validValues == 1) {
                 result_image[rx + ry * result_image_stride] = buffer[0];
@@ -120,7 +127,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         exit(EXIT_FAILURE);
     }
     if(double(image->total()) * image->elemSize() * 2.1 > double(freeMem)) {
-        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 3.1 / double(freeMem)) / log(4))));
+        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 2.1 / double(freeMem)) / log(4))));
     }
     uint chunksPerDim = fmax(1, numberOfChunks/2);
 
@@ -181,6 +188,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         }
 
         // Apply median filter
+        auto start = std::chrono::high_resolution_clock::now();
         roi = {subImage.cols - 2 * KERNEL_SIZE, subImage.rows - 2 * KERNEL_SIZE};
         threadsPerBlock = dim3(NUM_THREADS, NUM_THREADS);
         numBlocks = dim3(roi.x / threadsPerBlock.x, roi.y / threadsPerBlock.y);
@@ -188,6 +196,10 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         medianFilterKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep, pSrcOffset,
                                                            deviceResult, nResStep, pResultOffset,
                                                            roi, anchor);
+        cudaDeviceSynchronize();
+        auto finish = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = finish - start;
+        std::cout << "Elapsed time: " << elapsed.count() << " s\n";
 
         err = cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) {
