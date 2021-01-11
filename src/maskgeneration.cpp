@@ -135,7 +135,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
     cv::Scalar mean, stddev;
     cv::bitwise_not(*fullMask(), backgroundMask);
     cv::meanStdDev(*m_retardation, mean, stddev, backgroundMask);
-    cv::Mat mask = *m_retardation < mean[0] + 2*stddev[0];
+    cv::Mat mask = *m_retardation < mean[0] + 2*stddev[0] & *grayMask();
     return std::make_shared<cv::Mat>(mask);
 }
 
@@ -147,6 +147,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(m_transmittance->rows/10, m_transmittance->cols/10, CV_32FC1);
         MaskGeneration generation(small_retardation, small_transmittance);
         int numPixels = m_retardation->rows * m_retardation->cols;
+
         uint num_threads;
         #pragma omp parallel default(shared)
         num_threads = omp_get_num_threads();
@@ -187,6 +188,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
             }
 
             generation.setModalities(small_retardation, small_transmittance);
+            generation.set_tMin(this->tMin());
+            generation.set_tMax(this->tMax());
 
             t_ret = generation.tRet();
             if(t_ret > this->tRet()) {
@@ -208,9 +211,9 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         generation.setModalities(nullptr, nullptr);
 
         float diff_tRet_p = abs(std::accumulate(above_tRet.begin(), above_tRet.end(), 0) / fmax(1, above_tRet.size()) - tRet());
-        float diff_tRet_m = abs(std::accumulate(below_tRet.begin(), below_tRet.end(), 0) / fmax(1,below_tRet.size()) - tRet());
-        float diff_tTra_p = abs(std::accumulate(above_tTra.begin(), above_tTra.end(), 0) / fmax(1,above_tTra.size()) - tTra());
-        float diff_tTra_m = abs(std::accumulate(below_tTra.begin(), below_tTra.end(), 0) / fmax(1,below_tTra.size()) - tTra());
+        float diff_tRet_m = abs(std::accumulate(below_tRet.begin(), below_tRet.end(), 0) / fmax(1, below_tRet.size()) - tRet());
+        float diff_tTra_p = abs(std::accumulate(above_tTra.begin(), above_tTra.end(), 0) / fmax(1, above_tTra.size()) - tTra());
+        float diff_tTra_m = abs(std::accumulate(below_tTra.begin(), below_tTra.end(), 0) / fmax(1, below_tTra.size()) - tTra());
 
         float diffTra, diffRet;
         float tmpVal;
