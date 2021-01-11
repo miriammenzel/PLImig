@@ -5,19 +5,21 @@
 #include "toolbox.cuh"
 #include <unistd.h>
 
-__device__ void sortArray(float* array, uint start, uint stop) {
-    __shared__ float swap;
-    for (uint c = start ; c < stop - 1; c++)
-    {
-        for (uint d = start ; d < stop - c - 1; d++)
-        {
-            if (array[d] > array[d+1])
-            {
-                swap       = array[d];
-                array[d]   = array[d+1];
-                array[d+1] = swap;
+__device__ void sortArray(float* array, uint minIdx, uint maxIdx, uint stopIdx) {
+    __shared__ float swap, minVal;
+    __shared__ int minPos;
+    for(uint i = minIdx; i < stopIdx; ++i) {
+        swap = array[i];
+        minVal = swap;
+        minPos = minIdx;
+        for(uint j = i+1; j < maxIdx; ++j) {
+            if(array[j] < minVal) {
+                minVal = array[j];
+                minPos = j;
             }
         }
+        array[minPos] = swap;
+        array[i] = minVal;
     }
 }
 
@@ -46,7 +48,7 @@ __global__ void medianFilterKernel(const float* image, int image_stride, int2 im
             }
         }
         if (validValues > 1) {
-            sortArray(buffer, 0, validValues);
+            sortArray(buffer, 0, validValues, validValues / 2 + 1);
             result_image[rx + ry * result_image_stride] = buffer[validValues / 2];
         } else if (validValues == 1) {
             result_image[rx + ry * result_image_stride] = buffer[0];
@@ -88,7 +90,7 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride, i
                 }
             }
             if (validValues > 1) {
-                sortArray(buffer, 0, validValues);
+                sortArray(buffer, 0, validValues, validValues / 2 + 1);
                 result_image[rx + ry * result_image_stride] = buffer[validValues / 2];
             } else if (validValues == 1) {
                 result_image[rx + ry * result_image_stride] = buffer[0];
