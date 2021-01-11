@@ -6,18 +6,18 @@
 #include <chrono>
 
 __device__ void shellSort(float* array, uint low, uint high) {
+    // Using the Ciura, 2001 sequence for best performance
+    uint gaps[8] = {1, 4, 10, 23, 57, 132, 301, 701};
     if(low < high) {
         float* subArr = array + low;
         uint n = high - low;
-        // Start with a big gap, then reduce the gap
-        for (uint gap = n/2; gap > 0; gap /= 2)
-        {
+        for (int pos = 7; pos > 0; --pos) {
+            uint gap = gaps[pos];
             // Do a gapped insertion sort for this gap size.
             // The first gap elements a[0..gap-1] are already in gapped order
             // keep adding one more element until the entire array is
             // gap sorted
-            for (uint i = gap; i < n; i += 1)
-            {
+            for (uint i = gap; i < n; i += 1) {
                 // add a[i] to the elements that have been gap sorted
                 // save a[i] in temp and make a hole at position i
                 float temp = subArr[i];
@@ -25,10 +25,11 @@ __device__ void shellSort(float* array, uint low, uint high) {
                 // shift earlier gap-sorted elements up until the correct
                 // location for a[i] is found
                 uint j;
-                for (j = i; j >= gap && subArr[j - gap] > temp; j -= gap)
+                for (j = i; j >= gap && subArr[j - gap] > temp; j -= gap) {
                     subArr[j] = subArr[j - gap];
+                }
 
-                //  put temp (the original a[i]) in its correct location
+                // put temp (the original a[i]) in its correct location
                 subArr[j] = temp;
             }
         }
