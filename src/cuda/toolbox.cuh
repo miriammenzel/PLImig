@@ -14,6 +14,7 @@
 #define KERNEL_SIZE 10
 
 namespace PLImg::cuda::filters {
+    std::shared_ptr<cv::Mat> callCUDAmedianFilter(const std::shared_ptr<cv::Mat>& image);
     std::shared_ptr<cv::Mat> callCUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image,
                                                         const std::shared_ptr<cv::Mat>& mask);
 }

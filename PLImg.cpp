@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
 
     std::string transmittance_basename, retardation_basename, mask_basename, inclination_basename;
     std::string retardation_path, mask_path;
-    bool retardation_found, mask_found;
+    bool retardation_found;
 
     for(const auto& transmittance_path : transmittance_files) {
         std::cout << transmittance_path << std::endl;
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
             std::shared_ptr<cv::Mat> medTransmittance = transmittance;
             if (transmittance_path.find("median10") == std::string::npos) {
                 // Generate med10Transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilter(transmittance, 10);
+                medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
                 // Write it to a file
                 std::string medTraName(mask_basename);
                 medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittance");
