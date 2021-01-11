@@ -146,7 +146,7 @@ sharedMat PLImg::Inclination::inclination() {
                     blurredMaskVal = m_blurredMask->at<float>(y, x);
                     // If our blurred mask of PLImg has really low values, calculate the inclination only with the gray matter
                     // as it might result in saturation if both formulas are used
-                    if (blurredMaskVal < 0.01) {
+                    if(blurredMaskVal < 1e-3) {
                         blurredMaskVal = 0;
                     }
                     tmpVal = sqrt(

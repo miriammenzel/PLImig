@@ -6,11 +6,13 @@
 #define PLIMG_TOOLBOX_H
 
 #include "cuda/toolbox.cuh"
+#include <npp.h>
+#include <numeric>
+#include <omp.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include <vector>
-#include <npp.h>
 
 #define NUMBER_OF_BINS 256
 
@@ -26,11 +28,16 @@ namespace PLImg {
         bool runCUDAchecks();
         ulong getTotalMemory();
         ulong getFreeMemory();
-    }
 
-    namespace filters {
-        std::shared_ptr<cv::Mat> medianFilter(const std::shared_ptr<cv::Mat>& image, int radius);
-        std::shared_ptr<cv::Mat> medianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
+        namespace filters {
+            std::shared_ptr<cv::Mat> medianFilter(const std::shared_ptr<cv::Mat>& image, int radius);
+            std::shared_ptr<cv::Mat> medianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
+        }
+
+        namespace labeling {
+            cv::Mat connectedComponents (const cv::Mat& image);
+            std::pair<cv::Mat, int> largestComponent(const cv::Mat& connectedComponentsImage);
+        }
     }
 }
 

@@ -62,7 +62,7 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride, i
 
 }
 
-std::shared_ptr<cv::Mat> PLImg::filters::callCUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask) {
+std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask) {
     // Copy the result back to the CPU
     cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
 
