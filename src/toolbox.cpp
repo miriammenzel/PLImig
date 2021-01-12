@@ -100,6 +100,8 @@ cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
 bool PLImg::cuda::runCUDAchecks() {
     static bool didRunCudaChecks = false;
     if(!didRunCudaChecks) {
+        cudaError_t err;
+
         printf("Checking if CUDA is running as expected.\n");
 
         const NppLibraryVersion *libVer = nppGetLibVersion();
@@ -107,17 +109,32 @@ bool PLImg::cuda::runCUDAchecks() {
                libVer->build);
 
         int driverVersion, runtimeVersion;
-        cudaDriverGetVersion(&driverVersion);
-        cudaRuntimeGetVersion(&runtimeVersion);
-
+        err = cudaDriverGetVersion(&driverVersion);
+        if(err != cudaSuccess) {
+            std::cerr << "Could not get driver version! \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
         printf("CUDA Driver  Version: %d.%d\n", driverVersion / 1000,
                (driverVersion % 100) / 10);
+
+        err = cudaRuntimeGetVersion(&runtimeVersion);
+        if(err != cudaSuccess) {
+            std::cerr << "Could not get runtime version! \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
         printf("CUDA Runtime Version: %d.%d\n", runtimeVersion / 1000,
                (runtimeVersion % 100) / 10);
 
         // Min spec is SM 1.0 devices
         cudaDeviceProp deviceProperties{};
-        cudaGetDeviceProperties(&deviceProperties, 0);
+        err = cudaGetDeviceProperties(&deviceProperties, 0);
+        if(err != cudaSuccess) {
+            std::cerr << "Could not get device properties! \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
         printf("Compute capability: %d,%d\n", deviceProperties.major, deviceProperties.minor);
         printf("Total memory: %.3f MiB\n", deviceProperties.totalGlobalMem / 1024.0 / 1024.0);
         didRunCudaChecks = true;

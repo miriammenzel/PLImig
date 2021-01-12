@@ -50,12 +50,12 @@ __global__ void medianFilterKernel(const float* image, int image_stride, int2 im
     uint validValues = 0;
     int cy_bound;
 
-    float buffer[4 * KERNEL_SIZE * KERNEL_SIZE];
+    float buffer[4 * MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE];
 
-    if(x > KERNEL_SIZE && x < roi.x && y > KERNEL_SIZE && y < roi.y) {
+    if(x > MEDIAN_KERNEL_SIZE && x < roi.x && y > MEDIAN_KERNEL_SIZE && y < roi.y) {
         // Transfer image pixels to our kernel for median filtering application
-        for (int cx = -KERNEL_SIZE; cx <= KERNEL_SIZE; ++cx) {
-            cy_bound = sqrtf(KERNEL_SIZE * KERNEL_SIZE - cx * cx);
+        for (int cx = -MEDIAN_KERNEL_SIZE; cx <= MEDIAN_KERNEL_SIZE; ++cx) {
+            cy_bound = sqrtf(MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE - cx * cx);
             for (int cy = -cy_bound; cy <= cy_bound; ++cy) {
                 buffer[validValues] = image[x + cx + (y + cy) * image_stride];
                 ++validValues;
@@ -83,14 +83,17 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride, i
     uint mx = thread_x - anchor.x + mask_offset.x;
     uint my = thread_y - anchor.y + mask_offset.y;
 
-    float buffer[KERNEL_SIZE * KERNEL_SIZE];
     uint validValues = 0;
+    int cy_bound;
 
-    if(x > KERNEL_SIZE && x < roi.x && y > KERNEL_SIZE && y < roi.y) {
+    float buffer[4 * MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE];
+
+    if(x > MEDIAN_KERNEL_SIZE && x < roi.x && y > MEDIAN_KERNEL_SIZE && y < roi.y) {
         if(mask[mx + my * mask_stride]) {
             // Transfer image pixels to our kernel for median filtering application
-            for (uint cx = 0; cx < KERNEL_SIZE; ++cx) {
-                for (uint cy = 0; cy < KERNEL_SIZE; ++cy) {
+            for (int cx = -MEDIAN_KERNEL_SIZE; cx < MEDIAN_KERNEL_SIZE; ++cx) {
+                cy_bound = sqrtf(MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE - cx * cx);
+                for (int cy = -cy_bound; cy < cy_bound; ++cy) {
                     if (mask[mx + cx + (my + cy) * mask_stride] != 0) {
                         buffer[validValues] = image[x + cx + (y + cy) * image_stride];
                         ++validValues;
@@ -139,11 +142,11 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
     // Set size where median filter will be applied
     int2 roi;
     // Median kernel
-    int2 anchor = {KERNEL_SIZE, KERNEL_SIZE};
+    int2 anchor = {MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE};
     // Calculate offsets for image and result. Starting at the edge would result in errors because we would
     // go out of bounds.
-    int2 pSrcOffset = {KERNEL_SIZE, KERNEL_SIZE};
-    int2 pResultOffset = {KERNEL_SIZE, KERNEL_SIZE};
+    int2 pSrcOffset = {MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE};
+    int2 pResultOffset = {MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE};
     dim3 threadsPerBlock, numBlocks;
 
     cv::Mat subImage, subResult, croppedImage;
@@ -159,8 +162,8 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
         croppedImage.copyTo(subResult);
 
-        cv::copyMakeBorder(subImage, subImage, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
-        cv::copyMakeBorder(subResult, subResult, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
+        cv::copyMakeBorder(subImage, subImage, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+        cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
 
         err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
         if (err != cudaSuccess) {
@@ -190,8 +193,8 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
 
         // Apply median filter
         auto start = std::chrono::high_resolution_clock::now();
-        roi = {subImage.cols - 2 * KERNEL_SIZE, subImage.rows - 2 * KERNEL_SIZE};
-        threadsPerBlock = dim3(NUM_THREADS, NUM_THREADS);
+        roi = {subImage.cols - 2 * MEDIAN_KERNEL_SIZE, subImage.rows - 2 * MEDIAN_KERNEL_SIZE};
+        threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
         numBlocks = dim3(roi.x / threadsPerBlock.x, roi.y / threadsPerBlock.y);
         // Run median filter
         medianFilterKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep, pSrcOffset,
@@ -213,7 +216,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         cudaFree(deviceImage);
         cudaFree(deviceResult);
 
-        cv::Rect srcRect = cv::Rect(KERNEL_SIZE, KERNEL_SIZE, subResult.cols - 2*KERNEL_SIZE, subResult.rows - 2*KERNEL_SIZE);
+        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, subResult.cols - 2*MEDIAN_KERNEL_SIZE, subResult.rows - 2*MEDIAN_KERNEL_SIZE);
         cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
 
         subResult(srcRect).copyTo(result(dstRect));
@@ -249,12 +252,12 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const 
     // Set size where median filter will be applied
     int2 roi;
     // Median kernel
-    int2 anchor = {KERNEL_SIZE / 2, KERNEL_SIZE / 2};
+    int2 anchor = {MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE};
     // Calculate offsets for image and result. Starting at the edge would result in errors because we would
     // go out of bounds.
-    int2 pSrcOffset = {KERNEL_SIZE, KERNEL_SIZE};
-    int2 pResultOffset = {KERNEL_SIZE, KERNEL_SIZE};
-    int2 pMaskOffset = {KERNEL_SIZE, KERNEL_SIZE};
+    int2 pSrcOffset = {MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE};
+    int2 pResultOffset = {MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE};
+    int2 pMaskOffset = {MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE};
     dim3 threadsPerBlock, numBlocks;
 
     cv::Mat subImage, subMask, subResult, croppedImage;
@@ -272,9 +275,9 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const 
         croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
         croppedImage.copyTo(subResult);
 
-        cv::copyMakeBorder(subImage, subImage, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
-        cv::copyMakeBorder(subResult, subResult, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
-        cv::copyMakeBorder(subMask, subMask, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, KERNEL_SIZE, cv::BORDER_REPLICATE);
+        cv::copyMakeBorder(subImage, subImage, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+        cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+        cv::copyMakeBorder(subMask, subMask, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
 
         err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
         if (err != cudaSuccess) {
@@ -319,8 +322,8 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const 
         }
 
         // Apply median filter
-        roi = {subImage.cols - 2 * KERNEL_SIZE, subImage.rows - 2 * KERNEL_SIZE};
-        threadsPerBlock = dim3(NUM_THREADS, NUM_THREADS);
+        roi = {subImage.cols - 2 * MEDIAN_KERNEL_SIZE, subImage.rows - 2 * MEDIAN_KERNEL_SIZE};
+        threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
         numBlocks = dim3(roi.x / threadsPerBlock.x, roi.y / threadsPerBlock.y);
         // Run median filter
         medianFilterMaskedKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep, pSrcOffset,
@@ -340,7 +343,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const 
         cudaFree(deviceResult);
         cudaFree(deviceMask);
 
-        cv::Rect srcRect = cv::Rect(KERNEL_SIZE, KERNEL_SIZE, subResult.cols - 2*KERNEL_SIZE, subResult.rows - 2*KERNEL_SIZE);
+        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, subResult.cols - 2*MEDIAN_KERNEL_SIZE, subResult.rows - 2*MEDIAN_KERNEL_SIZE);
         cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
 
         subResult(srcRect).copyTo(result(dstRect));
