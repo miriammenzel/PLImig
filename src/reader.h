@@ -36,11 +36,38 @@
 namespace PLImg {
     class reader {
     public:
+        /**
+         * @brief fileExists
+         * @param filename
+         * @return
+         */
         static bool fileExists(const std::string& filename);
+        /**
+         * @brief imread
+         * @param filename
+         * @param dataset
+         * @return
+         */
         static cv::Mat imread(const std::string& filename, const std::string& dataset="/Image");
     private:
+        /**
+         * @brief readHDF5
+         * @param filename
+         * @param dataset
+         * @return
+         */
         static cv::Mat readHDF5(const std::string& filename, const std::string& dataset="/Image");
+        /**
+         * @brief readTiff
+         * @param filename
+         * @return
+         */
         static cv::Mat readTiff(const std::string& filename);
+        /**
+         * @brief readNIFTI
+         * @param filename
+         * @return
+         */
         static cv::Mat readNIFTI(const std::string& filename);
     };
 

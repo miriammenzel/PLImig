@@ -58,8 +58,6 @@ __global__ void medianFilterKernel(const float* image, int image_stride,
         }
         shellSort(buffer, 0, validValues);
         result_image[x + y * result_image_stride] = buffer[validValues / 2];
-    } else {
-        result_image[x + y * result_image_stride] = 0.0f;
     }
 }
 
@@ -75,7 +73,7 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
 
     float buffer[4 * MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE];
 
-    if(x >= MEDIAN_KERNEL_SIZE && x < imageDims.x - MEDIAN_KERNEL_SIZE && y >= MEDIAN_KERNEL_SIZE && y < imageDims.y - MEDIAN_KERNEL_SIZE) {
+    if(x > MEDIAN_KERNEL_SIZE && x < imageDims.x - MEDIAN_KERNEL_SIZE && y > MEDIAN_KERNEL_SIZE && y < imageDims.y - MEDIAN_KERNEL_SIZE) {
         if(mask[x + y * mask_stride]) {
             // Transfer image pixels to our kernel for median filtering application
             for (int cx = -MEDIAN_KERNEL_SIZE; cx < MEDIAN_KERNEL_SIZE; ++cx) {
@@ -95,8 +93,6 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
             } else {
                 result_image[x + y * result_image_stride] = 0;
             }
-        } else {
-            result_image[x + y * result_image_stride] = 0;
         }
     }
 
@@ -148,6 +144,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         croppedImage.copyTo(subResult);
         cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
 
+
         err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
         if (err != cudaSuccess) {
             std::cerr << "Could not allocate enough memory for original transmittance \n";
@@ -178,7 +175,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         auto start = std::chrono::high_resolution_clock::now();
         subImageDims = {subImage.cols, subImage.rows};
         threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
-        numBlocks = dim3(subImageDims.x / threadsPerBlock.x, subImageDims.y / threadsPerBlock.y);
+        numBlocks = dim3(ceil(float(subImageDims.x) / threadsPerBlock.x), ceil(float(subImageDims.y) / threadsPerBlock.y));
         // Run median filter
         medianFilterKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep,
                                                            deviceResult, nResStep,
@@ -199,7 +196,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         cudaFree(deviceImage);
         cudaFree(deviceResult);     
 
-        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, subResult.cols - 2*MEDIAN_KERNEL_SIZE, subResult.rows - 2*MEDIAN_KERNEL_SIZE);
+        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, xMax - xMin, yMax - yMin);
         cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
 
         subResult(srcRect).copyTo(result(dstRect));
@@ -304,7 +301,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const 
         // Apply median filter
         subImageDims = {subImage.cols, subImage.rows};
         threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
-        numBlocks = dim3(subImageDims.x / threadsPerBlock.x, subImageDims.y / threadsPerBlock.y);
+        numBlocks = dim3(ceil(float(subImageDims.x) / threadsPerBlock.x), ceil(float(subImageDims.y) / threadsPerBlock.y));
         // Run median filter
         medianFilterMaskedKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep,
                                                                  deviceResult, nResStep,

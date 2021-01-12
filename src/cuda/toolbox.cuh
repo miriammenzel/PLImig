@@ -31,8 +31,9 @@
 #include <iostream>
 #include <memory>
 #include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
 
-#define CUDA_KERNEL_NUM_THREADS 16
+#define CUDA_KERNEL_NUM_THREADS 32
 #define MEDIAN_KERNEL_SIZE 10
 
 namespace PLImg::cuda::filters {
