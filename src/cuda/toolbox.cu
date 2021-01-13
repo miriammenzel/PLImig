@@ -4,7 +4,6 @@
 
 #include "toolbox.cuh"
 
-
 __device__ void shellSort(float* array, uint low, uint high) {
     // Using the Ciura, 2001 sequence for best performance
     uint gaps[8] = {1, 4, 10, 23, 57, 132, 301, 701};

@@ -65,6 +65,8 @@ void PLImg::Inclination::set_rmaxWhite(float rmaxWhite) {
 
 float PLImg::Inclination::ic() {
     if(!m_ic) {
+        // ic will be calculated by taking the gray portion of the
+        // transmittance and calculating the maximum value in the histogram
         cv::Mat selection = *m_grayMask & *m_blurredMask < 0.01;
 
         int channels[] = {0};
@@ -83,6 +85,7 @@ float PLImg::Inclination::ic() {
 
 float PLImg::Inclination::im() {
     if(!m_im) {
+        // im is the mean value in the transmittance based on the highest retardation values
         if(!m_regionGrowingMask) {
             m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::imageRegionGrowing(*m_retardation));
         }
@@ -93,6 +96,7 @@ float PLImg::Inclination::im() {
 
 float PLImg::Inclination::rmaxGray() {
     if(!m_rmaxGray) {
+        // point of maximum curvature in the gray matter of the retardation
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f};
         const float* histRange = { histBounds };
@@ -120,6 +124,7 @@ float PLImg::Inclination::rmaxGray() {
 
 float PLImg::Inclination::rmaxWhite() {
     if(!m_rmaxWhite) {
+        // rmaxWhite is the mean value in the retardation based on the highest retardation values
         if(!m_regionGrowingMask) {
             m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::imageRegionGrowing(*m_retardation));
         }
@@ -182,8 +187,8 @@ sharedMat PLImg::Inclination::saturation() {
         m_saturation = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
         float inc_val;
         #pragma omp parallel for default(shared) private(inc_val)
-        for(uint y = 0; y < m_saturation->rows; ++y) {
-            for(uint x = 0; x < m_saturation->cols; ++x) {
+        for(int y = 0; y < m_saturation->rows; ++y) {
+            for(int x = 0; x < m_saturation->cols; ++x) {
                 inc_val = m_inclination->at<float>(y, x);
                 if(inc_val <= 0 | inc_val >= 90) {
                     if (inc_val <= 0) {

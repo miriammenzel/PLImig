@@ -35,74 +35,72 @@ typedef std::shared_ptr<cv::Mat> sharedMat;
 
 namespace PLImg {
     /**
+     * The class Inclination will handle the parameters as well as the generation of the inclination parameter map
+     * based on 3D-PLI measurements. Needed parameter maps for this class can be generated using MaskGeneration in this library.
+     * Parameters can be set manually to change how the inclination is calculated.
      * @brief The Inclination class
      */
     class Inclination {
     public:
         /**
-         * @brief Inclination
+         * Default constructor. All parameters will be set to None and have to be defined using
+         * setModalities(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask, sharedMat whiteMask, sharedMat grayMask)
+         * @brief Inclination constructor
          */
         Inclination();
         /**
-         * @brief Inclination
-         * @param transmittance
-         * @param retardation
-         * @param blurredMask
-         * @param whiteMask
-         * @param grayMask
+         * Basic inclination constructor. This will set all modalities needed for further calculations.
+         * Please note that shared pointers are required to reduce the memory load.
+         * @param transmittance NTransmittance parameter map
+         * @param retardation Retardation parameter map
+         * @param blurredMask Floating point mask in range (0, 1) specifying the linear interpolation of both inclination formulas for each pixel.
+         * @param whiteMask White mask
+         * @param grayMask Gray mask
          */
         Inclination(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask,
                     sharedMat whiteMask, sharedMat grayMask);
         /**
-         * @brief setModalities
-         * @param transmittance
-         * @param retardation
-         * @param blurredMask
-         * @param whiteMask
-         * @param grayMask
+         * Set parameter maps manually. All parameters will be reset so that the inclination will be calculated newly.
+         * @param transmittance NTransmittance parameter map
+         * @param retardation Retardation parameter map
+         * @param blurredMask Floating point mask in range (0, 1) specifying the linear interpolation of both inclination formulas for each pixel.
+         * @param whiteMask White mask
+         * @param grayMask Gray mask
          */
         void setModalities(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask, sharedMat whiteMask,
                            sharedMat grayMask);
 
         /**
-         * @brief im
-         * @return
+         * @return Manually set im value or the mean value in the transmittance based on the highest retardation values
          */
         float im();
         /**
-         * @brief ic
-         * @return
+         * @return Manually set ic value or the maximum value in the gray matter of the transmittance
          */
         float ic();
         /**
-         * @brief rmaxGray
-         * @return
+         * @return Manually set rmaxGray value or point of maximum curvature in the gray matter of the retardation
          */
         float rmaxGray();
         /**
-         * @brief rmaxWhite
-         * @return
+         * @return Manually set rmaxWhite value or the mean value in the retardation based on the highest retardation values
          */
         float rmaxWhite();
 
         /**
-         * @brief set_im
-         * @param im
+         * @param im Manually set im value
          */
         void set_im(float im);
         /**
-         * @brief set_ic
-         * @param ic
+         * @param ic Manually set ic value
          */
         void set_ic(float ic);
         /**
-         * @brief set_rmaxGray
-         * @param rmaxGray
+         * @param rmaxGray Manually set rmaxGray value
          */
         void set_rmaxGray(float rmaxGray);
         /**
-         * @brief set_rmaxWhite
-         * @param rmaxWhite
+         * @param rmaxWhite Manually set rmaxWhite value
          */
         void set_rmaxWhite(float rmaxWhite);
 

@@ -3,10 +3,8 @@
 //
 
 #include "writer.h"
-#include <iostream>
 
 PLImg::HDF5Writer::HDF5Writer() {
-    /* Save old error handler */
     m_filename = "";
 }
 
@@ -67,6 +65,8 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
     H5::DataSpace dataSpace;
     hsize_t dims[2];
     H5::Exception::dontPrint();
+    // Try to open the dataset.
+    // This will throw an exception if the dataset doesn't exist.
     bool dataSetFound;
     try {
         dset = m_hdf5file.openDataSet(dataset);
@@ -75,6 +75,8 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
         dataSetFound = false;
     }
     if(dataSetFound) {
+        // If the dataset is found, the program cannot delete the existing dataset
+        // Instead we will try to override the existing content if rows and columns do match
         dataSpace = dset.getSpace();
         dataSpace.getSimpleExtentDims(dims);
         if(dims[0] == image.rows && dims[1] == image.cols) {
@@ -85,6 +87,8 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
         dataSpace.close();
         dset.close();
     } else {
+        // Create dataset normally
+        // Check for the datatype from the OpenCV mat to determine the HDF5 datatype
         H5::DataType dtype;
         switch(image.type()) {
             case CV_32FC1:
@@ -97,6 +101,7 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
                 dtype = H5::PredType::NATIVE_UINT8;
                 break;
         }
+        // Write dataset
         dims[0] = static_cast<hsize_t>(image.rows);
         dims[1] = static_cast<hsize_t>(image.cols);
         dataSpace = H5::DataSpace(2, dims);
@@ -116,6 +121,7 @@ void PLImg::HDF5Writer::create_group(const std::string& group) {
 
     H5::Exception::dontPrint();
     H5::Group gr;
+    // Create groups recursively if the group doesn't exist.
     while (std::getline(ss, token, '/')) {
         groupString.append("/").append(token);
         if(!token.empty()) {
@@ -133,6 +139,8 @@ void PLImg::HDF5Writer::close() {
 
 void PLImg::HDF5Writer::open() {
     createDirectoriesIfMissing(m_filename);
+    // If the file doesn't exist open it with Read-Write.
+    // Otherwise open it with appending so that existing content will not be deleted.
     if(PLImg::reader::fileExists(m_filename)) {
         m_hdf5file = H5::H5File(m_filename, H5F_ACC_RDWR);
     } else {
@@ -148,7 +156,7 @@ void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) 
         std::error_code err;
         std::filesystem::create_directory(folder_name, err);
         if(err.value() != 0) {
-            throw std::runtime_error("Output folder " + folder_name + " could not LE created! Please check your path and permissions");
+            throw std::runtime_error("Output folder " + folder_name + " could not be created! Please check your path and permissions");
         }
     }
 }

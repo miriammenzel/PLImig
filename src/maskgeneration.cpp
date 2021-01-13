@@ -13,7 +13,6 @@ PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std:
 }
 
 void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     this->m_retardation = std::move(retardation);
     this->m_transmittance = std::move(transmittance);
 
@@ -52,7 +51,6 @@ float PLImg::MaskGeneration::tTra() {
 
 float PLImg::MaskGeneration::tRet() {
     if(!m_tRet) {
-        std::cout << __PRETTY_FUNCTION__ << std::endl;
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f};
         const float* histRange = { histBounds };
@@ -80,7 +78,6 @@ float PLImg::MaskGeneration::tRet() {
 
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
-        std::cout << __PRETTY_FUNCTION__ << std::endl;
         cv::Mat mask = imageRegionGrowing(*m_retardation);
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
@@ -90,7 +87,6 @@ float PLImg::MaskGeneration::tMin() {
 
 float PLImg::MaskGeneration::tMax() {
     if(!m_tMax) {
-        std::cout << __PRETTY_FUNCTION__ << std::endl;
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f+1e-15f};
         const float* histRange = { histBounds };
@@ -106,7 +102,6 @@ float PLImg::MaskGeneration::tMax() {
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::grayMask() {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     if(!m_grayMask) {
         cv::Mat mask = (*m_transmittance >= tTra()) & (*m_transmittance <= tMax()) & (*m_retardation <= tRet());
         m_grayMask = std::make_shared<cv::Mat>(mask);
@@ -115,7 +110,6 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::grayMask() {
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::whiteMask() {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     if(!m_whiteMask) {
         cv::Mat mask = ((*m_transmittance < tTra()) & (*m_transmittance > 0)) | (*m_retardation > tRet());
         m_whiteMask = std::make_shared<cv::Mat>(mask);
@@ -124,13 +118,11 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::whiteMask() {
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::fullMask() {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     cv::Mat mask = *whiteMask() | *grayMask();
     return std::make_shared<cv::Mat>(mask);
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     cv::Mat backgroundMask;
     cv::Scalar mean, stddev;
     cv::bitwise_not(*fullMask(), backgroundMask);
@@ -140,7 +132,6 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     if(!m_blurredMask) {
         m_blurredMask = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
         std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(m_retardation->rows/10, m_retardation->cols/10, CV_32FC1);
@@ -171,7 +162,6 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         below_tTra.reserve(BLURRED_MASK_ITERATIONS);
 
         float t_ret, t_tra;
-
 
         for(unsigned i = 0; i < BLURRED_MASK_ITERATIONS; ++i) {
             std::cout << __PRETTY_FUNCTION__ << ", Iteration: " << i << std::endl;

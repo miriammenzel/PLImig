@@ -364,7 +364,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
 std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &connectedComponentsImage) {
     PLImg::cuda::runCUDAchecks();
 
-    // Get max label
+    // Check how many labels are present in the given image.
     uint numLabels = 0;
     #pragma omp parallel reduction(max:numLabels) shared(connectedComponentsImage)
     {
@@ -376,6 +376,7 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
         numLabels = *std::max_element(connectedComponentsImage.begin<int>() + myStart, connectedComponentsImage.begin<int>() + myEnd);
     }
 
+    // If more than one label is present, continue to find the largest component
     if(numLabels > 1) {
         // Error objects
         cudaError_t err;
@@ -397,6 +398,7 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
         std::vector<Npp32s> globalHist = std::vector<Npp32s>(numLabels, 0);
         std::vector<Npp32f> bins = std::vector<float>(numLabels + 1, 1);
 
+        // Fill bin values with (0, 1, 2, ...)
         std::iota(bins.begin(), bins.end(), 0);
 
         Npp32s *histBuffer;
@@ -407,6 +409,8 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
         Npp8u *deviceBuffer;
         NppiSize deviceROI;
         Npp32s nSrcStep, bufferSize;
+
+        // Allocate memory for the bins
         err = cudaMalloc((void **) &binBuffer, bins.size() * sizeof(Npp32f));
         if (err != cudaSuccess) {
             std::cerr << "Could not allocate enough memory for bins of histogram \n";
@@ -420,6 +424,8 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
             std::cerr << cudaGetErrorName(err) << std::endl;
             exit(EXIT_FAILURE);
         }
+
+        // Allocate memory for the histogram
         err = cudaMalloc((void **) &histBuffer, localHist.size() * sizeof(Npp32s));
         if (err != cudaSuccess) {
             std::cerr << "Could not allocate enough memory bins of histogram \n";
@@ -463,6 +469,7 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
             nSrcStep = sizeof(Npp32f) * subImage.cols;
             deviceROI = {subImage.cols, subImage.rows};
 
+            // Get buffer size for the histogram calculation
             nppiHistogramRangeGetBufferSize_32f_C1R(deviceROI, numLabels + 1, &bufferSize);
             err = cudaMalloc(&deviceBuffer, bufferSize);
             if (err != cudaSuccess) {
@@ -471,6 +478,8 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
                 exit(EXIT_FAILURE);
             }
 
+            // Calculate the histogram based on our input image and bins.
+            // The largest histogram bin will be the largest component in our image.
             errCode = nppiHistogramRange_32f_C1R(deviceImage, nSrcStep, deviceROI, histBuffer, binBuffer, numLabels + 1,
                                                  deviceBuffer);
             if (errCode != NPP_SUCCESS) {
@@ -486,6 +495,8 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
                 exit(EXIT_FAILURE);
             }
 
+            // If our image was chunked we still need to create our full histogram based on our small histograms.
+            // The needed values are added here.
             #pragma omp parallel for default(shared)
             for (uint i = 0; i < globalHist.size(); ++i) {
                 globalHist.at(i) += localHist.at(i);
