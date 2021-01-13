@@ -4,12 +4,12 @@
 
 #include "reader.h"
 
-bool PLImg::reader::fileExists(const std::string& filename) {
+bool PLImg::Reader::fileExists(const std::string& filename) {
     struct stat buffer{};
     return (stat (filename.c_str(), &buffer) == 0);
 }
 
-cv::Mat PLImg::reader::imread(const std::string& filename, const std::string& dataset) {
+cv::Mat PLImg::Reader::imread(const std::string& filename, const std::string& dataset) {
     // Check if file exists
     if(fileExists(filename)) {
         // Opening the file has to be handeled differently depending on the file ending.
@@ -26,7 +26,7 @@ cv::Mat PLImg::reader::imread(const std::string& filename, const std::string& da
     }
 }
 
-cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &dataset) {
+cv::Mat PLImg::Reader::readHDF5(const std::string &filename, const std::string &dataset) {
     hid_t file, dspace, dset;
     hsize_t dims[2];
     // Open file read only
@@ -63,7 +63,7 @@ cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &
     return image;
 }
 
-cv::Mat PLImg::reader::readNIFTI(const std::string &filename) {
+cv::Mat PLImg::Reader::readNIFTI(const std::string &filename) {
     nifti_image * img = nifti_image_read(filename.c_str(), 1);
     // Get image dimensions
     uint width = img->nx;
@@ -92,6 +92,6 @@ cv::Mat PLImg::reader::readNIFTI(const std::string &filename) {
     return image;
 }
 
-cv::Mat PLImg::reader::readTiff(const std::string &filename) {
+cv::Mat PLImg::Reader::readTiff(const std::string &filename) {
     return cv::imread(filename, cv::IMREAD_ANYDEPTH);
 }

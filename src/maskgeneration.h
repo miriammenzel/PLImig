@@ -38,6 +38,10 @@
 
 #define BLURRED_MASK_ITERATIONS 100
 
+/**
+ * @file
+ * @brief PLImg::MaskGeneration class
+ */
 namespace PLImg {
     /**
      * @brief The MaskGeneration class

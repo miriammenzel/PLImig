@@ -34,7 +34,10 @@
 #include <vector>
 
 #define NUMBER_OF_BINS 256
-
+/**
+ * @file
+ * @brief PLImg histogram toolbox functions
+ */
 namespace PLImg {
     /**
      * @brief histogramPeakWidth

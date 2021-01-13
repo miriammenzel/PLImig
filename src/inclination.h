@@ -33,6 +33,10 @@
 
 typedef std::shared_ptr<cv::Mat> sharedMat;
 
+/**
+ * @file
+ * @brief PLImg::Inclination class
+ */
 namespace PLImg {
     /**
      * The class Inclination will handle the parameters as well as the generation of the inclination parameter map

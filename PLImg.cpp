@@ -84,9 +84,9 @@ int main(int argc, char** argv) {
             }
 
             std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(
-                    PLImg::reader::imread(transmittance_path, dataset));
+                    PLImg::Reader::imread(transmittance_path, dataset));
             std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(
-                    PLImg::reader::imread(retardation_path, dataset));
+                    PLImg::Reader::imread(retardation_path, dataset));
             std::cout << "Files read" << std::endl;
 
             std::shared_ptr<cv::Mat> medTransmittance = transmittance;

@@ -30,6 +30,10 @@
 #include <opencv2/core.hpp>
 #include "reader.h"
 
+/**
+ * @file
+ * @brief PLImg::HDF5Writer class
+ */
 namespace PLImg {
     /**
      * @brief The HDF5Writer class

@@ -141,7 +141,7 @@ void PLImg::HDF5Writer::open() {
     createDirectoriesIfMissing(m_filename);
     // If the file doesn't exist open it with Read-Write.
     // Otherwise open it with appending so that existing content will not be deleted.
-    if(PLImg::reader::fileExists(m_filename)) {
+    if(PLImg::Reader::fileExists(m_filename)) {
         m_hdf5file = H5::H5File(m_filename, H5F_ACC_RDWR);
     } else {
         m_hdf5file = H5::H5File(m_filename, H5F_ACC_TRUNC);

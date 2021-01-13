@@ -33,40 +33,44 @@
 #include <tiffio.h>
 #include <nifti/nifti1_io.h>
 
+/**
+ * @file
+ * @brief PLImg::Reader class
+ */
 namespace PLImg {
-    class reader {
+    class Reader {
     public:
         /**
-         * @brief fileExists
-         * @param filename
-         * @return
+         * Checks if the given file exists
+         * @param filename Path to the file to check
+         * @return True if file exists, otherwise false
          */
         static bool fileExists(const std::string& filename);
         /**
-         * @brief imread
-         * @param filename
-         * @param dataset
-         * @return
+         * Opens and reads an image with file ending .h5, .nii or .tiff
+         * @param filename Path to the file which shall be opened.
+         * @param dataset HDF5 dataset from which the image shall be read.
+         * @return OpenCV Matrix containing the image.
          */
         static cv::Mat imread(const std::string& filename, const std::string& dataset="/Image");
     private:
         /**
-         * @brief readHDF5
-         * @param filename
-         * @param dataset
-         * @return
+         * Opens and reads an image with file ending .h5
+         * @param filename Path to the file which shall be opened.
+         * @param dataset HDF5 dataset from which the image shall be read.
+         * @return OpenCV Matrix containing the image.
          */
         static cv::Mat readHDF5(const std::string& filename, const std::string& dataset="/Image");
         /**
-         * @brief readTiff
-         * @param filename
-         * @return
+         * Opens and reads an image with file ending .tiff
+         * @param filename Path to the file which shall be opened.
+         * @return OpenCV Matrix containing the image.
          */
         static cv::Mat readTiff(const std::string& filename);
         /**
-         * @brief readNIFTI
-         * @param filename
-         * @return
+         * Opens and reads an image with file ending .nii
+         * @param filename Path to the file which shall be opened.
+         * @return OpenCV Matrix containing the image.
          */
         static cv::Mat readNIFTI(const std::string& filename);
     };
