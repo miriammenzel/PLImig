@@ -27,23 +27,30 @@ void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, 
 
 void PLImg::MaskGeneration::set_tMax(float tMax) {
     this->m_tMax = std::make_unique<float>(tMax);
+    this->m_grayMask = nullptr;
+    this->m_blurredMask = nullptr;
 }
 
 void PLImg::MaskGeneration::set_tMin(float tMin) {
     this->m_tMin = std::make_unique<float>(tMin);
+    this->m_tTra = nullptr;
+    this->m_blurredMask = nullptr;
 }
 
 void PLImg::MaskGeneration::set_tRet(float tRet) {
     this->m_tRet = std::make_unique<float>(tRet);
+    this->m_whiteMask = nullptr;
+    this->m_grayMask = nullptr;
 }
 
 void PLImg::MaskGeneration::set_tTra(float tTra) {
     this->m_tTra = std::make_unique<float>(tTra);
+    this->m_whiteMask = nullptr;
+    this->m_grayMask = nullptr;
 }
 
 float PLImg::MaskGeneration::tTra() {
     if(!m_tTra) {
-        std::cout << __PRETTY_FUNCTION__ << std::endl;
         this->m_tTra = std::make_unique<float>(tMin());
     }
     return *this->m_tTra;

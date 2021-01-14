@@ -99,23 +99,23 @@ namespace PLImg {
         float tMax();
 
         /**
-         * @brief set_tRet
-         * @param t_ret
+         * Set the tRet value manually.
+         * @param t_ret tRet value which will be used for further calculations
          */
         void set_tRet(float t_ret);
         /**
-         * @brief set_tTra
-         * @param t_tra
+         * Set the tTra value manually.
+         * @param t_tra tTra value which will be used for further calculations
          */
         void set_tTra(float t_tra);
         /**
-         * @brief set_tMin
-         * @param t_min
+         * Set the tMin value manually.
+         * @param t_min tMin value which will be used for further calculations
          */
         void set_tMin(float t_min);
         /**
-         * @brief set_tMax
-         * @param t_max
+         * Set the tMax value manually.
+         * @param t_max tMax value which will be used for further calculations
          */
         void set_tMax(float t_max);
 
