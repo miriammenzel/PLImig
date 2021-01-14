@@ -24,7 +24,7 @@
 #ifndef PLIMG_TOOLBOX_H
 #define PLIMG_TOOLBOX_H
 
-#include "cuda/toolbox.cuh"
+#include "cuda/toolbox.h"
 #include <npp.h>
 #include <numeric>
 #include <omp.h>
@@ -33,6 +33,7 @@
 #include <opencv2/highgui.hpp>
 #include <vector>
 
+/// Number of bins used for histogram algorithms
 #define NUMBER_OF_BINS 256
 /**
  * @file

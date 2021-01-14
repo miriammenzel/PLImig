@@ -2,7 +2,7 @@
 // Created by jreuter on 07.12.20.
 //
 
-#include "toolbox.cuh"
+#include "cuda/toolbox.h"
 
 __device__ void shellSort(float* array, uint low, uint high) {
     // Using the Ciura, 2001 sequence for best performance

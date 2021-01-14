@@ -36,6 +36,7 @@
 
 #include "toolbox.h"
 
+/// Number of iterations that will be used to generate the blurredMask() parameter.
 #define BLURRED_MASK_ITERATIONS 100
 
 /**
@@ -44,41 +45,56 @@
  */
 namespace PLImg {
     /**
+     * This class handles the generation of all parameters needed to create the white matter and gray matter masks based on
+     * transmittance and retardation images. This class can be used as a pre-preparation step to separate the background from the actual tissue or
+     * to calculate the Inclination by using additial masks like the blurredMask().
      * @brief The MaskGeneration class
      */
     class MaskGeneration {
     public:
         /**
-         * @brief MaskGeneration
-         * @param retardation
-         * @param transmittance
+         * Constructor. Both the transmittance and retardation have to be set to create the white matter and gray matter masks. If none is set, use
+         * setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) to set those parameter maps afterwards.
+         * @brief Constructor
+         * @param retardation Shared pointer of an OpenCV matrix containing the retardation of a single 3D-PLI measurement.
+         * @param transmittance Shared pointer of an OpenCV matrix containing the normalized transmittance of a single 3D-PLI measurement.
          */
         explicit MaskGeneration(std::shared_ptr<cv::Mat> retardation = nullptr, std::shared_ptr<cv::Mat> transmittance = nullptr);
         /**
-         * @brief setModalities
-         * @param retardation
-         * @param transmittance
+         * To prevent the need to create a new MaskGeneration object each time this class allows to override previously set transmittance and
+         * retardation modalities. All previously generated or set parameters will be deleted in the process.
+         * @brief Set retardation and transmittance
+         * @param retardation Shared pointer of an OpenCV matrix containing the retardation of a single 3D-PLI measurement.
+         * @param transmittance Shared pointer of an OpenCV matrix containing the normalized transmittance of a single 3D-PLI measurement.
          */
         void setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance);
 
         /**
-         * @brief tRet
-         * @return
+         * Retrieve the point of maximum curvature in first half of the retardation histogram. If this was calculated already, retrieve the
+         * calculated value instead. If the value was set manually, no calculation will be done. Instead the set value will be returned.
+         * @brief Point of maximum curvature in first half of the retardation histogram.
+         * @return Floating point value with the position of the maximum curvature in first half of the retardation histogram.
          */
         float tRet();
         /**
-         * @brief tTra
-         * @return
+         * @brief Separating value in transmittance between white and gray matter.
+         * @return Floating point value which separates the white and gray matter in the transmittance.
          */
         float tTra();
         /**
-         * @brief tMin
-         * @return
+         * By using a region growing algorithm on the largest values in the retardation a connected region in the white matter can be found
+         * which will then be used to determine the mean value of the transmittance in the according region.
+         * @brief Mean transmittance value in region with highest retardation values
+         * @return Floating point value with the mean transmittance value in white matter.
          */
         float tMin();
         /**
-         * @brief tMax
-         * @return
+         * Retrieve the point of maximum curvature in the second half of the transmittance histogram. If this was calculated already, retrieve the
+         * calculated value instead. If the value was set manually, no calculation will be done. Instead the set value will be returned.
+         *
+         * The calculated value aims to separate the background of the transmittance from the tissue. This will be used for the white and gray matter masks.
+         * @brief Point of maximum curvature in second half of the transmittance histogram.
+         * @return Floating point value with the position of the maximum curvature in second half of the transmittance histogram.
          */
         float tMax();
 

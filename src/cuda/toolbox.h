@@ -33,9 +33,15 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
+/// Number of CUDA Kernel threads used for kernel execution
 #define CUDA_KERNEL_NUM_THREADS 32
+/// Fixed median kernel size
 #define MEDIAN_KERNEL_SIZE 10
 
+/**
+ * @file
+ * @brief PLImg::cuda::filters functions
+ */
 namespace PLImg::cuda::filters {
     /**
      * @brief callCUDAmedianFilter

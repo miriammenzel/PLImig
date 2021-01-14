@@ -160,7 +160,7 @@ sharedMat PLImg::Inclination::inclination() {
                                     asin(m_retardation->at<float>(y, x)) /
                                     asinWRmax *
                                     logIcIm /
-                                    fmax(1e-15, log(*m_ic / m_transmittance->at<float>(y, x)))
+                                    fmax(1e-15, log(ic() / m_transmittance->at<float>(y, x)))
                             )
                             + (1 - blurredMaskVal) *
                               asin(m_retardation->at<float>(y, x)) /

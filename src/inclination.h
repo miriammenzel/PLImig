@@ -124,7 +124,7 @@ namespace PLImg {
          * different formulas. Regions inbetween the white and gray matter are defined through the blurredMask and use a linear interpolation
          * of both formulas.
          * The formula is constructed like this \f[
-         * I_{x,y} = \cos^{-1} \sqrt{
+         * \alpha_{x,y} = \cos^{-1} \sqrt{
          *                          blurredMask_{x,y} \cdot
          *                          \left(
          *                              \frac
@@ -148,8 +148,20 @@ namespace PLImg {
          */
         sharedMat inclination();
         /**
-         * @brief saturation
-         * @return
+         * The saturation of an inclination parameter map defines all pixels which have \f$ \alpha \le 0\f$ or \f$ \alpha \ge 90 \f$.
+         * The resulting parameter map is color coded to differentiate between all possible scenarios where saturation could occur.
+         *
+         * 0 - No Saturation
+         *
+         * 1 - inclination() <= 0 and Retardation > rmaxWhite()
+         *
+         * 2 - inclination() <= 0 and Retardation <= rmaxWhite()
+         *
+         * 3 - inclination() >= 90 and Retardation > rmaxWhite()
+         *
+         * 4 - inclination() >= 90 and Retardation <= rmaxWhite()
+         *
+         * @return Shared pointer of a OpenCV matrix containing all saturated values in the calculated inclination parameter map.
          */
         sharedMat saturation();
     private:
