@@ -8,8 +8,6 @@
 PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) :
     m_retardation(std::move(retardation)), m_transmittance(std::move(transmittance)), m_tMin(nullptr), m_tMax(nullptr),
     m_tRet(nullptr), m_tTra(nullptr), m_whiteMask(nullptr), m_grayMask(nullptr), m_blurredMask(nullptr) {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
-
 }
 
 void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) {
@@ -101,9 +99,10 @@ float PLImg::MaskGeneration::tMax() {
 
         cv::Mat hist;
         cv::calcHist(&(*m_transmittance), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
-        std::vector<float> histVal(hist.begin<float>(), hist.end<float>());
         cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
-        this->m_tMax = std::make_unique<float>(histogramPlateau(hist,0.0f, 1.0f, -1, NUMBER_OF_BINS/2, NUMBER_OF_BINS));
+        int endPosition = std::max_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.end<float>()) - hist.begin<float>();
+        int startPosition = std::min_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.begin<float>() + endPosition) - hist.begin<float>();
+        this->m_tMax = std::make_unique<float>(histogramPlateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition));
     }
     return *this->m_tMax;
 }
@@ -171,7 +170,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         float t_ret, t_tra;
 
         for(unsigned i = 0; i < BLURRED_MASK_ITERATIONS; ++i) {
-            std::cout << __PRETTY_FUNCTION__ << ", Iteration: " << i << std::endl;
+            std::cout << "\rBlurred Mask Generation: Iteration " << i << " of " << BLURRED_MASK_ITERATIONS;
+            std::flush(std::cout);
             // Fill transmittance and retardation with random pixels from our base images
             #pragma omp parallel for firstprivate(distribution, selected_element) schedule(static) default(shared)
             for(int y = 0; y < small_retardation->rows; ++y) {
@@ -202,6 +202,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
                 below_tTra.push_back(t_tra);
             }
         }
+        std::cout << std::endl;
 
         small_transmittance = nullptr;
         small_retardation = nullptr;

@@ -21,7 +21,7 @@ int PLImg::histogramPeakWidth(cv::Mat hist, int peakPosition, float direction, f
     }
 }
 
-float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float direction, uint start, uint stop) {
+float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop) {
     auto maxIterator = std::max_element(hist.begin<float>() + start, hist.begin<float>() + stop);
     int maxPos = std::distance(hist.begin<float>(), maxIterator);
     int width = histogramPeakWidth(hist, maxPos, direction);
@@ -31,9 +31,9 @@ float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float
     int roiStart, roiEnd;
     if(direction > 0) {
         roiStart = maxPos;
-        roiEnd = std::min(maxPos + 20 * width, hist.rows);
+        roiEnd = std::min(maxPos + 20 * width, stop);
     } else {
-        roiStart = std::max(0, maxPos - 10 * width);
+        roiStart = std::max(start, maxPos - 10 * width);
         roiEnd = maxPos;
     }
 

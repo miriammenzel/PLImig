@@ -60,7 +60,7 @@ namespace PLImg {
      * @param stop
      * @return
      */
-    float histogramPlateau(cv::Mat hist, float histLow, float histHigh, float direction, uint start, uint stop);
+    float histogramPlateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop);
 
     /**
      * @brief imageRegionGrowing
