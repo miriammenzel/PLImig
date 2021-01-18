@@ -48,7 +48,7 @@ TEST(TestMaskgeneration, TestTRet) {
 
     auto shared_ret = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(shared_ret, nullptr);
-    ASSERT_FLOAT_EQ(mask.tRet(), 4.0f * (1.0f/256.0f));
+    ASSERT_FLOAT_EQ(mask.tRet(), 10.0f * (1.0f/256.0f));
 }
 
 TEST(TestMaskgeneration, TestTTra) {
@@ -177,9 +177,9 @@ TEST(TestMaskgeneration, TestWhiteMask) {
     for(int i = 0; i < mask->rows; ++i) {
         for(int j = 0; j < mask->cols; ++j) {
             if(i < 10 | j >= 15) {
-                ASSERT_TRUE(mask->at<bool>(i, j));// << "i = " << i << ", j = " << j;
+                ASSERT_TRUE(mask->at<bool>(i, j)) << "i = " << i << ", j = " << j;
             } else {
-                ASSERT_FALSE(mask->at<bool>(i, j));// << "i = " << i << ", j = " << j;
+                ASSERT_FALSE(mask->at<bool>(i, j)) << "i = " << i << ", j = " << j;
             }
         }
     }

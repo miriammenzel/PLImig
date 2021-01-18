@@ -63,6 +63,15 @@ namespace PLImg {
     float histogramPlateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop);
 
     /**
+     * @brief histogramPeaks
+     * @param hist
+     * @param start
+     * @param stop
+     * @return
+     */
+    std::vector<unsigned> histogramPeaks(cv::Mat hist, int start, int stop);
+
+    /**
      * @brief imageRegionGrowing
      * @param image
      * @param percentPixels

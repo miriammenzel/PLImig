@@ -70,6 +70,11 @@ namespace PLImg {
         void setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance);
 
         /**
+         * @brief resetParameters
+         */
+        void resetParameters();
+
+        /**
          * Retrieve the point of maximum curvature in first half of the retardation histogram. If this was calculated already, retrieve the
          * calculated value instead. If the value was set manually, no calculation will be done. Instead the set value will be returned.
          * @brief Point of maximum curvature in first half of the retardation histogram.

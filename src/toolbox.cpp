@@ -42,7 +42,7 @@ float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float
 
     float y2, y1, x2, x1;
     #pragma omp parallel for private(y2, y1, x2, x1)
-    for(uint i = 1; i < alphaAngle.rows-1; ++i) {
+    for(int i = 1; i < alphaAngle.rows-1; ++i) {
         y2 = histRoi.at<float>(i) - histRoi.at<float>(i+1);
         y1 = histRoi.at<float>(i) - histRoi.at<float>(i-1);
         x2 = stepSize;
@@ -54,6 +54,27 @@ float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float
     auto minIterator = std::min_element(alphaAngle.begin<float>()+1, alphaAngle.end<float>()-1);
     int minPos = std::distance(alphaAngle.begin<float>(), minIterator);
     return histLow + float(roiStart + minPos) * stepSize;
+}
+
+std::vector<unsigned> PLImg::histogramPeaks(cv::Mat hist, int start, int stop) {
+    std::vector<unsigned> peaks;
+
+    int posAhead;
+    for(int pos = start + 1; pos < stop-1; ++pos) {
+        if(hist.at<int>(pos) - hist.at<int>(pos-1) > 0) {
+            posAhead = pos + 1;
+
+            while(posAhead < hist.rows && hist.at<int>(pos) == hist.at<int>(posAhead)) {
+                ++posAhead;
+            }
+
+            if(hist.at<int>(pos) - hist.at<int>(posAhead) > 0) {
+                peaks.push_back((pos + posAhead - 1) / 2);
+            }
+        }
+    }
+
+    return peaks;
 }
 
 cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {

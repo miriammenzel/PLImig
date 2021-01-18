@@ -13,7 +13,10 @@ PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std:
 void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) {
     this->m_retardation = std::move(retardation);
     this->m_transmittance = std::move(transmittance);
+    resetParameters();
+}
 
+void PLImg::MaskGeneration::resetParameters() {
     this->m_tMin = nullptr;
     this->m_tMax = nullptr;
     this->m_tRet = nullptr;
@@ -25,32 +28,23 @@ void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, 
 
 void PLImg::MaskGeneration::set_tMax(float tMax) {
     this->m_tMax = std::make_unique<float>(tMax);
-    this->m_grayMask = nullptr;
-    this->m_blurredMask = nullptr;
 }
 
 void PLImg::MaskGeneration::set_tMin(float tMin) {
     this->m_tMin = std::make_unique<float>(tMin);
-    this->m_tTra = nullptr;
-    this->m_blurredMask = nullptr;
 }
 
 void PLImg::MaskGeneration::set_tRet(float tRet) {
     this->m_tRet = std::make_unique<float>(tRet);
-    this->m_whiteMask = nullptr;
-    this->m_grayMask = nullptr;
 }
 
 void PLImg::MaskGeneration::set_tTra(float tTra) {
     this->m_tTra = std::make_unique<float>(tTra);
-    this->m_whiteMask = nullptr;
-    this->m_grayMask = nullptr;
 }
 
 float PLImg::MaskGeneration::tTra() {
     if(!m_tTra) {
         this->m_tTra = std::make_unique<float>(tMin());
-        std::cout << "tTra generated" << std::endl;
     }
     return *this->m_tTra;
 }
@@ -73,12 +67,15 @@ float PLImg::MaskGeneration::tRet() {
         cv::filter2D(hist, hist, -1, kernel, cv::Point(-1, -1), 0, cv::BORDER_REPLICATE);
         cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
-        // TODO: Peaksuche
-
-        this->m_tRet = std::make_unique<float>(histogramPlateau(hist, -kernelSize / (2.0f * NUMBER_OF_BINS),
-                                                                1.0f - kernelSize / (2.0f * NUMBER_OF_BINS),
-                                                                1, 0, NUMBER_OF_BINS/2));
-        std::cout << "tRet generated" << std::endl;
+        // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
+        auto peaks = PLImg::histogramPeaks(hist, 0, NUMBER_OF_BINS / 2);
+        if(peaks.size() > 1) {
+            this->m_tRet = std::make_unique<float>(histogramPlateau(hist, peaks.at(1) * 1.0f / histSize, 1.0f, 1, peaks.at(1), NUMBER_OF_BINS/2));
+        } else if(peaks.size() == 1) {
+            this->m_tRet = std::make_unique<float>(histogramPlateau(hist, peaks.at(0) * 1.0f / histSize, 1.0f, 1, peaks.at(0), NUMBER_OF_BINS/2));
+        } else {
+            this->m_tRet = std::make_unique<float>(histogramPlateau(hist, 0.0f, 1.0f, 1, 0, NUMBER_OF_BINS/2));
+        }
     }
     return *this->m_tRet;
 }
@@ -88,7 +85,6 @@ float PLImg::MaskGeneration::tMin() {
         cv::Mat mask = imageRegionGrowing(*m_retardation);
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
-        std::cout << "tMin generated" << std::endl;
     }
     return *this->m_tMin;
 }
@@ -106,7 +102,6 @@ float PLImg::MaskGeneration::tMax() {
         int endPosition = std::max_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.end<float>()) - hist.begin<float>();
         int startPosition = std::min_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.begin<float>() + endPosition) - hist.begin<float>();
         this->m_tMax = std::make_unique<float>(histogramPlateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition));
-        std::cout << "tMax generated" << std::endl;
     }
     return *this->m_tMax;
 }
@@ -216,6 +211,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         float diff_tRet_m = abs(std::accumulate(below_tRet.begin(), below_tRet.end(), 0) / fmax(1, below_tRet.size()) - tRet());
         float diff_tTra_p = abs(std::accumulate(above_tTra.begin(), above_tTra.end(), 0) / fmax(1, above_tTra.size()) - tTra());
         float diff_tTra_m = abs(std::accumulate(below_tTra.begin(), below_tTra.end(), 0) / fmax(1, below_tTra.size()) - tTra());
+
+        std::cout << diff_tRet_p << " " << diff_tRet_m << " " << ", " << diff_tTra_p << " " << diff_tTra_m << std::endl;
 
         float diffTra, diffRet;
         float tmpVal;
