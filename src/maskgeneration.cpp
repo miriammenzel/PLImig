@@ -50,6 +50,7 @@ void PLImg::MaskGeneration::set_tTra(float tTra) {
 float PLImg::MaskGeneration::tTra() {
     if(!m_tTra) {
         this->m_tTra = std::make_unique<float>(tMin());
+        std::cout << "tTra generated" << std::endl;
     }
     return *this->m_tTra;
 }
@@ -77,6 +78,7 @@ float PLImg::MaskGeneration::tRet() {
         this->m_tRet = std::make_unique<float>(histogramPlateau(hist, -kernelSize / (2.0f * NUMBER_OF_BINS),
                                                                 1.0f - kernelSize / (2.0f * NUMBER_OF_BINS),
                                                                 1, 0, NUMBER_OF_BINS/2));
+        std::cout << "tRet generated" << std::endl;
     }
     return *this->m_tRet;
 }
@@ -86,6 +88,7 @@ float PLImg::MaskGeneration::tMin() {
         cv::Mat mask = imageRegionGrowing(*m_retardation);
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
+        std::cout << "tMin generated" << std::endl;
     }
     return *this->m_tMin;
 }
@@ -103,6 +106,7 @@ float PLImg::MaskGeneration::tMax() {
         int endPosition = std::max_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.end<float>()) - hist.begin<float>();
         int startPosition = std::min_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.begin<float>() + endPosition) - hist.begin<float>();
         this->m_tMax = std::make_unique<float>(histogramPlateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition));
+        std::cout << "tMax generated" << std::endl;
     }
     return *this->m_tMax;
 }

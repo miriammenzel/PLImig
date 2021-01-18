@@ -16,7 +16,7 @@ cv::Mat PLImg::Reader::imread(const std::string& filename, const std::string& da
         // This will be done here.
         if(filename.substr(filename.size()-2) == "h5") {
             return readHDF5(filename, dataset);
-        } else if(filename.substr(filename.size()-3) == "nii"){
+        } else if(filename.substr(filename.size()-3) == "nii" || filename.substr(filename.size()-6) == "nii.gz"){
             return readNIFTI(filename);
         } else {
             return readTiff(filename);

@@ -54,7 +54,19 @@ int main(int argc, char** argv) {
     for(const auto& transmittance_path : transmittance_files) {
         std::cout << transmittance_path << std::endl;
 
-        transmittance_basename = transmittance_path.substr(transmittance_path.find_last_of('/')+1);
+        unsigned long long int endPosition = transmittance_path.find_last_of('/');
+        if(endPosition != std::string::npos) {
+            transmittance_basename = transmittance_path.substr(endPosition+1);
+        } else {
+            transmittance_basename = transmittance_path;
+        }
+        for(std::string extension : std::array<std::string, 5> {".h5", ".tiff", ".tif", ".nii.gz", ".nii"}) {
+            endPosition = transmittance_basename.rfind(extension);
+            if(endPosition != std::string::npos) {
+                transmittance_basename = transmittance_basename.substr(0, endPosition);
+            }
+        }
+
         // Get name of retardation and check if transmittance has median filer applied.
         retardation_basename = std::string(transmittance_basename);
         if (retardation_basename.find("median10") != std::string::npos) {
@@ -160,6 +172,10 @@ int main(int argc, char** argv) {
 
             writer.close();
             std::cout << std::endl;
+        } else {
+            std::cerr << "Mask or Retardation not found. Please check your paths!\n";
+            std::cerr << "Retardation : " << retardation_path << "\n";
+            std::cerr << "Mask : " << mask_path << "\n" << std::endl;
         }
     }
 
