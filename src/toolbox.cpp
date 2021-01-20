@@ -22,44 +22,52 @@ int PLImg::histogramPeakWidth(cv::Mat hist, int peakPosition, float direction, f
 }
 
 float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop) {
-    auto maxIterator = std::max_element(hist.begin<float>() + start, hist.begin<float>() + stop);
-    int maxPos = std::distance(hist.begin<float>(), maxIterator);
-    int width = histogramPeakWidth(hist, maxPos, direction);
-
     float stepSize = (histHigh - histLow) / float(hist.rows);
+    if(stop - start > 3) {
+        auto maxIterator = std::max_element(hist.begin<float>() + start, hist.begin<float>() + stop);
+        int maxPos = std::distance(hist.begin<float>(), maxIterator);
+        int width = fmax(1.0f, histogramPeakWidth(hist, maxPos, direction));
 
-    int roiStart, roiEnd;
-    if(direction > 0) {
-        roiStart = maxPos;
-        roiEnd = std::min(maxPos + 20 * width, stop);
+        int roiStart, roiEnd;
+        if(direction > 0) {
+            roiStart = maxPos;
+            roiEnd = std::min(maxPos + 20 * width, stop);
+        } else {
+            roiStart = std::max(start, maxPos - 10 * width);
+            roiEnd = maxPos;
+        }
+
+        cv::Mat histRoi = hist.rowRange(roiStart, roiEnd);
+        cv::Mat alphaAngle = cv::Mat(histRoi.rows - 1, 1, CV_32FC1);
+
+        float y2, y1, x2, x1;
+        #pragma omp parallel for private(y2, y1, x2, x1)
+        for(int i = 1; i < alphaAngle.rows-1; ++i) {
+            y2 = histRoi.at<float>(i) - histRoi.at<float>(i+1);
+            y1 = histRoi.at<float>(i) - histRoi.at<float>(i-1);
+            x2 = stepSize;
+            x1 = stepSize;
+            alphaAngle.at<float>(i) = std::abs(90 - std::acos((y1 * y2 + x1 * x2) /
+                    std::max(1e-15f, std::sqrt(x1*x1 + y1*y1) * std::sqrt(x2*x2 + y2*y2))) * 180 / M_PI);
+        }
+
+        if(alphaAngle.rows < 3) {
+            return histLow + float(roiStart) * stepSize;
+        } else {
+            auto minIterator = std::min_element(alphaAngle.begin<float>()+1, alphaAngle.end<float>()-1);
+            int minPos = std::distance(alphaAngle.begin<float>(), minIterator);
+            return histLow + float(roiStart + minPos) * stepSize;
+        }
     } else {
-        roiStart = std::max(start, maxPos - 10 * width);
-        roiEnd = maxPos;
+        return histLow + float(start) * stepSize;
     }
-
-    cv::Mat histRoi = hist.rowRange(roiStart, roiEnd);
-    cv::Mat alphaAngle = cv::Mat(histRoi.rows - 1, 1, CV_32FC1);
-
-    float y2, y1, x2, x1;
-    #pragma omp parallel for private(y2, y1, x2, x1)
-    for(int i = 1; i < alphaAngle.rows-1; ++i) {
-        y2 = histRoi.at<float>(i) - histRoi.at<float>(i+1);
-        y1 = histRoi.at<float>(i) - histRoi.at<float>(i-1);
-        x2 = stepSize;
-        x1 = stepSize;
-        alphaAngle.at<float>(i) = std::abs(90 - std::acos((y1 * y2 + x1 * x2) /
-                std::max(1e-15f, std::sqrt(x1*x1 + y1*y1) * std::sqrt(x2*x2 + y2*y2))) * 180 / M_PI);
-    }
-
-    auto minIterator = std::min_element(alphaAngle.begin<float>()+1, alphaAngle.end<float>()-1);
-    int minPos = std::distance(alphaAngle.begin<float>(), minIterator);
-    return histLow + float(roiStart + minPos) * stepSize;
 }
 
-std::vector<unsigned> PLImg::histogramPeaks(cv::Mat hist, int start, int stop) {
+std::vector<unsigned> PLImg::histogramPeaks(cv::Mat hist, int start, int stop, float minSignificance) {
     std::vector<unsigned> peaks;
 
     int posAhead;
+    // find all peaks
     for(int pos = start + 1; pos < stop-1; ++pos) {
         if(hist.at<int>(pos) - hist.at<int>(pos-1) > 0) {
             posAhead = pos + 1;
@@ -71,6 +79,37 @@ std::vector<unsigned> PLImg::histogramPeaks(cv::Mat hist, int start, int stop) {
             if(hist.at<int>(pos) - hist.at<int>(posAhead) > 0) {
                 peaks.push_back((pos + posAhead - 1) / 2);
             }
+        }
+    }
+
+    float maxElem = *std::max_element(hist.begin<float>(), hist.end<float>());
+
+    // filter peaks by prominence
+    for(int i = peaks.size()-1; i >= 0; --i) {
+        float left_min = hist.at<float>(peaks.at(i));
+        if(left_min == maxElem) {
+            continue;
+        }
+        int left_i = peaks.at(i) - 1;
+        while(left_i > 0 && hist.at<float>(left_i) <= hist.at<float>(peaks.at(i))) {
+            if(hist.at<float>(left_i) < left_min) {
+                left_min = hist.at<float>(left_i);
+            }
+            --left_i;
+        }
+
+        float right_min = hist.at<float>(peaks.at(i));
+        int right_i = peaks.at(i) + 1;
+        while(right_i < hist.rows && hist.at<float>(right_i) <= hist.at<float>(peaks.at(i))) {
+            if(hist.at<float>(right_i) < right_min) {
+                right_min = hist.at<float>(right_i);
+            }
+            ++right_i;
+        }
+
+        float prominence = hist.at<float>(peaks.at(i)) - fmax(left_min, right_min);
+        if(prominence < minSignificance) {
+            peaks.erase(peaks.begin() + i);
         }
     }
 

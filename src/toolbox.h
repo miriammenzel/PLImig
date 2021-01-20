@@ -69,7 +69,7 @@ namespace PLImg {
      * @param stop
      * @return
      */
-    std::vector<unsigned> histogramPeaks(cv::Mat hist, int start, int stop);
+    std::vector<unsigned> histogramPeaks(cv::Mat hist, int start, int stop, float minSignificance = 0.01f);
 
     /**
      * @brief imageRegionGrowing
