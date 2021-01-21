@@ -113,10 +113,12 @@ target_link_libraries(PLImg ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIE
         CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu CUDA::nppist
         OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem)
 
-add_executable(PLIMaskGeneration PLImg.cpp)
+add_executable(PLIMaskGeneration MaskGeneration.cpp)
 target_link_libraries(PLIMaskGeneration PLImg)
 add_executable(PLIInclination CalcIncl.cpp)
 target_link_libraries(PLIInclination PLImg)
+add_executable(PLImgPipeline PLImg.cpp)
+target_link_libraries(PLImgPipeline PLImg)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     install(TARGETS PLImg LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION lib)

@@ -1,7 +1,6 @@
 #include "reader.h"
 #include "writer.h"
 #include "maskgeneration.h"
-#include "inclination.h"
 #include "CLI/CLI.hpp"
 
 #include <vector>
@@ -16,6 +15,7 @@ int main(int argc, char** argv) {
     std::string output_folder;
     std::string dataset;
     bool detailed = false;
+    bool blurred = false;
 
     float tmin, tmax, tret, ttra;
 
@@ -34,6 +34,7 @@ int main(int argc, char** argv) {
     optional->add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
                     ->default_val("/Image");
     optional->add_flag("--detailed", detailed);
+    optional->add_flag("--with_blurred", blurred);
     auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
     parameters->add_option("--ttra", ttra, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
@@ -47,7 +48,6 @@ int main(int argc, char** argv) {
 
     PLImg::HDF5Writer writer;
     PLImg::MaskGeneration generation;
-    PLImg::Inclination inclination;
 
     std::string transmittance_basename, retardation_basename, mask_basename, inclination_basename;
     std::string retardation_path, mask_path;
@@ -118,6 +118,7 @@ int main(int argc, char** argv) {
             } else {
                 medTransmittance = transmittance;
             }
+            transmittance = nullptr;
             std::cout << "Med10Transmittance generated" << std::endl;
 
             generation.setModalities(retardation, medTransmittance);
@@ -141,62 +142,16 @@ int main(int argc, char** argv) {
             std::cout << "White mask generated and written" << std::endl;
             writer.write_dataset(dataset + "/Gray", *generation.grayMask());
             std::cout << "Gray mask generated and written" << std::endl;
-            writer.write_dataset(dataset + "/Blurred", *generation.blurredMask());
-            std::cout << "Blurred mask generated and written" << std::endl;
 
+            if (blurred) {
+                writer.write_dataset(dataset + "/Blurred", *generation.blurredMask());
+                std::cout << "Blurred mask generated and written" << std::endl;
+            }
             if (detailed) {
                 writer.write_dataset(dataset + "/Full", *generation.fullMask());
                 writer.write_dataset(dataset + "/NoNerveFibers", *generation.noNerveFiberMask());
                 std::cout << "Detailed masks generated and written" << std::endl;
             }
-            writer.close();
-
-            std::shared_ptr<cv::Mat> medTransmittanceWhite;
-            if (transmittance_path.find("median10") == std::string::npos) {
-                // Write it to a file
-                std::string medTraName(mask_basename);
-                medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittanceMasked");
-                // Set file
-                writer.set_path(output_folder + "/" + medTraName + ".h5");
-                // Set dataset
-                std::string group = dataset.substr(0, dataset.find_last_of('/'));
-                // Create group and dataset
-                writer.create_group(group);
-                writer.create_group(dataset);
-
-                // Generate med10Transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.whiteMask());
-                writer.write_dataset(dataset + "/Gray", *medTransmittance);
-                medTransmittanceWhite = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.whiteMask());
-                writer.write_dataset(dataset + "/White", *medTransmittanceWhite);
-                cv::add(*medTransmittance, *medTransmittanceWhite, *medTransmittance, *generation.whiteMask(), CV_32FC1);
-                writer.write_dataset(dataset + "/Full", *medTransmittance);
-                medTransmittanceWhite = nullptr;
-                transmittance = nullptr;
-                writer.close();
-            } else {
-                medTransmittance = transmittance;
-            }
-            std::cout << "Median10 filtered and masked transmittance generated and written" << std::endl;
-
-            // Set our read parameters
-            inclination.setModalities(medTransmittance, retardation, generation.blurredMask(), generation.whiteMask(), generation.grayMask());
-            // If manual parameters were given, apply them here
-
-            inclination.set_im(generation.tMin());
-            inclination.set_rmaxGray(generation.tRet());
-
-            // Create file and dataset. Write the inclination afterwards.
-            writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
-            writer.create_group(dataset);
-            writer.write_dataset(dataset+"/Inclination", *inclination.inclination());
-            std::cout << "Inclination generated and written" << std::endl;
-
-            if(detailed) {
-                writer.write_dataset(dataset+"/Saturation", *inclination.saturation());
-                std::cout << "Saturation image generated and written" << std::endl;
-            }
-
             writer.close();
             std::cout << std::endl;
         }

@@ -142,7 +142,12 @@ void PLImg::HDF5Writer::open() {
     // If the file doesn't exist open it with Read-Write.
     // Otherwise open it with appending so that existing content will not be deleted.
     if(PLImg::Reader::fileExists(m_filename)) {
-        m_hdf5file = H5::H5File(m_filename, H5F_ACC_RDWR);
+        try {
+            m_hdf5file = H5::H5File(m_filename, H5F_ACC_RDWR);
+        }  catch (...) {
+            H5::Exception::printErrorStack();
+            exit(EXIT_FAILURE);
+        }
     } else {
         m_hdf5file = H5::H5File(m_filename, H5F_ACC_TRUNC);
     }
