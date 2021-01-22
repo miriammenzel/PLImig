@@ -227,10 +227,27 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         small_retardation = nullptr;
         generation.setModalities(nullptr, nullptr);
 
-        float diff_tRet_p = fmax(0, std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / fmax(1.0f, above_tRet.size()) - tRet());
-        float diff_tRet_m = fmax(0, tRet() - std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / fmax(1.0f, below_tRet.size()));
-        float diff_tTra_p = abs(std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / fmax(1.0f, above_tTra.size()) - tTra());
-        float diff_tTra_m = abs(std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / fmax(1.0f, below_tTra.size()) - tTra());
+        float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
+        if (above_tRet.size() == 0) {
+            diff_tRet_p = 1.0f / NUMBER_OF_BINS;
+        } else {
+            diff_tRet_p = fmax(1.0f / NUMBER_OF_BINS, std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / fmax(1.0f, above_tRet.size()) - tRet());
+        }
+        if (below_tRet.size() == 0) {
+            diff_tRet_m = 1.0f / NUMBER_OF_BINS;
+        } else {
+            diff_tRet_m = fmax(1.0f / NUMBER_OF_BINS, tRet() - std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / fmax(1.0f, below_tRet.size()));
+        }
+        if (above_tTra.size() == 0) {
+            diff_tTra_p = 1.0f / NUMBER_OF_BINS;
+        } else {
+            diff_tTra_p = fmax(1.0f / NUMBER_OF_BINS, std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / fmax(1.0f, above_tTra.size()) - tTra());
+        }
+        if (below_tTra.size() == 0) {
+            diff_tTra_m = 1.0f / NUMBER_OF_BINS;
+        } else {
+            diff_tTra_m = fmax(1.0f / NUMBER_OF_BINS, tTra() - std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / fmax(1.0f, below_tTra.size()));
+        }
 
         std::cout << diff_tRet_p << " " << diff_tRet_m << " " << ", " << diff_tTra_p << " " << diff_tTra_m << std::endl;
 

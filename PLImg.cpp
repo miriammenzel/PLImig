@@ -93,6 +93,10 @@ int main(int argc, char** argv) {
             if (mask_basename.find("Retardation") != std::string::npos) {
                 mask_basename = mask_basename.replace(mask_basename.find("Retardation"), 11, "Mask");
             }
+            inclination_basename = std::string(mask_basename);
+            if (mask_basename.find("Mask") != std::string::npos) {
+                inclination_basename = inclination_basename.replace(inclination_basename.find("Mask"), 4, "Inclination");
+            }
 
             std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(
                     PLImg::Reader::imread(transmittance_path, dataset));
@@ -165,7 +169,7 @@ int main(int argc, char** argv) {
                 writer.create_group(dataset);
 
                 // Generate med10Transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.whiteMask());
+                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.grayMask());
                 writer.write_dataset(dataset + "/Gray", *medTransmittance);
                 medTransmittanceWhite = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.whiteMask());
                 writer.write_dataset(dataset + "/White", *medTransmittanceWhite);
@@ -183,10 +187,11 @@ int main(int argc, char** argv) {
             inclination.setModalities(medTransmittance, retardation, generation.blurredMask(), generation.whiteMask(), generation.grayMask());
             // If manual parameters were given, apply them here
 
-            inclination.set_im(generation.tMin());
-            inclination.set_rmaxGray(generation.tRet());
+            //inclination.set_im(generation.tMin());
+            //inclination.set_rmaxGray(generation.tRet());
 
             // Create file and dataset. Write the inclination afterwards.
+            std::cout << output_folder+ "/" + inclination_basename + ".h5" << std::endl;
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
             writer.create_group(dataset);
             writer.write_dataset(dataset+"/Inclination", *inclination.inclination());
