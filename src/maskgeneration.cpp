@@ -78,7 +78,6 @@ float PLImg::MaskGeneration::tRet() {
         cv::Mat hist;
         cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
         cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
-        std::vector<float> vec(hist.begin<float>(), hist.end<float>());
 
         // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
         auto peaks = PLImg::histogramPeaks(hist, 0, NUMBER_OF_BINS / 2, 1e-2f);
@@ -91,12 +90,16 @@ float PLImg::MaskGeneration::tRet() {
             startPosition = 0;
         }
 
+        std::vector<float> vec(hist.begin<float>(), hist.end<float>());
+
         cv::Mat subHist = hist.rowRange(startPosition, hist.rows);
 
-        cv::blur(subHist, subHist, cv::Size(1, 20), cv::Point(-1, -1), cv::BORDER_REFLECT);
+        cv::blur(subHist, subHist, cv::Size(1, 10), cv::Point(-1, -1), cv::BORDER_REPLICATE);
         cv::normalize(subHist, subHist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
-        this->m_tRet = std::make_unique<float>(histogramPlateau(subHist, startPosition * 1.0f/NUMBER_OF_BINS, 1.0f, 1, 0, NUMBER_OF_BINS/2));
+        vec = std::vector<float>(hist.begin<float>(), hist.end<float>());
+
+        this->m_tRet = std::make_unique<float>(histogramPlateau(subHist, startPosition * 1.0f/NUMBER_OF_BINS, 1.0f, 1, 0, NUMBER_OF_BINS/2 - startPosition));
     }
     return *this->m_tRet;
 }

@@ -40,15 +40,16 @@ float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float
         cv::Mat histRoi = hist.rowRange(roiStart, roiEnd);
         cv::Mat alphaAngle = cv::Mat(histRoi.rows - 1, 1, CV_32FC1);
 
-        float y2, y1, x2, x1;
-        #pragma omp parallel for private(y2, y1, x2, x1)
+        float y2, y1, x2, x1, dotprod, magnitude;
+        #pragma omp parallel for private(y2, y1, x2, x1, dotprod, magnitude)
         for(int i = 1; i < alphaAngle.rows-1; ++i) {
-            y2 = histRoi.at<float>(i) - histRoi.at<float>(i+1);
-            y1 = histRoi.at<float>(i) - histRoi.at<float>(i-1);
+            y2 = histRoi.at<float>(i+1) - histRoi.at<float>(i);
+            y1 = histRoi.at<float>(i-1) - histRoi.at<float>(i);
             x2 = stepSize;
-            x1 = stepSize;
-            alphaAngle.at<float>(i) = std::abs(90 - std::acos((y1 * y2 + x1 * x2) /
-                    std::max(1e-15f, std::sqrt(x1*x1 + y1*y1) * std::sqrt(x2*x2 + y2*y2))) * 180 / M_PI);
+            x1 = -stepSize;
+            dotprod = x1 * x2 + y1 * y2;
+            magnitude = fmax(1e-10, std::sqrt(x1 * x1 + y1 * y1) * std::sqrt(x2 * x2 + y2 * y2));
+            alphaAngle.at<float>(i) = std::acos(dotprod / magnitude) * 180 / M_PI;
         }
 
         if(alphaAngle.rows < 3) {
