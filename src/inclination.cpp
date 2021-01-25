@@ -87,7 +87,7 @@ float PLImg::Inclination::im() {
     if(!m_im) {
         // im is the mean value in the transmittance based on the highest retardation values
         if(!m_regionGrowingMask) {
-            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::imageRegionGrowing(*m_retardation));
+            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::Image::regionGrowing(*m_retardation));
         }
         m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask)[0]);
     }
@@ -108,7 +108,7 @@ float PLImg::Inclination::rmaxGray() {
         std::vector<float> vec(hist.begin<float>(), hist.end<float>());
 
         // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
-        auto peaks = PLImg::histogramPeaks(hist, 0, NUMBER_OF_BINS / 2, 1e-2f);
+        auto peaks = PLImg::Histogram::peaks(hist, 0, NUMBER_OF_BINS / 2, 1e-2f);
         int startPosition;
         if(peaks.size() > 1) {
             startPosition = peaks.at(peaks.size() - 1);
@@ -123,7 +123,7 @@ float PLImg::Inclination::rmaxGray() {
         cv::blur(subHist, subHist, cv::Size(1, 20), cv::Point(-1, -1), cv::BORDER_REFLECT);
         cv::normalize(subHist, subHist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
-        m_rmaxGray = std::make_unique<float>(histogramPlateau(subHist, startPosition * 1.0f/NUMBER_OF_BINS, 1.0f, 1, 0, NUMBER_OF_BINS/2));
+        m_rmaxGray = std::make_unique<float>(Histogram::plateau(subHist, startPosition * 1.0f/NUMBER_OF_BINS, 1.0f, 1, 0, NUMBER_OF_BINS/2));
     }
     return *m_rmaxGray;
 }
@@ -132,7 +132,7 @@ float PLImg::Inclination::rmaxWhite() {
     if(!m_rmaxWhite) {
         // rmaxWhite is the mean value in the retardation based on the highest retardation values
         if(!m_regionGrowingMask) {
-            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::imageRegionGrowing(*m_retardation));
+            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::Image::regionGrowing(*m_retardation));
         }
         m_rmaxWhite = std::make_unique<float>(cv::mean(*m_retardation, *m_regionGrowingMask)[0]);
     }

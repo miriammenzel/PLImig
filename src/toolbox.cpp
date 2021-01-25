@@ -5,7 +5,7 @@
 #include "toolbox.h"
 #include <iostream>
 
-int PLImg::histogramPeakWidth(cv::Mat hist, int peakPosition, float direction, float targetHeight) {
+int PLImg::Histogram::peakWidth(cv::Mat hist, int peakPosition, float direction, float targetHeight) {
     float height = hist.at<float>(peakPosition) * targetHeight;
     int i = peakPosition;
     if(direction > 0) {
@@ -21,12 +21,12 @@ int PLImg::histogramPeakWidth(cv::Mat hist, int peakPosition, float direction, f
     }
 }
 
-float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop) {
+float PLImg::Histogram::plateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop) {
     float stepSize = (histHigh - histLow) / float(hist.rows);
     if(stop - start > 3) {
         auto maxIterator = std::max_element(hist.begin<float>() + start, hist.begin<float>() + stop);
         int maxPos = std::distance(hist.begin<float>(), maxIterator);
-        int width = fmax(1.0f, histogramPeakWidth(hist, maxPos, direction));
+        int width = fmax(1.0f, peakWidth(hist, maxPos, direction));
 
         int roiStart, roiEnd;
         if(direction > 0) {
@@ -64,7 +64,7 @@ float PLImg::histogramPlateau(cv::Mat hist, float histLow, float histHigh, float
     }
 }
 
-std::vector<unsigned> PLImg::histogramPeaks(cv::Mat hist, int start, int stop, float minSignificance) {
+std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop, float minSignificance) {
     std::vector<unsigned> peaks;
 
     int posAhead;
@@ -117,7 +117,7 @@ std::vector<unsigned> PLImg::histogramPeaks(cv::Mat hist, int start, int stop, f
     return peaks;
 }
 
-cv::Mat PLImg::imageRegionGrowing(const cv::Mat& image, float percentPixels) {
+cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, float percentPixels) {
     float pixelThreshold = float(image.rows)/100 * float(image.cols) * percentPixels;
 
     int channels[] = {0};

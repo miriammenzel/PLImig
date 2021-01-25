@@ -23,13 +23,13 @@ TEST(TestToolbox, TestHistogramPeakWidth) {
     std::vector<float> test_arr = {0, 0, 0.5, 0.75, 0.8, 0.85, 0.9, 1};
     cv::Mat test_img(test_arr.size(), 1, CV_32FC1);
     test_img.data = (uchar*) test_arr.data();
-    int width = PLImg::histogramPeakWidth(test_img, test_img.rows-1, -1);
+    int width = PLImg::Histogram::peakWidth(test_img, test_img.rows-1, -1);
     ASSERT_EQ(width, 5);
 
     test_arr = {1, 0.9, 0.85, 0.8, 0.75, 0.5, 0, 0};
     test_img = cv::Mat(test_arr.size(), 1, CV_32FC1);
     test_img.data = (uchar*) test_arr.data();
-    width = PLImg::histogramPeakWidth(test_img, 0, 1);
+    width = PLImg::Histogram::peakWidth(test_img, 0, 1);
     ASSERT_EQ(width, 5);
 }
 
@@ -69,7 +69,7 @@ TEST(TestToolbox, TestHistogramPlateauLeft) {
     cv::Mat hist;
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
 
-    float result = PLImg::histogramPlateau(hist, 0, 1, 1, 1, NUMBER_OF_BINS/2);
+    float result = PLImg::Histogram::plateau(hist, 0, 1, 1, 1, NUMBER_OF_BINS/2);
     ASSERT_FLOAT_EQ(result, 4.0f * (1.0f/256.0f));
 }
 
@@ -110,7 +110,7 @@ TEST(TestToolbox, TestHistogramPlateauRight) {
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
     std::reverse(hist.begin<float>(), hist.end<float>());
 
-    float result = PLImg::histogramPlateau(hist, 0, 1, -1, NUMBER_OF_BINS/2, NUMBER_OF_BINS);
+    float result = PLImg::Histogram::plateau(hist, 0, 1, -1, NUMBER_OF_BINS/2, NUMBER_OF_BINS);
     ASSERT_FLOAT_EQ(result, 1.0f - 5.0f * (1.0f/256.0f));
 }
 
@@ -130,7 +130,7 @@ TEST(TestToolbox, TestImageRegionGrowing) {
         }
     }
 
-    cv::Mat mask = PLImg::imageRegionGrowing(test_retardation);
+    cv::Mat mask = PLImg::Image::regionGrowing(test_retardation);
     for(uint i = 11; i < 20; ++i) {
         for(uint j = 11; j < 15; ++j) {
             ASSERT_TRUE(mask.at<bool>(i, j));

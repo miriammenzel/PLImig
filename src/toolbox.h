@@ -40,44 +40,52 @@
  * @brief PLImg histogram toolbox functions
  */
 namespace PLImg {
-    /**
-     * @brief histogramPeakWidth
-     * @param hist
-     * @param peakPosition
-     * @param direction
-     * @param targetHeight
-     * @return
-     */
-    int histogramPeakWidth(cv::Mat hist, int peakPosition, float direction, float targetHeight = 0.5f);
+    namespace Histogram {
+        /**
+         * @brief histogramPeakWidth
+         * @param hist
+         * @param peakPosition
+         * @param direction
+         * @param targetHeight
+         * @return
+         */
+        int peakWidth(cv::Mat hist, int peakPosition, float direction, float targetHeight = 0.5f);
 
-    /**
-     * @brief histogramPlateau
-     * @param hist
-     * @param histLow
-     * @param histHigh
-     * @param direction
-     * @param start
-     * @param stop
-     * @return
-     */
-    float histogramPlateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop);
+        /**
+         * @brief histogramPlateau
+         * @param hist
+         * @param histLow
+         * @param histHigh
+         * @param direction
+         * @param start
+         * @param stop
+         * @return
+         */
+        float plateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop);
 
-    /**
-     * @brief histogramPeaks
-     * @param hist
-     * @param start
-     * @param stop
-     * @return
-     */
-    std::vector<unsigned> histogramPeaks(cv::Mat hist, int start, int stop, float minSignificance = 0.01f);
+        /**
+         * @brief histogramPeaks
+         * @param hist
+         * @param start
+         * @param stop
+         * @return
+         */
+        std::vector<unsigned> peaks(cv::Mat hist, int start, int stop, float minSignificance = 0.01f);
 
-    /**
-     * @brief imageRegionGrowing
-     * @param image
-     * @param percentPixels
-     * @return
-     */
-    cv::Mat imageRegionGrowing(const cv::Mat& image, float percentPixels = 0.05f);
+        /**
+         * @brief imageRegionGrowing
+         * @param image
+         * @param percentPixels
+         * @return
+         */
+
+        cv::Mat savgolFilter(cv::Mat hist);
+    }
+
+    namespace Image {
+        cv::Mat regionGrowing(const cv::Mat& image, float percentPixels = 0.05f);
+    }
+
 
     namespace cuda {
         /**

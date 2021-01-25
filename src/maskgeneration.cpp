@@ -62,7 +62,7 @@ float PLImg::MaskGeneration::tTra() {
         auto maxElem = std::max_element(hist.begin<float>() + startPosition, hist.begin<float>() + endPosition);
         endPosition = std::min_element(hist.begin<float>() + startPosition, maxElem) - hist.begin<float>();
 
-        this->m_tTra = std::make_unique<float>(histogramPlateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition));
+        this->m_tTra = std::make_unique<float>(Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition));
     }
     return *this->m_tTra;
 }
@@ -80,7 +80,7 @@ float PLImg::MaskGeneration::tRet() {
         cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
         // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
-        auto peaks = PLImg::histogramPeaks(hist, 0, NUMBER_OF_BINS / 2, 1e-2f);
+        auto peaks = PLImg::Histogram::peaks(hist, 0, NUMBER_OF_BINS / 2, 1e-2f);
         int startPosition;
         if(peaks.size() > 1) {
             startPosition = peaks.at(peaks.size() - 1);
@@ -93,20 +93,19 @@ float PLImg::MaskGeneration::tRet() {
         std::vector<float> vec(hist.begin<float>(), hist.end<float>());
 
         cv::Mat subHist = hist.rowRange(startPosition, hist.rows);
-
-        cv::blur(subHist, subHist, cv::Size(1, 10), cv::Point(-1, -1), cv::BORDER_REPLICATE);
+        cv::blur(subHist, subHist, cv::Size(1, 20), cv::Point(-1, -1), cv::BORDER_REPLICATE);
         cv::normalize(subHist, subHist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
         vec = std::vector<float>(hist.begin<float>(), hist.end<float>());
 
-        this->m_tRet = std::make_unique<float>(histogramPlateau(subHist, startPosition * 1.0f/NUMBER_OF_BINS, 1.0f, 1, 0, NUMBER_OF_BINS/2 - startPosition));
+        this->m_tRet = std::make_unique<float>(Histogram::plateau(subHist, startPosition * 1.0f/NUMBER_OF_BINS, 1.0f, 1, 0, NUMBER_OF_BINS/2 - startPosition));
     }
     return *this->m_tRet;
 }
 
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
-        cv::Mat mask = imageRegionGrowing(*m_retardation);
+        cv::Mat mask = Image::regionGrowing(*m_retardation);
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
     }
@@ -125,7 +124,7 @@ float PLImg::MaskGeneration::tMax() {
         cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
         int endPosition = std::max_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.end<float>()) - hist.begin<float>();
         int startPosition = std::min_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.begin<float>() + endPosition) - hist.begin<float>();
-        this->m_tMax = std::make_unique<float>(histogramPlateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition));
+        this->m_tMax = std::make_unique<float>(Histogram::plateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition));
     }
     return *this->m_tMax;
 }
