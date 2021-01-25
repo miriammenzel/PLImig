@@ -93,7 +93,7 @@ float PLImg::MaskGeneration::tRet() {
         std::vector<float> vec(hist.begin<float>(), hist.end<float>());
 
         cv::Mat subHist = hist.rowRange(startPosition, hist.rows);
-        cv::blur(subHist, subHist, cv::Size(1, 20), cv::Point(-1, -1), cv::BORDER_REPLICATE);
+        cv::blur(subHist, subHist, cv::Size(1, 10), cv::Point(-1, -1), cv::BORDER_REFLECT);
         cv::normalize(subHist, subHist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
         vec = std::vector<float>(hist.begin<float>(), hist.end<float>());

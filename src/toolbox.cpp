@@ -38,25 +38,30 @@ float PLImg::Histogram::plateau(cv::Mat hist, float histLow, float histHigh, flo
         }
 
         cv::Mat histRoi = hist.rowRange(roiStart, roiEnd);
-        cv::Mat alphaAngle = cv::Mat(histRoi.rows - 1, 1, CV_32FC1);
+        cv::Mat kappa = cv::Mat(histRoi.rows, 1, CV_32FC1);
 
-        float y2, y1, x2, x1, dotprod, magnitude;
-        #pragma omp parallel for private(y2, y1, x2, x1, dotprod, magnitude)
-        for(int i = 1; i < alphaAngle.rows-1; ++i) {
-            y2 = histRoi.at<float>(i+1) - histRoi.at<float>(i);
-            y1 = histRoi.at<float>(i-1) - histRoi.at<float>(i);
-            x2 = stepSize;
-            x1 = -stepSize;
-            dotprod = x1 * x2 + y1 * y2;
-            magnitude = fmax(1e-10, std::sqrt(x1 * x1 + y1 * y1) * std::sqrt(x2 * x2 + y2 * y2));
-            alphaAngle.at<float>(i) = std::acos(dotprod / magnitude) * 180 / M_PI;
+        float d1, d2;
+        #pragma omp parallel for private(d1, d2)
+        for(int i = 1; i < kappa.rows-1; ++i) {
+            d1 = (histRoi.at<float>(i) + (histRoi.at<float>(i+1) - histRoi.at<float>(i)) / 2.0f) - (hist.at<float>(i-1) + (histRoi.at<float>(i) - histRoi.at<float>(i-1)) / 2.0f);
+            d2 = histRoi.at<float>(i+1) - 2 * histRoi.at<float>(i) + histRoi.at<float>(i-1);
+            // Correct angle to respect near 90° values caused by plateaus or similar problems
+            kappa.at<float>(i) = abs(d2 / pow(1 + pow(d1, 2), 3.0f/2.0f));
+            if(kappa.at<float>(i) < 1e-4) {
+                kappa.at<float>(i) = 0;
+            }
         }
+        auto kappaPeaks = peaks(kappa, 0, kappa.rows, 0);
 
-        if(alphaAngle.rows < 3) {
+        if(kappa.rows < 3 || kappaPeaks.size() == 0) {
             return histLow + float(roiStart) * stepSize;
         } else {
-            auto minIterator = std::min_element(alphaAngle.begin<float>()+1, alphaAngle.end<float>()-1);
-            int minPos = std::distance(alphaAngle.begin<float>(), minIterator);
+            int minPos;
+            if(direction < 1) {
+                minPos = kappaPeaks[0];
+            } else {
+                minPos = kappaPeaks[kappaPeaks.size()-1];
+            }
             return histLow + float(roiStart + minPos) * stepSize;
         }
     } else {

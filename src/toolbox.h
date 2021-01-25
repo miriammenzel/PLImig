@@ -71,18 +71,15 @@ namespace PLImg {
          * @return
          */
         std::vector<unsigned> peaks(cv::Mat hist, int start, int stop, float minSignificance = 0.01f);
+    }
 
+    namespace Image {
         /**
          * @brief imageRegionGrowing
          * @param image
          * @param percentPixels
          * @return
          */
-
-        cv::Mat savgolFilter(cv::Mat hist);
-    }
-
-    namespace Image {
         cv::Mat regionGrowing(const cv::Mat& image, float percentPixels = 0.05f);
     }
 
