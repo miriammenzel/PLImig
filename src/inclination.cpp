@@ -96,34 +96,39 @@ float PLImg::Inclination::im() {
 
 float PLImg::Inclination::rmaxGray() {
     if(!m_rmaxGray) {
+        float temp_rMax = 0;
         int channels[] = {0};
         float histBounds[] = {0.0f+1e-10f, 1.0f};
         const float* histRange = { histBounds };
-        int histSize = NUMBER_OF_BINS;
 
-        // Generate histogram
-        cv::Mat hist;
-        cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
-        cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
-        std::vector<float> vec(hist.begin<float>(), hist.end<float>());
+        int startPosition, endPosition;
+        startPosition = 0;
+        endPosition = MIN_NUMBER_OF_BINS / 2;
 
-        // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
-        auto peaks = PLImg::Histogram::peaks(hist, 0, NUMBER_OF_BINS / 2, 1e-2f);
-        int startPosition;
-        if(peaks.size() > 1) {
-            startPosition = peaks.at(peaks.size() - 1);
-        } else if(peaks.size() == 1) {
-            startPosition = peaks.at(0);
-        } else {
-            startPosition = 0;
+        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS < MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
+            int histSize = NUMBER_OF_BINS;
+
+            // Generate histogram
+            cv::Mat hist;
+            cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
+            cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
+
+            // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
+            auto peaks = PLImg::Histogram::peaks(hist, startPosition, endPosition, 1e-2f);
+            if(peaks.size() > 1) {
+                startPosition = peaks.at(peaks.size() - 1);
+            } else if(peaks.size() == 1) {
+                startPosition = peaks.at(0);
+            } else {
+                startPosition = 0;
+            }
+
+            temp_rMax = Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
+
+            startPosition = fmax(0, ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) * ((temp_rMax * NUMBER_OF_BINS) - 3));
+            endPosition = fmin(((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) * ((temp_rMax * NUMBER_OF_BINS) + 3), NUMBER_OF_BINS << 1);
         }
-
-        cv::Mat subHist = hist.rowRange(startPosition, hist.rows);
-
-        cv::blur(subHist, subHist, cv::Size(1, 20), cv::Point(-1, -1), cv::BORDER_REFLECT);
-        cv::normalize(subHist, subHist, 0, 1, cv::NORM_MINMAX, CV_32F);
-
-        m_rmaxGray = std::make_unique<float>(Histogram::plateau(subHist, startPosition * 1.0f/NUMBER_OF_BINS, 1.0f, 1, 0, NUMBER_OF_BINS/2));
+        m_rmaxGray = std::make_unique<float>(temp_rMax);
     }
     return *m_rmaxGray;
 }

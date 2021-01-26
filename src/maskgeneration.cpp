@@ -50,14 +50,14 @@ float PLImg::MaskGeneration::tTra() {
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f+1e-15f};
         const float* histRange = { histBounds };
-        int histSize = NUMBER_OF_BINS;
+        int histSize = MAX_NUMBER_OF_BINS;
 
         cv::Mat hist;
         cv::calcHist(&(*m_transmittance), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
         cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
 
-        int startPosition = temp_tTra * NUMBER_OF_BINS;
-        int endPosition = tMax() * NUMBER_OF_BINS;
+        int startPosition = temp_tTra * MAX_NUMBER_OF_BINS;
+        int endPosition = tMax() * MAX_NUMBER_OF_BINS;
 
         auto maxElem = std::max_element(hist.begin<float>() + startPosition, hist.begin<float>() + endPosition);
         endPosition = std::min_element(hist.begin<float>() + startPosition, maxElem) - hist.begin<float>();
@@ -69,36 +69,40 @@ float PLImg::MaskGeneration::tTra() {
 
 float PLImg::MaskGeneration::tRet() {
     if(!m_tRet) {
+        float temp_tRet = 0;
         int channels[] = {0};
         float histBounds[] = {0.0f+1e-10f, 1.0f};
         const float* histRange = { histBounds };
-        int histSize = NUMBER_OF_BINS;
 
-        // Generate histogram
-        cv::Mat hist;
-        cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
-        cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
+        int startPosition, endPosition;
+        startPosition = 0;
+        endPosition = MIN_NUMBER_OF_BINS / 2;
 
-        // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
-        auto peaks = PLImg::Histogram::peaks(hist, 0, NUMBER_OF_BINS / 2, 1e-2f);
-        int startPosition;
-        if(peaks.size() > 1) {
-            startPosition = peaks.at(peaks.size() - 1);
-        } else if(peaks.size() == 1) {
-            startPosition = peaks.at(0);
-        } else {
-            startPosition = 0;
+        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS < MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
+            int histSize = NUMBER_OF_BINS;
+
+            // Generate histogram
+            cv::Mat hist;
+            cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
+            cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
+
+            // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
+            auto peaks = PLImg::Histogram::peaks(hist, startPosition, endPosition, 1e-2f);
+            if(peaks.size() > 1) {
+                startPosition = peaks.at(peaks.size() - 1);
+            } else if(peaks.size() == 1) {
+                startPosition = peaks.at(0);
+            } else {
+                startPosition = 0;
+            }
+
+            temp_tRet = Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
+
+            startPosition = fmax(0, ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) * ((temp_tRet * NUMBER_OF_BINS) - 3));
+            endPosition = fmin(((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) * ((temp_tRet * NUMBER_OF_BINS) + 3), NUMBER_OF_BINS << 1);
         }
 
-        std::vector<float> vec(hist.begin<float>(), hist.end<float>());
-
-        cv::Mat subHist = hist.rowRange(startPosition, hist.rows);
-        cv::blur(subHist, subHist, cv::Size(1, 10), cv::Point(-1, -1), cv::BORDER_REFLECT);
-        cv::normalize(subHist, subHist, 0, 1, cv::NORM_MINMAX, CV_32F);
-
-        vec = std::vector<float>(hist.begin<float>(), hist.end<float>());
-
-        this->m_tRet = std::make_unique<float>(Histogram::plateau(subHist, startPosition * 1.0f/NUMBER_OF_BINS, 1.0f, 1, 0, NUMBER_OF_BINS/2 - startPosition));
+        this->m_tRet = std::make_unique<float>(temp_tRet);
     }
     return *this->m_tRet;
 }
@@ -117,13 +121,13 @@ float PLImg::MaskGeneration::tMax() {
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f+1e-15f};
         const float* histRange = { histBounds };
-        int histSize = NUMBER_OF_BINS;
+        int histSize = MAX_NUMBER_OF_BINS;
 
         cv::Mat hist;
         cv::calcHist(&(*m_transmittance), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
         cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
-        int endPosition = std::max_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.end<float>()) - hist.begin<float>();
-        int startPosition = std::min_element(hist.begin<float>() + NUMBER_OF_BINS/2, hist.begin<float>() + endPosition) - hist.begin<float>();
+        int endPosition = std::max_element(hist.begin<float>() + MAX_NUMBER_OF_BINS/2, hist.end<float>()) - hist.begin<float>();
+        int startPosition = std::min_element(hist.begin<float>() + MAX_NUMBER_OF_BINS/2, hist.begin<float>() + endPosition) - hist.begin<float>();
         this->m_tMax = std::make_unique<float>(Histogram::plateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition));
     }
     return *this->m_tMax;
@@ -231,24 +235,24 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
 
         float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
         if (above_tRet.size() == 0) {
-            diff_tRet_p = 1.0f / NUMBER_OF_BINS;
+            diff_tRet_p = 1.0f / MAX_NUMBER_OF_BINS;
         } else {
-            diff_tRet_p = fmax(1.0f / NUMBER_OF_BINS, std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / fmax(1.0f, above_tRet.size()) - tRet());
+            diff_tRet_p = fmax(1.0f / MAX_NUMBER_OF_BINS, std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / fmax(1.0f, above_tRet.size()) - tRet());
         }
         if (below_tRet.size() == 0) {
-            diff_tRet_m = 1.0f / NUMBER_OF_BINS;
+            diff_tRet_m = 1.0f / MAX_NUMBER_OF_BINS;
         } else {
-            diff_tRet_m = fmax(1.0f / NUMBER_OF_BINS, tRet() - std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / fmax(1.0f, below_tRet.size()));
+            diff_tRet_m = fmax(1.0f / MAX_NUMBER_OF_BINS, tRet() - std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / fmax(1.0f, below_tRet.size()));
         }
         if (above_tTra.size() == 0) {
-            diff_tTra_p = 1.0f / NUMBER_OF_BINS;
+            diff_tTra_p = 1.0f / MAX_NUMBER_OF_BINS;
         } else {
-            diff_tTra_p = fmax(1.0f / NUMBER_OF_BINS, std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / fmax(1.0f, above_tTra.size()) - tTra());
+            diff_tTra_p = fmax(1.0f / MAX_NUMBER_OF_BINS, std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / fmax(1.0f, above_tTra.size()) - tTra());
         }
         if (below_tTra.size() == 0) {
-            diff_tTra_m = 1.0f / NUMBER_OF_BINS;
+            diff_tTra_m = 1.0f / MAX_NUMBER_OF_BINS;
         } else {
-            diff_tTra_m = fmax(1.0f / NUMBER_OF_BINS, tTra() - std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / fmax(1.0f, below_tTra.size()));
+            diff_tTra_m = fmax(1.0f / MAX_NUMBER_OF_BINS, tTra() - std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / fmax(1.0f, below_tTra.size()));
         }
 
         std::cout << diff_tRet_p << " " << diff_tRet_m << " " << ", " << diff_tTra_p << " " << diff_tTra_m << std::endl;

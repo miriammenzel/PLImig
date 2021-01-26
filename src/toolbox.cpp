@@ -51,10 +51,11 @@ float PLImg::Histogram::plateau(cv::Mat hist, float histLow, float histHigh, flo
                 kappa.at<float>(i) = 0;
             }
         }
-        auto kappaPeaks = peaks(kappa, 0, kappa.rows, 0);
+        std::vector<float> kappaVec(kappa.begin<float>(), kappa.end<float>());
+        auto kappaPeaks = peaks(kappa, 1, kappa.rows-1, 0);
 
         if(kappa.rows < 3 || kappaPeaks.size() == 0) {
-            return histLow + float(roiStart) * stepSize;
+            return histLow + float(roiStart+1) * stepSize;
         } else {
             int minPos;
             if(direction < 1) {
@@ -128,7 +129,7 @@ cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, float percentPixels) {
     int channels[] = {0};
     float histBounds[] = {0.0f, 1.0f};
     const float* histRange = { histBounds };
-    int histSize = NUMBER_OF_BINS;
+    int histSize = MAX_NUMBER_OF_BINS;
 
     cv::Mat hist;
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
@@ -143,7 +144,7 @@ cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, float percentPixels) {
     cv::Mat mask, labels;
     std::pair<cv::Mat, int> component;
     while(front_bin > 0) {
-        mask = image > float(front_bin)/NUMBER_OF_BINS;
+        mask = image > float(front_bin)/MAX_NUMBER_OF_BINS;
         labels = PLImg::cuda::labeling::connectedComponents(mask);
         mask.release();
         component = PLImg::cuda::labeling::largestComponent(labels);

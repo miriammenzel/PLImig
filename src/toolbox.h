@@ -34,7 +34,9 @@
 #include <vector>
 
 /// Number of bins used for histogram algorithms
-#define NUMBER_OF_BINS 256
+#define MIN_NUMBER_OF_BINS 16
+#define MAX_NUMBER_OF_BINS 256
+
 /**
  * @file
  * @brief PLImg histogram toolbox functions

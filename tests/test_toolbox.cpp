@@ -63,13 +63,13 @@ TEST(TestToolbox, TestHistogramPlateauLeft) {
     int channels[] = {0};
     float histBounds[] = {0.0f, 1.0f};
     const float* histRange = { histBounds };
-    int histSize = NUMBER_OF_BINS;
+    int histSize = MAX_NUMBER_OF_BINS;
 
     // Generate histogram
     cv::Mat hist;
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
 
-    float result = PLImg::Histogram::plateau(hist, 0, 1, 1, 1, NUMBER_OF_BINS/2);
+    float result = PLImg::Histogram::plateau(hist, 0, 1, 1, 1, MAX_NUMBER_OF_BINS/2);
     ASSERT_FLOAT_EQ(result, 4.0f * (1.0f/256.0f));
 }
 
@@ -103,14 +103,14 @@ TEST(TestToolbox, TestHistogramPlateauRight) {
     int channels[] = {0};
     float histBounds[] = {0.0f, 1.0f};
     const float* histRange = { histBounds };
-    int histSize = NUMBER_OF_BINS;
+    int histSize = MAX_NUMBER_OF_BINS;
 
     // Generate histogram
     cv::Mat hist;
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
     std::reverse(hist.begin<float>(), hist.end<float>());
 
-    float result = PLImg::Histogram::plateau(hist, 0, 1, -1, NUMBER_OF_BINS/2, NUMBER_OF_BINS);
+    float result = PLImg::Histogram::plateau(hist, 0, 1, -1, MAX_NUMBER_OF_BINS/2, MAX_NUMBER_OF_BINS);
     ASSERT_FLOAT_EQ(result, 1.0f - 5.0f * (1.0f/256.0f));
 }
 
