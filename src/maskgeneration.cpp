@@ -59,10 +59,13 @@ float PLImg::MaskGeneration::tTra() {
         int startPosition = temp_tTra * MAX_NUMBER_OF_BINS;
         int endPosition = tMax() * MAX_NUMBER_OF_BINS;
 
-        auto maxElem = std::max_element(hist.begin<float>() + startPosition, hist.begin<float>() + endPosition);
-        endPosition = std::min_element(hist.begin<float>() + startPosition, maxElem) - hist.begin<float>();
-
-        this->m_tTra = std::make_unique<float>(Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition));
+        auto peaks = Histogram::peaks(hist, startPosition, endPosition);
+        if(peaks.size() > 0) {
+            endPosition = std::min_element(hist.begin<float>() + startPosition, hist.begin<float>() + peaks.at(peaks.size()-1)) - hist.begin<float>();
+            this->m_tTra = std::make_unique<float>(Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition));
+        } else {
+            this->m_tTra = std::make_unique<float>(temp_tTra);
+        }
     }
     return *this->m_tTra;
 }
@@ -178,7 +181,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         std::vector<std::mt19937> random_engines(num_threads);
         #pragma omp parallel for default(shared) schedule(static)
         for(unsigned i = 0; i < num_threads; ++i) {
-            random_engines.at(i) = std::mt19937();
+            random_engines.at(i) = std::mt19937((clock() * i) % LONG_MAX);
         }
         std::uniform_int_distribution<int> distribution(0, numPixels);
         int selected_element;

@@ -26,6 +26,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <opencv2/core.hpp>
