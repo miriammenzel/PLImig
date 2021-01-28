@@ -61,7 +61,7 @@ float PLImg::MaskGeneration::tTra() {
 
         auto peaks = Histogram::peaks(hist, startPosition, endPosition);
         if(peaks.size() > 0) {
-            endPosition = std::min_element(hist.begin<float>() + startPosition, hist.begin<float>() + peaks.at(peaks.size()-1)) - hist.begin<float>();
+            endPosition = std::min_element(hist.begin<float>() + startPosition, hist.begin<float>() + peaks.at(0)) - hist.begin<float>();
             this->m_tTra = std::make_unique<float>(Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition));
         } else {
             this->m_tTra = std::make_unique<float>(temp_tTra);
@@ -190,10 +190,6 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         std::vector<float> below_tRet;
         std::vector<float> above_tTra;
         std::vector<float> below_tTra;
-        above_tRet.reserve(BLURRED_MASK_ITERATIONS);
-        below_tRet.reserve(BLURRED_MASK_ITERATIONS);
-        above_tTra.reserve(BLURRED_MASK_ITERATIONS);
-        below_tTra.reserve(BLURRED_MASK_ITERATIONS);
 
         float t_ret, t_tra;
 
@@ -238,48 +234,44 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
 
         float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
         if (above_tRet.size() == 0) {
-            diff_tRet_p = 1.0f / MAX_NUMBER_OF_BINS;
+            diff_tRet_p = tRet();
         } else {
-            diff_tRet_p = fmax(1.0f / MAX_NUMBER_OF_BINS, std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / fmax(1.0f, above_tRet.size()) - tRet());
+            diff_tRet_p = std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / above_tRet.size();
         }
         if (below_tRet.size() == 0) {
-            diff_tRet_m = 1.0f / MAX_NUMBER_OF_BINS;
+            diff_tRet_m = tRet();
         } else {
-            diff_tRet_m = fmax(1.0f / MAX_NUMBER_OF_BINS, tRet() - std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / fmax(1.0f, below_tRet.size()));
+            diff_tRet_m = std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / below_tRet.size();
         }
         if (above_tTra.size() == 0) {
-            diff_tTra_p = 1.0f / MAX_NUMBER_OF_BINS;
+            diff_tTra_p = tTra();
         } else {
-            diff_tTra_p = fmax(1.0f / MAX_NUMBER_OF_BINS, std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / fmax(1.0f, above_tTra.size()) - tTra());
+            diff_tTra_p = std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / above_tTra.size();
         }
         if (below_tTra.size() == 0) {
-            diff_tTra_m = 1.0f / MAX_NUMBER_OF_BINS;
+            diff_tTra_m = tTra();
         } else {
-            diff_tTra_m = fmax(1.0f / MAX_NUMBER_OF_BINS, tTra() - std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / fmax(1.0f, below_tTra.size()));
+            diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();
         }
 
-        std::cout << diff_tRet_p << " " << diff_tRet_m << " " << ", " << diff_tTra_p << " " << diff_tTra_m << std::endl;
+        std::cout << diff_tRet_p << " " << diff_tRet_m << ", " << diff_tTra_p << " " << diff_tTra_m << std::endl;
 
         float diffTra, diffRet;
-        float tmpVal;
-        #pragma omp parallel for private(diffTra, diffRet, tmpVal) default(shared) schedule(static)
+        #pragma omp parallel for private(diffTra, diffRet) default(shared) schedule(static)
         for(int y = 0; y < m_retardation->rows; ++y) {
             for (int x = 0; x < m_retardation->cols; ++x) {
-                tmpVal = m_transmittance->at<float>(y, x) - tTra();
-                if(tmpVal > 0) {
-                    tmpVal = tmpVal / diff_tTra_p;
+                diffTra = m_transmittance->at<float>(y, x);
+                if(diffTra < tTra()) {
+                    diffTra = (diffTra - tTra()) / diff_tTra_m;
                 } else {
-                    tmpVal = tmpVal / diff_tTra_m;
+                    diffTra = (diffTra - tTra()) / diff_tTra_p;
                 }
-                diffTra = tmpVal;
-                tmpVal = m_retardation->at<float>(y, x) - tRet();
-                if(tmpVal > 0) {
-                    tmpVal = tmpVal / diff_tRet_p;
+                diffRet = m_retardation->at<float>(y, x);
+                if(diffRet < tRet()) {
+                    diffRet = (diffRet - tRet()) / diff_tRet_m;
                 } else {
-                    tmpVal = tmpVal / diff_tRet_m;
+                    diffRet = (diffRet - tRet()) / diff_tRet_p;
                 }
-                diffRet = tmpVal;
-
                 m_blurredMask->at<float>(y, x) = (-erf(cos(3.0f*M_PI/4.0f - atan2(diffTra, diffRet)) *
                         sqrt(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
             }

@@ -187,8 +187,8 @@ int main(int argc, char** argv) {
             inclination.setModalities(medTransmittance, retardation, generation.blurredMask(), generation.whiteMask(), generation.grayMask());
             // If manual parameters were given, apply them here
 
-            //inclination.set_im(generation.tMin());
-            //inclination.set_rmaxGray(generation.tRet());
+            inclination.set_im(generation.tMin());
+            inclination.set_rmaxGray(generation.tRet());
 
             // Create file and dataset. Write the inclination afterwards.
             std::cout << output_folder+ "/" + inclination_basename + ".h5" << std::endl;
