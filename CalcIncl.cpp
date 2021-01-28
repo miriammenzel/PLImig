@@ -114,7 +114,6 @@ int main(int argc, char** argv) {
             std::shared_ptr<cv::Mat> blurredMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/Blurred"));
             std::cout << "Files read" << std::endl;
 
-            std::shared_ptr<cv::Mat> medTransmittanceWhite;
             std::shared_ptr<cv::Mat> medTransmittance;
             // If our given transmittance isn't already median filtered (based on it's file name)
             if (transmittance_path.find("median10") == std::string::npos) {
@@ -127,16 +126,10 @@ int main(int argc, char** argv) {
                 std::string group = dataset.substr(0, dataset.find_last_of('/'));
                 // Create group and dataset
                 writer.create_group(group);
-                writer.create_group(dataset);
 
                 // Generate med10Transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, grayMask);
-                writer.write_dataset(dataset + "/Gray", *medTransmittance);
-                medTransmittanceWhite = PLImg::cuda::filters::medianFilterMasked(transmittance, whiteMask);
-                writer.write_dataset(dataset + "/White", *medTransmittanceWhite);
-                cv::add(*medTransmittance, *medTransmittanceWhite, *medTransmittance, *whiteMask, CV_32FC1);
-                writer.write_dataset(dataset + "/Full", *medTransmittance);
-                medTransmittanceWhite = nullptr;
+                writer.write_dataset(dataset + "/", *medTransmittance);
                 writer.close();
             } else {
                 medTransmittance = transmittance;

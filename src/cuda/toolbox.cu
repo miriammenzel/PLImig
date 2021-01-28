@@ -80,30 +80,27 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
 
     // Only try to calculate the median of pixels within the non-padded image
     if(x > MEDIAN_KERNEL_SIZE && x < imageDims.x - MEDIAN_KERNEL_SIZE && y > MEDIAN_KERNEL_SIZE && y < imageDims.y - MEDIAN_KERNEL_SIZE) {
-        // Check if the current pixel is on the mask
-        if(mask[x + y * mask_stride]) {
-            // Transfer image pixels to our kernel for median filtering application
-            for (int cx = -MEDIAN_KERNEL_SIZE; cx < MEDIAN_KERNEL_SIZE; ++cx) {
-                // The median filter kernel is round. Therefore calculate the valid y-positions based on our x-position in the kernel
-                cy_bound = sqrtf(MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE - cx * cx);
-                for (int cy = -cy_bound; cy < cy_bound; ++cy) {
-                    // Check if the pixel on our kernel is on the mask
-                    if (mask[x + cx + (y + cy) * mask_stride] != 0) {
-                        // Save values in buffer
-                        buffer[validValues] = image[x + cx + (y + cy) * image_stride];
-                        ++validValues;
-                    }
+        // Transfer image pixels to our kernel for median filtering application
+        for (int cx = -MEDIAN_KERNEL_SIZE; cx < MEDIAN_KERNEL_SIZE; ++cx) {
+            // The median filter kernel is round. Therefore calculate the valid y-positions based on our x-position in the kernel
+            cy_bound = sqrtf(MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE - cx * cx);
+            for (int cy = -cy_bound; cy < cy_bound; ++cy) {
+                // If the pixel in the kernel matches the current pixel on the gray / white mask
+                if (mask[x + y * mask_stride] == mask[x + cx + (y + cy) * image_stride]) {
+                    // Save values in buffer
+                    buffer[validValues] = image[x + cx + (y + cy) * image_stride];
+                    ++validValues;
                 }
             }
-            // Depending on the number of valid values, calculate the median, save the pixel value itself or save zero
-            if (validValues > 1) {
-                shellSort(buffer, 0, validValues);
-                result_image[x + y * result_image_stride] = buffer[validValues / 2];
-            } else if (validValues == 1) {
-                result_image[x + y * result_image_stride] = buffer[0];
-            } else {
-                result_image[x + y * result_image_stride] = 0;
-            }
+        }
+        // Depending on the number of valid values, calculate the median, save the pixel value itself or save zero
+        if (validValues > 1) {
+            shellSort(buffer, 0, validValues);
+            result_image[x + y * result_image_stride] = buffer[validValues / 2];
+        } else if (validValues == 1) {
+            result_image[x + y * result_image_stride] = buffer[0];
+        } else {
+            result_image[x + y * result_image_stride] = 0;
         }
     }
 

@@ -155,7 +155,6 @@ int main(int argc, char** argv) {
             }
             writer.close();
 
-            std::shared_ptr<cv::Mat> medTransmittanceWhite;
             if (transmittance_path.find("median10") == std::string::npos) {
                 // Write it to a file
                 std::string medTraName(mask_basename);
@@ -166,16 +165,10 @@ int main(int argc, char** argv) {
                 std::string group = dataset.substr(0, dataset.find_last_of('/'));
                 // Create group and dataset
                 writer.create_group(group);
-                writer.create_group(dataset);
 
                 // Generate med10Transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.grayMask());
-                writer.write_dataset(dataset + "/Gray", *medTransmittance);
-                medTransmittanceWhite = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.whiteMask());
-                writer.write_dataset(dataset + "/White", *medTransmittanceWhite);
-                cv::add(*medTransmittance, *medTransmittanceWhite, *medTransmittance, *generation.whiteMask(), CV_32FC1);
-                writer.write_dataset(dataset + "/Full", *medTransmittance);
-                medTransmittanceWhite = nullptr;
+                writer.write_dataset(dataset + "/", *medTransmittance);
                 transmittance = nullptr;
                 writer.close();
             } else {
