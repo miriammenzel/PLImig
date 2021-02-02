@@ -20,21 +20,21 @@ int main(int argc, char** argv) {
     bool detailed = false;
 
     auto required = app.add_option_group("Required parameters");
-    required->add_option("--itra, itra", transmittance_files, "Input transmittance files")
+    required->add_option("--itra", transmittance_files, "Input transmittance files")
             ->required()
             ->check(CLI::ExistingFile);
-    required->add_option("--iret, iret", retardation_files, "Input retardation files")
+    required->add_option("--iret", retardation_files, "Input retardation files")
             ->required()
             ->check(CLI::ExistingFile);
-    required->add_option("--imask, imask", mask_files, "Input mask files from PLImg")
+    required->add_option("--imask", mask_files, "Input mask files from PLImg")
             ->required()
             ->check(CLI::ExistingFile);
-    required->add_option("-o, --output, ofolder", output_folder, "Output folder")
+    required->add_option("-o, --output", output_folder, "Output folder")
             ->required()
             ->check(CLI::ExistingDirectory);
 
     auto optional = app.add_option_group("Optional parameters");
-    optional->add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
+    optional->add_option("-d, --dataset", dataset, "HDF5 dataset")
             ->default_val("/Image");
     optional->add_flag("--detailed", detailed);
     optional->add_option("--im", im)->default_val(-1);
