@@ -219,11 +219,64 @@ $`f^{''}(x) = \frac{f(x+1) - 2f(x) + f(x-1)}{h^2}`$
 As we're not able to calculate the maxima of $`\kappa`$ directly we just choose the 
 highest value of $`\kappa`$ for our point of maximum curvature.
 
-`tMax` or *maximum transmittance value* separates the background of the transmittance from the tissue.
+`tMax` or *maximum transmittance value* separates the background of the transmittance from the tissue. 
+The background is discernible by a clearly visible peak in the latter half of the histogram. The peak itself and all pixels with a value above the 
+point of maximum curvature represent the background and will not be visible in the white / gray mask.
+
+To find the maximum curvature a search interval between the second half of the histogram and absolute maximum value is selected.
+In between this interval the next local minima in the left direction from the absolute maximum is selected as the left bound for the
+maximum curvature. 
+
+An example for the resulting mask can be seen below.
+
+![](./img/tMaxExample.png)
 
 ### tRet
 
+After most of the necessary parameters are generated on the transmittance, one parameter in the retardation is needed to 
+generate the desired white and gray fiber masks. The general procedure follows the algorithm used for `tTra`. However, to ensure that
+the result is not influenced by small interferences or more than one peak, we change the algorithm a bit.
+
+We start using a histogram of only 16 bins to get a first estimation of `tRet`. In each following iteration we increase the number of
+bins by a factor of 2 up to 256 bins. In each iteration we take the last estimation and choose a interval around the last estimation
+for our current one. This ensures that we do not end in a small dip which becomes visible with higher bin counts.
+
+In addition if there's more than one peak in our interval, we start at the last peak. This is chosen because there might be a 
+background peak resulting in erroneous parameters.
+
+The resulting mask can be seen below. This mask generally gets most of the white substance but might still miss a few
+areas. Those will be filled in combination with `tTra`.
+
+![](./img/tRetExample.png)
+
 ### tTra
+
+While `tMin` is a good estimation in the transmittance some fine fibers might not be caught by simply using the mean
+transmittance value. Therefore we use the curvature formula again to estimate a point which contains more finer fibers without
+including too much to the gray matter. Our range will be limited by the next peak starting from `tMin`.
+If not enough values are present to calculate $`\kappa`$ then `tMin` will be used as our value.
+
+### White mask
+After generating all of our parameters we can finally build our masks which separate the white and gray matter.
+The formula for both masks as well as an example are shown below:
+
+$`M_{white} = ((I_T < tTra) \wedge (I_T > 0)) \vee (r > sRet)`$
+![](./img/WhiteMaskExample.png)
+
+### Gray mask
+$`M_{grey} = (I_T \geq tTra) \wedge (I_T \leq tMax) \wedge (r \leq tRet)`$
+![](./img/GrayMaskExample.png)
+
+### Blurred mask
+![](./img/BlurredMaskExample.png)
+
+### No nerve fiber mask
+The gray matter doesn't have as many fibers as the white matter. When calculating the inclination some parts might be
+wrong because no fibers are present. This mask gives an esimation which parts of the gray matter might not have any fibers.
+To archive this the mean and standard deviation of the background are used. Regions in the gray matter with a value below
+mean + 2*stddev are considered as a region without any fibers.
+
+![](./img/NoNerveFiberExample.png)
 
 ## Generation of the inclination
 
@@ -234,3 +287,11 @@ highest value of $`\kappa`$ for our point of maximum curvature.
 ### rmaxGray
 
 ### rmaxWhite
+
+### Inclination
+
+![](./img/InclinationExample.png)
+
+### Saturation map
+
+![](./img/SaturationExample.png)

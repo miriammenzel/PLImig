@@ -105,7 +105,7 @@ float PLImg::Inclination::rmaxGray() {
         startPosition = 0;
         endPosition = MIN_NUMBER_OF_BINS / 2;
 
-        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS < MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
+        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
             int histSize = NUMBER_OF_BINS;
 
             // Generate histogram
@@ -119,14 +119,12 @@ float PLImg::Inclination::rmaxGray() {
                 startPosition = peaks.at(peaks.size() - 1);
             } else if(peaks.size() == 1) {
                 startPosition = peaks.at(0);
-            } else {
-                startPosition = 0;
             }
 
             temp_rMax = Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
 
-            startPosition = fmax(0, ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) * ((temp_rMax * NUMBER_OF_BINS) - 3));
-            endPosition = fmin(((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) * ((temp_rMax * NUMBER_OF_BINS) + 3), NUMBER_OF_BINS << 1);
+            startPosition = fmax(0, (temp_rMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
+            endPosition = fmin((temp_rMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1, NUMBER_OF_BINS << 1);
         }
         m_rmaxGray = std::make_unique<float>(temp_rMax);
     }
