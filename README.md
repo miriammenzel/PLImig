@@ -280,8 +280,6 @@ After the generation of a random image we calculate `tRet` and `tTra` with our n
 from our initial values.
 
 After our number of iterations we calculate each pixel of our blurred mask with the following formula:
-blurred_{i, j} = 0.5 \cdot (-erf(\cos(0.75\cdot\pi - \arctan2(\delta I_{t, i, j}, \delta r_{i, j}) \cdot
-\sqrt(\delta I_{t, i, j}^2 + \delta r_{i, j}^2) \cdot 2 ) + 1
 ```math
 tRet_p = \frac{1}{n_1} \cdot \sum_{i=0}^{n_1} tRet_{p, i} \\
 tRet_n = \frac{1}{n_2} \cdot \sum_{i=0}^{n_2} tRet_{n, i} \\
@@ -306,6 +304,8 @@ blurred_{i, j} = 0.5 \cdot (-erf(\cos(0.75\cdot\pi - \arctan2(\Delta I_{t, i, j}
 i, j \in \mathbb{N}
 ```
 
+An example of a resulting blurred mask is shown below. All values are in range of $`[0, 1]`$.
+
 ![](./img/BlurredMaskExample.png)
 
 ### No nerve fiber mask
@@ -319,14 +319,49 @@ mean + 2*stddev are considered as a region without any fibers.
 ## Generation of the inclination
 
 ### im
+The `im` value matches the calculation of `tMin` in our mask generation.
 
 ### ic
+`ic` is considered as the mode of the transmittance in the gray substance. The gray substance is defined by
+our blurred mask with values below 0.01. 
 
 ### rmaxGray
+The `rmaxGray` calculation matches the calculation of `tRet` in our mask generation.
+This value will be used as our maximum value which is present in the gray substance.
 
 ### rmaxWhite
+`rmaxWhite` will be calculated using the region growing algorithm described above. However, instead of using the resulting mask
+to calculate the mean transmittance value like in `tMin` here the mean retardation value of the mask
+is calculated.
 
 ### Inclination
+
+The inclination formula will convert the transmittance and retardation values to an angle between $`0^\circ`$ and $`90^\circ`$ depending on our chosen parameters. The white and gray substance will use different formulas. Regions which have values between zero and one in the blurred mask will use a linear interplation of both formulas.
+
+The formula is:
+```math
+\alpha_{i,j} = \sqrt{blurred_{i, j} \cdot 
+  \left(
+    \frac{
+      \sin^{-1} r_{i, j}
+    }{
+      \sin^{-1} rmax_{W}
+    }
+    \cdot
+    \frac{
+      \log (\frac{ic}{im})
+    }{
+      \log (\frac{ic}{I_{T, i, j}})
+    }
+  \right)
+  + (1-blurred_{i, j}) \cdot
+  \frac{
+    \sin^{-1} r_{i, j}
+  }{
+    \sin^{-1} rmax_{G}
+  }
+}
+```
 
 ![](./img/InclinationExample.png)
 
