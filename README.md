@@ -366,5 +366,14 @@ The formula is:
 ![](./img/InclinationExample.png)
 
 ### Saturation map
+The saturation map is an optional parameter map which will be written after the inclination generation. Here, all pixels with a value of 0° or below and 90° or above are marked by a value between 0 and 4.
+
+The numbers can be interpreted like this:
+
+- 0 -- No saturated pixel
+- 1 -- Saturated pixel. Inclination angle is 0° or below. The retardation was higher than `rmaxWhite`
+- 2 -- Saturated pixel. Inclination angle is 90° or above. The retardation was higher than `rmaxWhite`
+- 3 -- Saturated pixel. Inclination angle is 0° or below. The retardation was lower than `rmaxWhite`
+- 4 -- Saturated pixel. Inclination angle is 90° or above. The retardation was lower than `rmaxWhite`
 
 ![](./img/SaturationExample.png)
