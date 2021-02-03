@@ -231,22 +231,22 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         generation.setModalities(nullptr, nullptr);
 
         float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
-        if (above_tRet.size() == 0) {
+        if (above_tRet.empty()) {
             diff_tRet_p = tRet();
         } else {
             diff_tRet_p = std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / above_tRet.size();
         }
-        if (below_tRet.size() == 0) {
+        if (below_tRet.empty()) {
             diff_tRet_m = tRet();
         } else {
             diff_tRet_m = std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / below_tRet.size();
         }
-        if (above_tTra.size() == 0) {
+        if (above_tTra.empty()) {
             diff_tTra_p = tTra();
         } else {
             diff_tTra_p = std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / above_tTra.size();
         }
-        if (below_tTra.size() == 0) {
+        if (below_tTra.empty()) {
             diff_tTra_m = tTra();
         } else {
             diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();

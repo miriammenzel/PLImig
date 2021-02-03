@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
     PLImg::HDF5Writer writer;
     PLImg::MaskGeneration generation;
 
-    std::string transmittance_basename, retardation_basename, mask_basename, inclination_basename;
+    std::string transmittance_basename, retardation_basename, mask_basename;
     std::string retardation_path, mask_path;
     bool retardation_found;
 
