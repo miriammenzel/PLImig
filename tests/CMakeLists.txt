@@ -8,6 +8,9 @@ find_package(CUDAToolkit REQUIRED)
 include_directories(${CUDAToolkit_INCLUDE_DIRS})
 include_directories(src/)
 
+# Set output directory to tests
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+
 add_executable(test_reader test_reader.cpp ${PROJECT_SOURCE_DIR}/src/reader.cpp)
 target_link_libraries(test_reader GTest::GTest ${OpenCV_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES})
 gtest_discover_tests(test_reader TEST_PREFIX new:)
