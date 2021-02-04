@@ -111,7 +111,7 @@ def main():
     plot_bars(below_tTra, title='Below tTra')
     plt.savefig("/tmp/below_tTra_bars.png", dpi=300)
     plt.close()
-    plot_stats(below_tTra, title='Above tTra')
+    plot_stats(below_tTra, title='Below tTra')
     plt.savefig("/tmp/below_tTra_stats.png", dpi=300)
     plt.close()
 
