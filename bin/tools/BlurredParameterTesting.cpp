@@ -12,6 +12,7 @@ int main(int argc, char** argv) {
     std::string dataset;
     int num_iterations;
     int num_retakes;
+    int scale_factor;
 
     auto required = app.add_option_group("Required parameters");
     required->add_option("--itra", transmittance_files, "Input transmittance files")
@@ -31,6 +32,8 @@ int main(int argc, char** argv) {
             ->default_val(500);
     optional->add_option("--retakes", num_retakes, "Number of retakes")
             ->default_val(100);
+    optional->add_option("--scaleFactor", scale_factor, "Scale subimages in blurring algorithm by 1/n")
+            ->default_val(10);
     CLI11_PARSE(app, argc, argv);
 
     PLImg::MaskGeneration generation;
@@ -108,11 +111,11 @@ int main(int argc, char** argv) {
                 //////////////////////////////
                 //////////////////////////////
 
-                std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(retardation->rows / 10,
-                                                                                       retardation->cols / 10,
+                std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(retardation->rows / scale_factor,
+                                                                                       retardation->cols / scale_factor,
                                                                                        CV_32FC1);
-                std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(medTransmittance->rows / 10,
-                                                                                         medTransmittance->cols / 10,
+                std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(medTransmittance->rows / scale_factor,
+                                                                                         medTransmittance->cols / scale_factor,
                                                                                          CV_32FC1);
                 PLImg::MaskGeneration blurredGeneration(small_retardation, small_transmittance);
                 int numPixels = retardation->rows * retardation->cols;
