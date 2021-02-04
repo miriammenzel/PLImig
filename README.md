@@ -18,7 +18,7 @@
 * GPU: CUDA 9.0+ capable with 4+ GiB VRAM
 
 # Required programs and packages
-* CMake 3.19+
+* CMake 3.14+
 * C++-17 capable compiler 
 * Make
 
@@ -51,7 +51,7 @@ In addition to the install instructions for the exeuction of PLImig some other p
 Example using Ubuntu or Debian:
 ```bash
 sudo apt-get install -y gcc g++ cmake make build-essential file git gcovr libgtest-dev doxygen
-sudo cd /usr/src/gtest
+cd /usr/src/gtest
 sudo cmake CMakeLists.txt
 sudo make
 sudo cp ./lib/libgtest*.a /usr/lib
