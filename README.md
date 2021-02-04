@@ -1,4 +1,4 @@
-# Minimal C++ Project
+# PLImig (PLI Mask and Inclination Generation)
 
 - [System Requirements](#system-requirements)
 - [Required programs and packages](#required-programs-and-packages)
@@ -46,7 +46,7 @@ apt-get install -y libopencv-dev libhdf5-dev libnifti-dev
 ```
 
 ## Setting up the program for development
-In addition to the install instructions for the exeuction of PLImg some other packages are needed for tests and documentation.
+In addition to the install instructions for the exeuction of PLImig some other packages are needed for tests and documentation.
 
 Example using Ubuntu or Debian:
 ```bash
@@ -60,8 +60,8 @@ cd -
 
 ### Clone the project
 ```bash
-git clone git@jugit.fz-juelich.de:j.reuter/plimg.git 
-cd plimg
+git clone git@jugit.fz-juelich.de:j.reuter/PLImig.git 
+cd PLImig
 ```
 
 
@@ -75,7 +75,7 @@ cmake ..
 make && make test
 ```
 
-If everything ran successful the generated programs are located at `plimg/build/` and can be started from there.
+If everything ran successful the generated programs are located at `PLImig/build/` and can be started from there.
 
 ## Changing options
 By default the following options are set:
@@ -131,9 +131,9 @@ PLIInclination --itra [input-ntransmittance] --iret [input-retardation] --imask 
 | `--rmaxGray` | Point of maximum curvature in the gray matter of the retardation |
 | `--detailed` | Add saturation map to the inclination HDF5 file marking each region with values <0° or >90° |
 
-## PLImgPipeline
+## PLImigPipeline
 ```
-PLImgPipeline --itra [input-ntransmittance] --iret [input-retardation] --output [output-folder] [[parameters]]
+PLImigPipeline --itra [input-ntransmittance] --iret [input-retardation] --output [output-folder] [[parameters]]
 ```
 ### Required Arguments
 | Argument      | Function                                                                    |
@@ -156,12 +156,12 @@ PLImgPipeline --itra [input-ntransmittance] --iret [input-retardation] --output 
 
 # Functionality of this toolbox
 
-PLImg is designed as a standalone tool but can also be used in other projects for preparation or processing steps. 
+PLImig is designed as a standalone tool but can also be used in other projects for preparation or processing steps. 
 The three command line tool allow basic processing functionalities and can be used freely to process standard 3D-PLI measurements.
 Please keep in mind that only **NTransmittance** files can be processed as non-normalized transmittance files could result in 
 erroneous parameters and therefore also wrong inclination angles.
 
-Applying a median filter before calling the tool is optional as **PLImg** does include a basic median filter functionality using CUDA.
+Applying a median filter before calling the tool is optional as **PLImig** does include a basic median filter functionality using CUDA.
 The filter kernel size can only be changed by setting `MEDIAN_KERNEL_SIZE` during compilation. The default parameter is `10`.
 
 ## Generation of masks
@@ -175,8 +175,8 @@ and retardation. For reference both histograms are shown below:
 ![](./img/hist_transmittance_256bins.png)
 
 While the structure of those histograms is similar for complete measurements, this tool will fail if only a part
-of a measurement is used as the input for **PLImg**. 
-If a non median filtered NTransmittance is used as input, **PLImg** will generate the median10NTransmittance
+of a measurement is used as the input for **PLImig**. 
+If a non median filtered NTransmittance is used as input, **PLImig** will generate the median10NTransmittance
 automatically and save it as **[...]_Mask_[...].h5**. The dataset will match the original dataset of the input
 files or is set by the `--dataset` parameter when starting the program.
 
