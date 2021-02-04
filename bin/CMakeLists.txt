@@ -5,16 +5,16 @@ add_subdirectory(tools)
 
 # normal executables
 add_executable(PLIMaskGeneration MaskGeneration.cpp)
-target_link_libraries(PLIMaskGeneration PLImg)
+target_link_libraries(PLIMaskGeneration PLImig)
 add_executable(PLIInclination CalcIncl.cpp)
-target_link_libraries(PLIInclination PLImg)
-add_executable(PLImgPipeline PLImg.cpp)
-target_link_libraries(PLImgPipeline PLImg)
+target_link_libraries(PLIInclination PLImig)
+add_executable(PLImigPipeline PLImig.cpp)
+target_link_libraries(PLImigPipeline PLImig)
 
 
 # install instructions for CMake
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    install(TARGETS PLImg LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION lib)
+    install(TARGETS PLImig LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION lib)
     install(TARGETS PLIMaskGeneration LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION bin)
     install(TARGETS PLIInclination LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE DESTINATION bin)
     install(DIRECTORY DESTINATION include/PLImg)

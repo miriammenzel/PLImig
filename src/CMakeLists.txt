@@ -20,7 +20,7 @@ set(HEADER
         cuda/toolbox.cuh)
 
 # Generate executable file
-add_library(PLImg SHARED ${SOURCE})
-target_link_libraries(PLImg ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
+add_library(PLImig SHARED ${SOURCE})
+target_link_libraries(PLImig ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
         CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu CUDA::nppist
         OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem)
