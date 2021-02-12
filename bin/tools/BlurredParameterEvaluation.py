@@ -46,11 +46,7 @@ def plot_stats(two_dimension_array, title="", thinout=1):
     fig.tight_layout()
 
 
-def main():
-    if len(sys.argv) < 2:
-        return
-    folder = sys.argv[1]
-
+def read_folder(folder):
     above_tRet = None
     below_tRet = None
     above_tTra = None
@@ -83,37 +79,47 @@ def main():
         else:
             below_tTra = numpy.column_stack((below_tTra, below_tTra_it))
 
-    above_tRet = numpy.swapaxes(above_tRet, -1, 0)
-    plot_bars(above_tRet, title='Above tRet')
-    plt.savefig("/tmp/above_tRet_bars.png", dpi=300)
-    plt.close()
-    plot_stats(above_tRet, title='Above tRet')
-    plt.savefig("/tmp/above_tRet_stats.png", dpi=300)
-    plt.close()
+    return above_tRet, below_tRet, above_tTra, below_tTra
 
-    below_tRet = numpy.swapaxes(below_tRet, -1, 0)
-    plot_bars(below_tRet, title='Below tRet')
-    plt.savefig("/tmp/below_tRet_bars.png", dpi=300)
-    plt.close()
-    plot_stats(below_tRet, title='Below tRet')
-    plt.savefig("/tmp/below_tRet_stats.png", dpi=300)
-    plt.close()
 
-    above_tTra = numpy.swapaxes(above_tTra, -1, 0)
-    plot_bars(above_tTra, title='Above tTra')
-    plt.savefig("/tmp/above_tTra_bars.png", dpi=300)
-    plt.close()
-    plot_stats(above_tTra, title='Above tTra')
-    plt.savefig("/tmp/above_tTra_stats.png", dpi=300)
-    plt.close()
+def main():
+    if len(sys.argv) < 2:
+        return
 
-    below_tTra = numpy.swapaxes(below_tTra, -1, 0)
-    plot_bars(below_tTra, title='Below tTra')
-    plt.savefig("/tmp/below_tTra_bars.png", dpi=300)
-    plt.close()
-    plot_stats(below_tTra, title='Below tTra')
-    plt.savefig("/tmp/below_tTra_stats.png", dpi=300)
-    plt.close()
+    for folder in sys.argv[1:]:
+        above_tRet, below_tRet, above_tTra, below_tTra = read_folder(folder)
+
+        above_tRet = numpy.swapaxes(above_tRet, -1, 0)
+        plot_bars(above_tRet, title='Above tRet')
+        plt.savefig("/tmp/above_tRet_bars.png", dpi=300)
+        plt.close()
+        plot_stats(above_tRet, title='Above tRet')
+        plt.savefig("/tmp/above_tRet_stats.png", dpi=300)
+        plt.close()
+
+        below_tRet = numpy.swapaxes(below_tRet, -1, 0)
+        plot_bars(below_tRet, title='Below tRet')
+        plt.savefig("/tmp/below_tRet_bars.png", dpi=300)
+        plt.close()
+        plot_stats(below_tRet, title='Below tRet')
+        plt.savefig("/tmp/below_tRet_stats.png", dpi=300)
+        plt.close()
+
+        above_tTra = numpy.swapaxes(above_tTra, -1, 0)
+        plot_bars(above_tTra, title='Above tTra')
+        plt.savefig("/tmp/above_tTra_bars.png", dpi=300)
+        plt.close()
+        plot_stats(above_tTra, title='Above tTra')
+        plt.savefig("/tmp/above_tTra_stats.png", dpi=300)
+        plt.close()
+
+        below_tTra = numpy.swapaxes(below_tTra, -1, 0)
+        plot_bars(below_tTra, title='Below tTra')
+        plt.savefig("/tmp/below_tTra_bars.png", dpi=300)
+        plt.close()
+        plot_stats(below_tTra, title='Below tTra')
+        plt.savefig("/tmp/below_tTra_stats.png", dpi=300)
+        plt.close()
 
 
 if __name__ == "__main__":

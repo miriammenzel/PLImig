@@ -49,11 +49,10 @@ float PLImg::Histogram::plateau(cv::Mat hist, float histLow, float histHigh, flo
         std::vector<float> kappaVec(kappa.begin<float>(), kappa.end<float>());
         std::vector<float> histVec(hist.begin<float>(), hist.end<float>());
 
-        auto minKappa = std::max_element(kappa.begin<float>()+1, kappa.end<float>()-1);
-
         if(kappa.rows < 3) {
             return histLow + float(roiStart+1) * stepSize;
         } else {
+            auto minKappa = std::max_element(kappa.begin<float>()+1, kappa.end<float>()-1);
             int minPos = minKappa - kappa.begin<float>();
             return histLow + float(roiStart + minPos) * stepSize;
         }
@@ -115,8 +114,8 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
     return peaks;
 }
 
-cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, float percentPixels) {
-    float pixelThreshold = float(image.rows)/100 * float(image.cols) * percentPixels;
+cv::Mat PLImg::Image:: regionGrowing(const cv::Mat& image, float percentPixels) {
+    float pixelThreshold = 4096; //float(image.rows)/100 * float(image.cols) * percentPixels;
 
     int channels[] = {0};
     float histBounds[] = {0.0f, 1.0f};
@@ -137,6 +136,7 @@ cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, float percentPixels) {
     std::pair<cv::Mat, int> component;
     while(front_bin > 0) {
         mask = image > float(front_bin)/MAX_NUMBER_OF_BINS;
+        cv::imwrite("/tmp/mask.tiff", mask);
         labels = PLImg::cuda::labeling::connectedComponents(mask);
         mask.release();
         component = PLImg::cuda::labeling::largestComponent(labels);
@@ -149,6 +149,7 @@ cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, float percentPixels) {
             --front_bin;
         } else {
             std::cout << std::endl;
+            cv::imwrite("/tmp/cc_mask.tiff", component.first);
             return component.first;
         }
     }
@@ -319,12 +320,11 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         pSrcOffset = 1 + 1 * nSrcStep / sizeof(Npp8u);
         pDstOffset = 1 + 1 * nDstStep / sizeof(Npp32u);
 
-        errCode = nppiLabelMarkersGetBufferSize_8u32u_C1R(roi, &bufferSize);
+        errCode = nppiLabelMarkersUFGetBufferSize_32u_C1R(roi, &bufferSize);
         if (errCode != NPP_SUCCESS) {
             printf("NPP error: Could not get buffer size : %d\n", errCode);
             exit(EXIT_FAILURE);
         }
-
         err = cudaMalloc((void **) &deviceBuffer, bufferSize);
         if (err != cudaSuccess) {
             std::cerr << "Could not generate buffer for Connected Components application. Error code is: ";
@@ -332,10 +332,29 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
             exit(EXIT_FAILURE);
         }
 
-        nextLabelNumber = nextLabelNumber + maxLabelNumber;
-        errCode = nppiLabelMarkers_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, 0, nppiNormInf, &maxLabelNumber, deviceBuffer);
+        errCode = nppiLabelMarkersUF_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, nppiNormL1, deviceBuffer);
         if (errCode != NPP_SUCCESS) {
             printf("NPP error: Could not create labeling : %d\n", errCode);
+            exit(EXIT_FAILURE);
+        }
+        cudaFree(deviceBuffer);
+
+        errCode = nppiCompressMarkerLabelsGetBufferSize_32u_C1R(roi.height * roi.width, &bufferSize);
+        if (errCode != NPP_SUCCESS) {
+            printf("NPP error: Could not get buffer size for compressing label markers : %d\n", errCode);
+            exit(EXIT_FAILURE);
+        }
+
+        err = cudaMalloc((void **) &deviceBuffer, bufferSize);
+        if (err != cudaSuccess) {
+            std::cerr << "Could not allocate enough memory for compressing label marker buffer \n";
+            std::cerr << cudaGetErrorName(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        errCode = nppiCompressMarkerLabelsUF_32u_C1IR(deviceResult + pDstOffset, nDstStep, roi, roi.height * roi.width, &maxLabelNumber, deviceBuffer);
+        if (errCode != NPP_SUCCESS) {
+            printf("NPP error: Could not compress label markers : %d\n", errCode);
             exit(EXIT_FAILURE);
         }
 
@@ -350,6 +369,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         subMask = subResult == 0;
         subResult = subResult + cv::Scalar(nextLabelNumber, 0, 0);
         subResult.setTo(0, subMask);
+        nextLabelNumber = nextLabelNumber + maxLabelNumber;
 
         // Free reserved memory
         cudaFree(deviceImage);
@@ -360,6 +380,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
         subResult(srcRect).copyTo(result(dstRect));
     }
+
     // Iterate along the borders of each chunk to check if any labels overlap there. If that's the case
     // replace the higher numbered label by the lower numbered label. Only apply if more than one chunk is present.
     if(numberOfChunks > 1) {
@@ -595,4 +616,5 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
     } else {
         return std::pair<cv::Mat, int>(cv::Mat(), 0);
     }
+
 }

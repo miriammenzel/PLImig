@@ -81,12 +81,19 @@ float PLImg::MaskGeneration::tRet() {
         startPosition = 0;
         endPosition = MIN_NUMBER_OF_BINS / 2;
 
-        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
-            int histSize = NUMBER_OF_BINS;
+        // Generate histogram
+        cv::Mat fullHist;
+        int histSize = MAX_NUMBER_OF_BINS;
+        cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), fullHist, 1, &histSize, &histRange, true, false);
 
-            // Generate histogram
-            cv::Mat hist;
-            cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
+        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
+            cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
+            #pragma omp parallel for
+            for(unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
+                unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
+                unsigned myEndPos = (i+1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
+                hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos, fullHist.begin<float>() + myEndPos, 0);
+            }
             cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
             // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
@@ -167,8 +174,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
     if(!m_blurredMask) {
         m_blurredMask = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
-        std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(m_retardation->rows/10, m_retardation->cols/10, CV_32FC1);
-        std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(m_transmittance->rows/10, m_transmittance->cols/10, CV_32FC1);
+        std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(m_retardation->rows/2, m_retardation->cols/2, CV_32FC1);
+        std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(m_transmittance->rows/2, m_transmittance->cols/2, CV_32FC1);
         MaskGeneration generation(small_retardation, small_transmittance);
         int numPixels = m_retardation->rows * m_retardation->cols;
 
