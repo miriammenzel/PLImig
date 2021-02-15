@@ -259,7 +259,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
             diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();
         }
 
-        std::cout << diff_tRet_p << " " << diff_tRet_m << ", " << diff_tTra_p << " " << diff_tTra_m << std::endl;
+        std::cout << "Probability parameters: R+:"  << diff_tRet_p << ", R-:" << diff_tRet_m << ", T+:" << diff_tTra_p << ", T-:" << diff_tTra_m << std::endl;
 
         float diffTra, diffRet;
         #pragma omp parallel for private(diffTra, diffRet) default(shared) schedule(static)

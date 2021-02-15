@@ -115,7 +115,7 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
 }
 
 cv::Mat PLImg::Image:: regionGrowing(const cv::Mat& image, float percentPixels) {
-    float pixelThreshold = 4096; //float(image.rows)/100 * float(image.cols) * percentPixels;
+    float pixelThreshold = float(image.rows)/100 * float(image.cols) * percentPixels;
 
     int channels[] = {0};
     float histBounds[] = {0.0f, 1.0f};
@@ -136,7 +136,6 @@ cv::Mat PLImg::Image:: regionGrowing(const cv::Mat& image, float percentPixels) 
     std::pair<cv::Mat, int> component;
     while(front_bin > 0) {
         mask = image > float(front_bin)/MAX_NUMBER_OF_BINS;
-        cv::imwrite("/tmp/mask.tiff", mask);
         labels = PLImg::cuda::labeling::connectedComponents(mask);
         mask.release();
         component = PLImg::cuda::labeling::largestComponent(labels);
@@ -146,10 +145,13 @@ cv::Mat PLImg::Image:: regionGrowing(const cv::Mat& image, float percentPixels) 
         std::flush(std::cout);
 
         if(component.second < pixelThreshold) {
-            --front_bin;
+            int difference = int(pixelThreshold) - component.second;
+            while(difference > 0) {
+                --front_bin;
+                difference = difference - int(hist.at<float>(front_bin));
+            }
         } else {
             std::cout << std::endl;
-            cv::imwrite("/tmp/cc_mask.tiff", component.first);
             return component.first;
         }
     }
@@ -332,7 +334,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
             exit(EXIT_FAILURE);
         }
 
-        errCode = nppiLabelMarkersUF_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, nppiNormL1, deviceBuffer);
+        errCode = nppiLabelMarkersUF_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, nppiNormInf, deviceBuffer);
         if (errCode != NPP_SUCCESS) {
             printf("NPP error: Could not create labeling : %d\n", errCode);
             exit(EXIT_FAILURE);
@@ -352,7 +354,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
             exit(EXIT_FAILURE);
         }
 
-        errCode = nppiCompressMarkerLabelsUF_32u_C1IR(deviceResult + pDstOffset, nDstStep, roi, roi.height * roi.width, &maxLabelNumber, deviceBuffer);
+        errCode = nppiCompressMarkerLabels_32u_C1IR(deviceResult + pDstOffset, nDstStep, roi, roi.height * roi.width, &maxLabelNumber, deviceBuffer);
         if (errCode != NPP_SUCCESS) {
             printf("NPP error: Could not compress label markers : %d\n", errCode);
             exit(EXIT_FAILURE);
@@ -587,7 +589,7 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
         cudaFree(binBuffer);
         cudaFree(histBuffer);
 
-        int maxLabel = 0;
+        int maxLabel;
         // Get number of threads for next step
         uint numThreads;
         #pragma omp parallel
@@ -600,10 +602,12 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
             uint numElements = globalHist.end() - globalHist.begin() - 1;
             uint myStart = numElements / numThreads * myThread;
             uint myEnd = fmin(numElements, numElements / numThreads * (myThread + 1));
-            maxLabel = std::distance(globalHist.begin(), std::max_element(globalHist.begin()+1+myStart, globalHist.begin()+1+myEnd));
+            maxLabel = std::distance(globalHist.begin(), std::max_element(globalHist.begin() + 1 + myStart, globalHist.begin() + 1 + myEnd));
             std::pair<int, int> myMaxLabel = std::pair<int, int>(maxLabel, globalHist.at(maxLabel));
             threadMaxLabels.at(myThread) = myMaxLabel;
         }
+
+        maxLabel = 0;
         for(uint i = 0; i < numThreads; ++i) {
             if(threadMaxLabels.at(i).second >= threadMaxLabels.at(maxLabel).second) {
                 maxLabel = i;

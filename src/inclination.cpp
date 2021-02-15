@@ -163,6 +163,8 @@ sharedMat PLImg::Inclination::inclination() {
                     // as it might result in saturation if both formulas are used
                     if(blurredMaskVal < 0.05) {
                         blurredMaskVal = 0;
+                    } else if(blurredMaskVal > 0.95) {
+                        blurredMaskVal = 1;
                     }
                     tmpVal = sqrt(
                             blurredMaskVal *
