@@ -131,12 +131,34 @@ float PLImg::MaskGeneration::tMax() {
         const float* histRange = { histBounds };
         int histSize = MAX_NUMBER_OF_BINS;
 
-        cv::Mat hist;
-        cv::calcHist(&(*m_transmittance), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
-        cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
-        int endPosition = std::max_element(hist.begin<float>() + MAX_NUMBER_OF_BINS/2, hist.end<float>()) - hist.begin<float>();
-        int startPosition = std::min_element(hist.begin<float>() + MAX_NUMBER_OF_BINS/2, hist.begin<float>() + endPosition) - hist.begin<float>();
-        this->m_tMax = std::make_unique<float>(Histogram::plateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition));
+        cv::Mat fullHist;
+        cv::calcHist(&(*m_transmittance), 1, channels, cv::Mat(), fullHist, 1, &histSize, &histRange, true, false);
+
+        int startPosition, endPosition;
+        endPosition = MIN_NUMBER_OF_BINS;
+        startPosition = MIN_NUMBER_OF_BINS/2;
+
+        std::vector tmp(fullHist.begin<float>(), fullHist.end<float>());
+
+        float temp_tMax;
+        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
+            cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
+            #pragma omp parallel for
+            for (unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
+                unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
+                unsigned myEndPos = (i + 1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
+                hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos,
+                                                    fullHist.begin<float>() + myEndPos, 0);
+            }
+            cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
+
+            temp_tMax = Histogram::plateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition);
+
+            startPosition = fmax(0, (temp_tMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
+            endPosition = fmax((temp_tMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1,
+                               NUMBER_OF_BINS << 1);
+        }
+            this->m_tMax = std::make_unique<float>(temp_tMax);
     }
     return *this->m_tMax;
 }

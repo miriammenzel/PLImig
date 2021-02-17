@@ -25,37 +25,34 @@ float PLImg::Histogram::plateau(cv::Mat hist, float histLow, float histHigh, flo
     float stepSize = (histHigh - histLow) / float(hist.rows);
     if(stop - start > 3) {
         auto maxIterator = std::max_element(hist.begin<float>() + start, hist.begin<float>() + stop);
-        int maxPos = std::distance(hist.begin<float>(), maxIterator);
+        int maxPos = maxIterator - hist.begin<float>();
         int width = fmax(1.0f, peakWidth(hist, maxPos, direction));
 
         int roiStart, roiEnd;
         if(direction > 0) {
             roiStart = maxPos;
-            roiEnd = std::min(maxPos + 20 * width, stop);
+            roiEnd = std::min(maxPos + 10 * width, stop);
         } else {
             roiStart = std::max(start, maxPos - 10 * width);
             roiEnd = maxPos;
         }
-
-        cv::Mat kappa = cv::Mat(roiEnd - roiStart, 1, CV_32FC1);
-
-        float d1, d2;
-        #pragma omp parallel for private(d1, d2)
-        for(int i = 1; i < kappa.rows-1; ++i) {
-            d1 = (hist.at<float>(roiStart + i+1) - hist.at<float>(roiStart + i)) / stepSize;
-            d2 = (hist.at<float>(roiStart + i+1) - 2 * hist.at<float>(roiStart + i) + hist.at<float>(roiStart + i-1)) / pow(stepSize, 2.0f);
-            kappa.at<float>(i) = d2 / pow(1 + pow(d1, 2.0f), 3.0f/2.0f);
-        }
-        std::vector<float> kappaVec(kappa.begin<float>(), kappa.end<float>());
-        std::vector<float> histVec(hist.begin<float>(), hist.end<float>());
-
-        if(kappa.rows < 3) {
-            return histLow + float(roiStart+1) * stepSize;
+        cv::Mat kappa;
+        if(roiEnd - roiStart > 3) {
+            kappa = cv::Mat(roiEnd - roiStart, 1, CV_32FC1);
+            float d1, d2;
+            #pragma omp parallel for private(d1, d2)
+            for (int i = 1; i < kappa.rows - 1; ++i) {
+                d1 = (hist.at<float>(roiStart + i + 1) - hist.at<float>(roiStart + i)) / stepSize;
+                d2 = (hist.at<float>(roiStart + i + 1) - 2 * hist.at<float>(roiStart + i) +
+                      hist.at<float>(roiStart + i - 1)) / pow(stepSize, 2.0f);
+                kappa.at<float>(i) = d2 / pow(1 + pow(d1, 2.0f), 3.0f / 2.0f);
+            }
         } else {
-            auto minKappa = std::max_element(kappa.begin<float>()+1, kappa.end<float>()-1);
-            int minPos = minKappa - kappa.begin<float>();
-            return histLow + float(roiStart + minPos) * stepSize;
+            return histLow + float(roiStart + 1) * stepSize;
         }
+        auto minKappa = std::max_element(kappa.begin<float>()+1, kappa.end<float>()-1);
+        int minPos = minKappa - kappa.begin<float>();
+        return histLow + float(roiStart + minPos) * stepSize;
     } else {
         return histLow + float(start) * stepSize;
     }
