@@ -254,9 +254,9 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     // Calculate the number of chunks for the Connected Components algorithm
     Npp32u numberOfChunks = 1;
     Npp32u chunksPerDim;
-    Npp32f predictedMemoryUsage = float(image.total()) * float(image.elemSize() + 2 * sizeof(Npp32u));
-    if(predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
-        numberOfChunks = fmax(1, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
+    Npp32f predictedMemoryUsage = 2.1f * float(image.total()) * float(sizeof(Npp32s));
+    if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
+        numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
     chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
 
@@ -272,6 +272,8 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     Npp32s maxLabelNumber = 0;
     cv::Mat subImage, subResult, subMask, croppedImage;
     for(Npp32u it = 0; it < numberOfChunks; ++it) {
+        std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
+        std::flush(std::cout);
         // Calculate image boarders
         xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
         xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
@@ -340,14 +342,9 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
             exit(EXIT_FAILURE);
         }
         cudaFree(deviceBuffer);
+        cudaFree(deviceImage);
 
-        errCode = nppiCompressMarkerLabelsGetBufferSize_32u_C1R(roi.height * roi.width, &bufferSize);
-        if (errCode != NPP_SUCCESS) {
-            printf("NPP error: Could not get buffer size for compressing label markers : %d\n", errCode);
-            exit(EXIT_FAILURE);
-        }
-
-        err = cudaMalloc((void **) &deviceBuffer, bufferSize);
+        err = cudaMalloc((void **) &deviceBuffer, size_t(roi.width) * size_t(roi.height) * 9);
         if (err != cudaSuccess) {
             std::cerr << "Could not allocate enough memory for compressing label marker buffer \n";
             std::cerr << cudaGetErrorName(err) << std::endl;
@@ -374,7 +371,6 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         nextLabelNumber = nextLabelNumber + maxLabelNumber;
 
         // Free reserved memory
-        cudaFree(deviceImage);
         cudaFree(deviceResult);
         cudaFree(deviceBuffer);
 

@@ -137,6 +137,7 @@ float PLImg::Inclination::rmaxWhite() {
         if(!m_regionGrowingMask) {
             m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::Image::regionGrowing(*m_retardation));
         }
+
         m_rmaxWhite = std::make_unique<float>(cv::mean(*m_retardation, *m_regionGrowingMask)[0]);
     }
     return *m_rmaxWhite;

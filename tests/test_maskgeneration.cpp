@@ -12,14 +12,14 @@
 // Test function for histogram generation
 void f(std::vector<float>& x) {
     for(float & i : x) {
-        i = 1.0f / (i+1.0f) + std::pow(2.0f, -i/2.0f + 4.0f);
+        i = 1000.0f / (i+1.0f) + std::pow(2.0f, -i/2.0f + 4.0f);
     }
 }
 
 TEST(TestMaskgeneration, TestTRet) {
-    auto x = std::vector<float>(256*256);
+    auto x = std::vector<float>(256 * 256);
     for(ulong i = 0; i < x.size(); ++i) {
-        x.at(i) = float(i)/256.0f;
+        x.at(i) = float(i) / 256.0f;
     }
 
     auto y = std::vector<float>(x.size());
@@ -28,7 +28,7 @@ TEST(TestMaskgeneration, TestTRet) {
 
     float sum = 0;
     for(float i : y) {
-        sum += std::ceil(i);
+        sum += int(i);
     }
     cv::Mat image(sum, 1, CV_32FC1);
 
@@ -39,18 +39,16 @@ TEST(TestMaskgeneration, TestTRet) {
         image.at<float>(i) = x.at(current_index);
 
         ++current_sum;
-        if(current_sum > unsigned(y.at(current_index))) {
+        if(current_sum >= unsigned(y.at(current_index))) {
             ++current_index;
             current_sum = 0;
         }
     }
     cv::normalize(image, image, 0, 1, cv::NORM_MINMAX);
 
-    cv::imwrite("/tmp/ret.tiff", image);
-
     auto shared_ret = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(shared_ret, nullptr);
-    ASSERT_FLOAT_EQ(mask.tRet(), 10.0f * (1.0f/256.0f));
+    ASSERT_FLOAT_EQ(mask.tRet(), 0.07421875f);
 }
 
 TEST(TestMaskgeneration, TestTTra) {
@@ -72,7 +70,7 @@ TEST(TestMaskgeneration, TestTTra) {
     auto shared_ret = std::make_shared<cv::Mat>(test_retardation);
     auto shared_tra = std::make_shared<cv::Mat>(test_transmittance);
     auto mask = PLImg::MaskGeneration(shared_ret, shared_tra);
-    ASSERT_FLOAT_EQ(mask.tTra(), 0.34375);
+    ASSERT_FLOAT_EQ(mask.tTra(), 0.3456f);
 }
 
 TEST(TestMaskgeneration, TestTMin) {
@@ -110,7 +108,7 @@ TEST(TestMaskgeneration, TestTMax) {
 
     float sum = 0;
     for(float i : y) {
-        sum += std::ceil(i);
+        sum += i;
     }
     cv::Mat image(sum, 1, CV_32FC1);
 
@@ -127,9 +125,10 @@ TEST(TestMaskgeneration, TestTMax) {
         }
     }
     cv::normalize(image, image, 0, 1, cv::NORM_MINMAX);
+    cv::imwrite("/tmp/ret.tiff", image);
     auto shared_tra = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(nullptr, shared_tra);
-    ASSERT_FLOAT_EQ(mask.tMax(), 251.0f * (1.0f/256.0f));
+    ASSERT_FLOAT_EQ(mask.tMax(), 1.0f - 0.07421875f);
 }
 
 TEST(TestMaskgeneration, TestSetGet) {
