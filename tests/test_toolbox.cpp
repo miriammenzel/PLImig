@@ -140,22 +140,18 @@ TEST(TestToolbox, TestImageRegionGrowing) {
 }
 
 TEST(TestToolbox, TestMedianFilter) {
-    std::vector<float> test_arr = {1, 1, 3, 3, 3, 3, 2, 2, 3};
-    cv::Mat test_img(3, 3, CV_32FC1);
-    test_img.data = (uchar*) test_arr.data();
+    auto testImage = cv::imread("../../tests/files/median_filter/median_input.tiff", cv::IMREAD_ANYDEPTH);
+    auto expectedResult = cv::imread("../../tests/files/median_filter/median_expected_result.tiff", cv::IMREAD_ANYDEPTH);
 
-    auto test_img_ptr = std::make_shared<cv::Mat>(test_img);
-    auto result_img = PLImg::cuda::filters::medianFilter(test_img_ptr);
+    auto testImagePtr = std::make_shared<cv::Mat>(testImage);
+    auto medianFilterPtr = PLImg::cuda::filters::medianFilter(testImagePtr);
 
-    std::vector<float> expected_arr = {1, 1, 3, 3, 3, 3, 2, 2, 3};
-    cv::Mat expected_img(3, 3, CV_32FC1);
-    expected_img.data = (uchar*) expected_arr.data();
-
-    for(uint i = 0; i < test_img.rows; ++i) {
-        for(uint j = 0; j < test_img.cols; ++j) {
-            ASSERT_FLOAT_EQ(expected_img.at<float>(i, j), result_img->at<float>(i, j));
+    for(unsigned i = 0; i < expectedResult.rows; ++i) {
+        for(unsigned j = 0; j < expectedResult.cols; ++j) {
+            EXPECT_FLOAT_EQ(medianFilterPtr->at<float>(i, j), expectedResult.at<float>(i, j)) << "i = " << i << ", j = " << j << std::endl;
         }
     }
+    cv::imwrite("/tmp/PLImgMedianFiltered.tiff", *medianFilterPtr);
 }
 
 TEST(TestToolbox, TestMedianFilterMasked) {

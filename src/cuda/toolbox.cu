@@ -50,7 +50,7 @@ __global__ void medianFilterKernel(const float* image, int image_stride,
     // Only try to calculate the median of pixels within the non-padded image
     if(x >= MEDIAN_KERNEL_SIZE && x < imageDims.x - MEDIAN_KERNEL_SIZE && y >= MEDIAN_KERNEL_SIZE && y < imageDims.y - MEDIAN_KERNEL_SIZE) {
         // Transfer image pixels to our kernel for median filtering application
-        for (int cx = -MEDIAN_KERNEL_SIZE; cx <= MEDIAN_KERNEL_SIZE; ++cx) {
+        for (int cx = -MEDIAN_KERNEL_SIZE; cx < MEDIAN_KERNEL_SIZE; ++cx) {
             // The median filter kernel is round. Therefore calculate the valid y-positions based on our x-position in the kernel
             cy_bound = sqrtf(MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE - cx * cx);
             for (int cy = -cy_bound; cy <= cy_bound; ++cy) {

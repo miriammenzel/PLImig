@@ -251,7 +251,8 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     // Calculate the number of chunks for the Connected Components algorithm
     Npp32u numberOfChunks = 1;
     Npp32u chunksPerDim;
-    Npp32f predictedMemoryUsage = 2.1f * float(image.total()) * float(sizeof(Npp32s));
+    Npp32f predictedMemoryUsage = float(image.total()) * float(image.elemSize()) + 2 * float(image.total()) * float(sizeof(Npp32u))
+                                    + float(size_t(image.rows) * size_t(image.cols) * 9);
     if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
@@ -321,12 +322,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         pSrcOffset = 1 + 1 * nSrcStep / sizeof(Npp8u);
         pDstOffset = 1 + 1 * nDstStep / sizeof(Npp32u);
 
-        errCode = nppiLabelMarkersUFGetBufferSize_32u_C1R(roi, &bufferSize);
-        if (errCode != NPP_SUCCESS) {
-            printf("NPP error: Could not get buffer size : %d\n", errCode);
-            exit(EXIT_FAILURE);
-        }
-        err = cudaMalloc((void **) &deviceBuffer, bufferSize);
+        err = cudaMalloc((void **) &deviceBuffer, size_t(roi.width) * size_t(roi.height) * 9);
         if (err != cudaSuccess) {
             std::cerr << "Could not generate buffer for Connected Components application. Error code is: ";
             std::cerr << cudaGetErrorName(err) << std::endl;
@@ -338,15 +334,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
             printf("NPP error: Could not create labeling : %d\n", errCode);
             exit(EXIT_FAILURE);
         }
-        cudaFree(deviceBuffer);
         cudaFree(deviceImage);
-
-        err = cudaMalloc((void **) &deviceBuffer, size_t(roi.width) * size_t(roi.height) * 9);
-        if (err != cudaSuccess) {
-            std::cerr << "Could not allocate enough memory for compressing label marker buffer \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
 
         errCode = nppiCompressMarkerLabels_32u_C1IR(deviceResult + pDstOffset, nDstStep, roi, roi.height * roi.width, &maxLabelNumber, deviceBuffer);
         if (errCode != NPP_SUCCESS) {
