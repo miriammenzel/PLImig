@@ -240,16 +240,16 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
             generation.set_tMax(this->tMax());
 
             t_ret = generation.tRet();
-            if(t_ret > this->tRet()) {
+            if(t_ret >= this->tRet()) {
                 above_tRet.push_back(t_ret);
-            } else if(t_ret < this->tRet()) {
+            } else if(t_ret <= this->tRet()) {
                 below_tRet.push_back(t_ret);
             }
 
             t_tra = generation.tTra();
-            if(t_tra > this->tTra()) {
+            if(t_tra >= this->tTra()) {
                 above_tTra.push_back(t_tra);
-            } else if(t_tra < this->tTra() && t_tra > 0) {
+            } else if(t_tra <= this->tTra() && t_tra > 0) {
                 below_tTra.push_back(t_tra);
             }
         }
@@ -260,25 +260,46 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         generation.setModalities(nullptr, nullptr);
 
         float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
+        float sumStd;
         if (above_tRet.empty()) {
             diff_tRet_p = tRet();
         } else {
             diff_tRet_p = std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / above_tRet.size();
+            sumStd = 0;
+            for(auto elem : above_tRet) {
+                sumStd += powf(elem - diff_tRet_p, 2.0f);
+            }
+            diff_tRet_p = tRet() + sqrtf(sumStd / above_tRet.size());
         }
         if (below_tRet.empty()) {
             diff_tRet_m = tRet();
         } else {
             diff_tRet_m = std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / below_tRet.size();
+            sumStd = 0;
+            for(auto elem : below_tRet) {
+                sumStd += powf(elem - diff_tRet_m, 2.0f);
+            }
+            diff_tRet_m = tRet() - sqrtf(sumStd / below_tRet.size());
         }
         if (above_tTra.empty()) {
             diff_tTra_p = tTra();
         } else {
             diff_tTra_p = std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / above_tTra.size();
+            sumStd = 0;
+            for(auto elem : above_tTra) {
+                sumStd += powf(elem - diff_tTra_p, 2.0f);
+            }
+            diff_tTra_p = tTra() + sqrtf(sumStd / above_tTra.size());
         }
         if (below_tTra.empty()) {
             diff_tTra_m = tTra();
         } else {
             diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();
+            sumStd = 0;
+            for(auto elem : below_tTra) {
+                sumStd += powf(elem - diff_tTra_m, 2.0f);
+            }
+            diff_tTra_m = tTra() - sqrtf(sumStd / below_tTra.size());
         }
 
         std::cout << "Probability parameters: R+:"  << diff_tRet_p << ", R-:" << diff_tRet_m << ", T+:" << diff_tTra_p << ", T-:" << diff_tTra_m << std::endl;

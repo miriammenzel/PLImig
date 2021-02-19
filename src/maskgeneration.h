@@ -38,7 +38,7 @@
 #include "toolbox.h"
 
 /// Number of iterations that will be used to generate the blurredMask() parameter.
-#define BLURRED_MASK_ITERATIONS 100
+#define BLURRED_MASK_ITERATIONS 200
 
 /**
  * @file
