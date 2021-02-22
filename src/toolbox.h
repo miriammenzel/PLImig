@@ -85,7 +85,6 @@ namespace PLImg {
         cv::Mat regionGrowing(const cv::Mat& image, float percentPixels = 0.01f);
     }
 
-
     namespace cuda {
         /**
          * @brief runCUDAchecks

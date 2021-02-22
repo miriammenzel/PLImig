@@ -158,7 +158,7 @@ float PLImg::MaskGeneration::tMax() {
             endPosition = fmax((temp_tMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1,
                                NUMBER_OF_BINS << 1);
         }
-            this->m_tMax = std::make_unique<float>(temp_tMax);
+        this->m_tMax = std::make_unique<float>(temp_tMax);
     }
     return *this->m_tMax;
 }
@@ -260,49 +260,30 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
         generation.setModalities(nullptr, nullptr);
 
         float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
-        float sumStd;
         if (above_tRet.empty()) {
             diff_tRet_p = tRet();
         } else {
             diff_tRet_p = std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / above_tRet.size();
-            sumStd = 0;
-            for(auto elem : above_tRet) {
-                sumStd += powf(elem - diff_tRet_p, 2.0f);
-            }
-            diff_tRet_p = tRet() + sqrtf(sumStd / above_tRet.size());
         }
         if (below_tRet.empty()) {
             diff_tRet_m = tRet();
         } else {
             diff_tRet_m = std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / below_tRet.size();
-            sumStd = 0;
-            for(auto elem : below_tRet) {
-                sumStd += powf(elem - diff_tRet_m, 2.0f);
-            }
-            diff_tRet_m = tRet() - sqrtf(sumStd / below_tRet.size());
         }
         if (above_tTra.empty()) {
             diff_tTra_p = tTra();
         } else {
             diff_tTra_p = std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / above_tTra.size();
-            sumStd = 0;
-            for(auto elem : above_tTra) {
-                sumStd += powf(elem - diff_tTra_p, 2.0f);
-            }
-            diff_tTra_p = tTra() + sqrtf(sumStd / above_tTra.size());
         }
         if (below_tTra.empty()) {
             diff_tTra_m = tTra();
         } else {
             diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();
-            sumStd = 0;
-            for(auto elem : below_tTra) {
-                sumStd += powf(elem - diff_tTra_m, 2.0f);
-            }
-            diff_tTra_m = tTra() - sqrtf(sumStd / below_tTra.size());
         }
-
-        std::cout << "Probability parameters: R+:"  << diff_tRet_p << ", R-:" << diff_tRet_m << ", T+:" << diff_tTra_p << ", T-:" << diff_tTra_m << std::endl;
+        
+        std::cout << "Probability parameters: R+:"  << diff_tRet_p << ", R-:" << diff_tRet_m <<
+                                                    ", T+:" << diff_tTra_p << ", T-:" << diff_tTra_m
+                                                    << std::endl;
 
         float diffTra, diffRet;
         #pragma omp parallel for private(diffTra, diffRet) default(shared) schedule(static)
@@ -320,8 +301,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
                 } else {
                     diffRet = (diffRet - tRet()) / diff_tRet_p;
                 }
-                m_blurredMask->at<float>(y, x) = (-erf(cos(3.0f*M_PI/4.0f - atan2(diffTra, diffRet)) *
-                        sqrt(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
+                m_blurredMask->at<float>(y, x) = (-erf(cos(3.0f*M_PI/4.0f - atan2f(diffTra, diffRet)) *
+                        sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
             }
         }
     }
