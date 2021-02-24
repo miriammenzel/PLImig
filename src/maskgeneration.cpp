@@ -3,7 +3,6 @@
 //
 
 #include "maskgeneration.h"
-#include <iostream>
 
 PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) :
     m_retardation(std::move(retardation)), m_transmittance(std::move(transmittance)), m_tMin(nullptr), m_tMax(nullptr),
@@ -118,6 +117,7 @@ float PLImg::MaskGeneration::tRet() {
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
         cv::Mat mask = Image::regionGrowing(*m_retardation);
+
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
     }
@@ -127,38 +127,54 @@ float PLImg::MaskGeneration::tMin() {
 float PLImg::MaskGeneration::tMax() {
     if(!m_tMax) {
         int channels[] = {0};
-        float histBounds[] = {0.0f, 1.0f+1e-15f};
+        float histBounds[] = {0.0f, 1.0f + 1.0f/MAX_NUMBER_OF_BINS};
         const float* histRange = { histBounds };
         int histSize = MAX_NUMBER_OF_BINS;
 
         cv::Mat fullHist;
         cv::calcHist(&(*m_transmittance), 1, channels, cv::Mat(), fullHist, 1, &histSize, &histRange, true, false);
 
+        // Determine start and end on full histogram
         int startPosition, endPosition;
-        endPosition = MIN_NUMBER_OF_BINS;
-        startPosition = MIN_NUMBER_OF_BINS/2;
+        endPosition = std::max_element(fullHist.begin<float>() + MAX_NUMBER_OF_BINS / 2, fullHist.end<float>()) - fullHist.begin<float>();
+        auto peaks = PLImg::Histogram::peaks(fullHist, MAX_NUMBER_OF_BINS / 2, endPosition);
+        startPosition = std::min_element(fullHist.begin<float>() + peaks.at(peaks.size() - 1), fullHist.begin<float>() + endPosition) - fullHist.begin<float>();
 
-        std::vector tmp(fullHist.begin<float>(), fullHist.end<float>());
-
-        float temp_tMax;
-        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
-            cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
-            #pragma omp parallel for
-            for (unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
-                unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                unsigned myEndPos = (i + 1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos,
-                                                    fullHist.begin<float>() + myEndPos, 0);
-            }
-            cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
-
-            temp_tMax = Histogram::plateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition);
-
-            startPosition = fmax(0, (temp_tMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
-            endPosition = fmax((temp_tMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1,
-                               NUMBER_OF_BINS << 1);
+        std::cout << startPosition << "," << endPosition << std::endl;
+        for(unsigned i = 0; i < fullHist.rows; ++i) {
+            std::cout << fullHist.at<float>(i) << std::endl;
         }
-        this->m_tMax = std::make_unique<float>(temp_tMax);
+
+        //If the transmittance was masked, we should see a large plateau with 0 values after the highest peak
+        if(endPosition - startPosition < 2) {
+            this->m_tMax = std::make_unique<float>(float(startPosition)/MAX_NUMBER_OF_BINS);
+        }
+        //Else do the normal calculation
+        else {
+            // Convert from 256 to 16 bins
+            startPosition = MIN_NUMBER_OF_BINS * float(startPosition)/MAX_NUMBER_OF_BINS;
+            endPosition = MIN_NUMBER_OF_BINS * float(endPosition)/MAX_NUMBER_OF_BINS;
+
+            float temp_tMax;
+            for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
+                cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
+                #pragma omp parallel for
+                for (unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
+                    unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
+                    unsigned myEndPos = (i + 1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
+                    hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos,
+                                                        fullHist.begin<float>() + myEndPos, 0);
+                }
+                cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
+
+                temp_tMax = Histogram::plateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition);
+
+                startPosition = fmax(0, (temp_tMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
+                endPosition = fmax((temp_tMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1,
+                                   NUMBER_OF_BINS << 1);
+            }
+            this->m_tMax = std::make_unique<float>(temp_tMax);
+        }
     }
     return *this->m_tMax;
 }

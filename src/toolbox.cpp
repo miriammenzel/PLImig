@@ -135,6 +135,7 @@ cv::Mat PLImg::Image:: regionGrowing(const cv::Mat& image, float percentPixels) 
         mask = image > float(front_bin)/MAX_NUMBER_OF_BINS;
         labels = PLImg::cuda::labeling::connectedComponents(mask);
         mask.release();
+
         component = PLImg::cuda::labeling::largestComponent(labels);
         labels.release();
 
