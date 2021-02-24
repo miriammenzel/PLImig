@@ -138,11 +138,11 @@ float PLImg::MaskGeneration::tMax() {
         int startPosition, endPosition;
         endPosition = std::max_element(fullHist.begin<float>() + MAX_NUMBER_OF_BINS / 2, fullHist.end<float>()) - fullHist.begin<float>();
         auto peaks = PLImg::Histogram::peaks(fullHist, MAX_NUMBER_OF_BINS / 2, endPosition);
-        startPosition = std::min_element(fullHist.begin<float>() + peaks.at(peaks.size() - 1), fullHist.begin<float>() + endPosition) - fullHist.begin<float>();
-
-        std::cout << startPosition << "," << endPosition << std::endl;
-        for(unsigned i = 0; i < fullHist.rows; ++i) {
-            std::cout << fullHist.at<float>(i) << std::endl;
+        if(peaks.size() > 1) {
+            startPosition = std::min_element(fullHist.begin<float>() + peaks.at(peaks.size() - 1),
+                                             fullHist.begin<float>() + endPosition) - fullHist.begin<float>();
+        } else {
+            startPosition = MAX_NUMBER_OF_BINS / 2;
         }
 
         //If the transmittance was masked, we should see a large plateau with 0 values after the highest peak
