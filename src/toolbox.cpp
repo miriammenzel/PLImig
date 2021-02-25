@@ -114,9 +114,9 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
 cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, const cv::Mat& mask, float percentPixels) {
     float pixelThreshold;
     if(mask.empty()) {
-        pixelThreshold = float(image.cols) * float(image.rows) * percentPixels;
+        pixelThreshold = float(image.cols) * float(image.rows) * percentPixels / 100;
     } else {
-        pixelThreshold = float(cv::countNonZero(mask)) * percentPixels;
+        pixelThreshold = float(cv::countNonZero(mask)) * percentPixels / 100;
     }
 
     int channels[] = {0};
