@@ -87,7 +87,8 @@ float PLImg::Inclination::im() {
     if(!m_im) {
         // im is the mean value in the transmittance based on the highest retardation values
         if(!m_regionGrowingMask) {
-            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::Image::regionGrowing(*m_retardation));
+            cv::Mat backgroundMask = *m_whiteMask & *m_grayMask;
+            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::Image::regionGrowing(*m_retardation, backgroundMask));
         }
         m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask & (*m_blurredMask > 0.95))[0]);
     }

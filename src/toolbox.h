@@ -82,7 +82,7 @@ namespace PLImg {
          * @param percentPixels
          * @return
          */
-        cv::Mat regionGrowing(const cv::Mat& image, float percentPixels = 0.01f);
+        cv::Mat regionGrowing(const cv::Mat& image, const cv::Mat& mask = cv::Mat(), float percentPixels = 0.01f);
     }
 
     namespace cuda {

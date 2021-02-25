@@ -111,8 +111,13 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
     return peaks;
 }
 
-cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, float percentPixels) {
-    float pixelThreshold = float(image.rows)/100 * float(image.cols) * percentPixels;
+cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, const cv::Mat& mask, float percentPixels) {
+    float pixelThreshold;
+    if(mask.empty()) {
+        pixelThreshold = float(image.cols) * float(image.rows) * percentPixels;
+    } else {
+        pixelThreshold = float(cv::countNonZero(mask)) * percentPixels;
+    }
 
     int channels[] = {0};
     float histBounds[] = {0.0f, 1.0f};
@@ -129,12 +134,12 @@ cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, float percentPixels) {
         --front_bin;
     }
 
-    cv::Mat mask, labels;
+    cv::Mat cc_mask, labels;
     std::pair<cv::Mat, int> component;
     while(front_bin > 0) {
-        mask = image > float(front_bin)/MAX_NUMBER_OF_BINS;
-        labels = PLImg::cuda::labeling::connectedComponents(mask);
-        mask.release();
+        cc_mask = image > float(front_bin)/MAX_NUMBER_OF_BINS;
+        labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
+        cc_mask.release();
 
         component = PLImg::cuda::labeling::largestComponent(labels);
         labels.release();

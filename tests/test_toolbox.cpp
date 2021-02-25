@@ -130,7 +130,7 @@ TEST(TestToolbox, TestImageRegionGrowing) {
         }
     }
 
-    cv::Mat mask = PLImg::Image::regionGrowing(test_retardation);
+    cv::Mat mask = PLImg::Image::regionGrowing(test_retardation, cv::Mat(), 0.0001);
     for(uint i = 11; i < 20; ++i) {
         for(uint j = 11; j < 15; ++j) {
             ASSERT_TRUE(mask.at<bool>(i, j));
@@ -148,7 +148,7 @@ TEST(TestToolbox, TestMedianFilter) {
 
     for(unsigned i = 0; i < expectedResult.rows; ++i) {
         for(unsigned j = 0; j < expectedResult.cols; ++j) {
-            EXPECT_FLOAT_EQ(medianFilterPtr->at<float>(i, j), expectedResult.at<float>(i, j)) << "i = " << i << ", j = " << j << std::endl;
+            ASSERT_FLOAT_EQ(medianFilterPtr->at<float>(i, j), expectedResult.at<float>(i, j));
         }
     }
     cv::imwrite("/tmp/PLImgMedianFiltered.tiff", *medianFilterPtr);

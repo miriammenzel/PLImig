@@ -127,7 +127,7 @@ TEST(TestMaskgeneration, TestTMax) {
     cv::normalize(image, image, 0, 1, cv::NORM_MINMAX);
     auto shared_tra = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(nullptr, shared_tra);
-    ASSERT_FLOAT_EQ(mask.tMax(), 0.94140625f);
+    ASSERT_FLOAT_EQ(mask.tMax(), 0.9375);
 }
 
 TEST(TestMaskgeneration, TestSetGet) {
