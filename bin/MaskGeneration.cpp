@@ -36,13 +36,13 @@ int main(int argc, char** argv) {
     optional->add_flag("--detailed", detailed);
     optional->add_flag("--with_blurred", blurred);
     auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
-    parameters->add_option("--ttra", ttra, "Average transmittance value of brightest retardation values")
+    parameters->add_option("--ilower", ttra, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--tret", tret, "Plateau in retardation histogram")
+    parameters->add_option("--rthres", tret, "Plateau in retardation histogram")
               ->default_val(-1);
-    parameters->add_option("--tmin", tmin, "Average transmittance value of brightest retardation values")
+    parameters->add_option("--irmax", tmin, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--tmax", tmax, "Separator of gray matter and background")
+    parameters->add_option("--iupper", tmax, "Separator of gray matter and background")
               ->default_val(-1);
     CLI11_PARSE(app, argc, argv);
 

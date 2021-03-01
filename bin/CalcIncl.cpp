@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
             std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(PLImg::Reader::imread(retardation_path, dataset));
             std::shared_ptr<cv::Mat> whiteMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/White"));
             std::shared_ptr<cv::Mat> grayMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/Gray"));
-            std::shared_ptr<cv::Mat> blurredMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/Blurred"));
+            std::shared_ptr<cv::Mat> blurredMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/Probability"));
             std::cout << "Files read" << std::endl;
 
             std::shared_ptr<cv::Mat> medTransmittance;
