@@ -188,9 +188,9 @@ int main(int argc, char** argv) {
                 writer.write_dataset(dataset, *inclination.saturation());
                 writer.writePLIMAttributes(transmittance_path, retardation_path, dataset, "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;
+                writer.close();
             }
 
-            writer.close();
             std::cout << std::endl;
         } else {
             std::cerr << "Mask or Retardation not found. Please check your paths!\n";
