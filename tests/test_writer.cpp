@@ -21,7 +21,10 @@ TEST(WriterTest, TestWriteAttributes) {
     float min = 0.2;
     float max = 0.3;
     writer.set_path("output/writer_test_1.h5");
-    writer.write_attributes("/", tra, ret, min, max);
+    writer.write_attribute("/", "t_tra", tra);
+    writer.write_attribute("/", "t_ret",ret);
+    writer.write_attribute("/", "t_min", min);
+    writer.write_attribute("/", "t_max", max);
     writer.close();
 
     auto file = H5::H5File("output/writer_test_1.h5", H5F_ACC_RDONLY);

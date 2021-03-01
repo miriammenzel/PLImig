@@ -116,6 +116,7 @@ cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, const cv::Mat& mask, f
     if(mask.empty()) {
         pixelThreshold = float(image.cols) * float(image.rows) * percentPixels / 100;
     } else {
+        std::cout << float(cv::countNonZero(mask)) << " " << float(image.cols) * float(image.rows) << std::endl;
         pixelThreshold = float(cv::countNonZero(mask)) * percentPixels / 100;
     }
 

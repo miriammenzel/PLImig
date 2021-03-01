@@ -155,6 +155,11 @@ int main(int argc, char** argv) {
             // Create file and dataset. Write the inclination afterwards.
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
             writer.create_group(dataset);
+            writer.write_attribute("/", "im", inclination.im());
+            writer.write_attribute("/", "ic", inclination.ic());
+            writer.write_attribute("/", "rmax_W", inclination.rmaxWhite());
+            writer.write_attribute("/", "rmax_G", inclination.rmaxGray());
+
             writer.write_dataset(dataset+"/Inclination", *inclination.inclination());
             std::cout << "Inclination generated and written" << std::endl;
 

@@ -136,7 +136,11 @@ int main(int argc, char** argv) {
             }
             writer.set_path(output_folder + "/" + mask_basename + ".h5");
             writer.create_group(dataset);
-            writer.write_attributes("/", generation.tTra(), generation.tRet(), generation.tMin(), generation.tMax());
+            writer.write_attribute("/", "I_lower", generation.tTra());
+            writer.write_attribute("/", "r_tres", generation.tRet());
+            writer.write_attribute("/", "I_rmax", generation.tMin());
+            writer.write_attribute("/", "I_upper", generation.tMax());
+
             std::cout << "Attributes generated and written" << std::endl;
             writer.write_dataset(dataset + "/White", *generation.whiteMask());
             std::cout << "White mask generated and written" << std::endl;

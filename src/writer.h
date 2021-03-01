@@ -62,7 +62,8 @@ namespace PLImg {
          * @param t_min
          * @param t_max
          */
-        void write_attributes(std::string dataset, float t_tra, float t_ret, float t_min, float t_max);
+        template<typename T>
+        void write_attribute(std::string dataset, const std::string& parameter_name, T value);
         /**
          * @brief write_dataset
          * @param dataset
@@ -89,6 +90,8 @@ namespace PLImg {
          */
         static void createDirectoriesIfMissing(const std::string& filename);
 
+        void write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::PredType& datatype, void* value);
+
         ///
         std::string m_filename;
         ///
@@ -96,5 +99,9 @@ namespace PLImg {
     };
 }
 
-
 #endif //PLIMG_WRITER_H
+
+template<> void PLImg::HDF5Writer::write_attribute<float>(std::string dataset, const std::string& parameter_name, float value);
+template<> void PLImg::HDF5Writer::write_attribute<double>(std::string dataset, const std::string& parameter_name, double value);
+template<> void PLImg::HDF5Writer::write_attribute<int>(std::string dataset, const std::string& parameter_name, int value);
+template<> void PLImg::HDF5Writer::write_attribute<std::string>(std::string dataset, const std::string& parameter_name, std::string value);

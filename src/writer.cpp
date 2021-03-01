@@ -4,6 +4,8 @@
 
 #include "writer.h"
 
+#include <utility>
+
 PLImg::HDF5Writer::HDF5Writer() {
     m_filename = "";
 }
@@ -19,7 +21,27 @@ void PLImg::HDF5Writer::set_path(const std::string& filename) {
     }
 }
 
-void PLImg::HDF5Writer::write_attributes(std::string dataset, float t_tra, float t_ret, float t_min, float t_max) {
+template<>
+void PLImg::HDF5Writer::write_attribute<float>(std::string dataset, const std::string& parameter_name, float value) {
+    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_FLOAT, &value);
+}
+
+template<>
+void PLImg::HDF5Writer::write_attribute<double>(std::string dataset, const std::string& parameter_name, double value) {
+    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_DOUBLE, &value);
+}
+
+template<>
+void PLImg::HDF5Writer::write_attribute<int>(std::string dataset, const std::string& parameter_name, int value) {
+    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_INT, &value);
+}
+
+template<>
+void PLImg::HDF5Writer::write_attribute<std::string>(std::string dataset, const std::string& parameter_name, std::string value) {
+    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_CHAR, &value);
+}
+
+void PLImg::HDF5Writer::write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::PredType& type, void* value) {
     while(!dataset.empty() && dataset.at(dataset.size()-1) == '/') {
         dataset = dataset.substr(0, dataset.size()-1);
     }
@@ -27,36 +49,12 @@ void PLImg::HDF5Writer::write_attributes(std::string dataset, float t_tra, float
     hsize_t dims[1] = {1};
     H5::Attribute attr;
     H5::DataSpace space(1, dims);
-    if(!m_hdf5file.attrExists(dataset+"t_tra")) {
-        attr = m_hdf5file.createAttribute(dataset + "t_tra", H5::PredType::NATIVE_FLOAT, space);
+    if(!m_hdf5file.attrExists(dataset+"/"+parameter_name)) {
+        attr = m_hdf5file.createAttribute(dataset +"/"+ parameter_name, type, space);
     } else {
-        attr = m_hdf5file.openAttribute(dataset + "t_tra");
+        attr = m_hdf5file.openAttribute(dataset +"/"+ parameter_name);
     }
-    attr.write(H5::PredType::NATIVE_FLOAT, &t_tra);
-    attr.close();
-
-    if(!m_hdf5file.attrExists(dataset+"t_ret")) {
-        attr = m_hdf5file.createAttribute(dataset + "t_ret", H5::PredType::NATIVE_FLOAT, space);
-    } else {
-        attr = m_hdf5file.openAttribute(dataset + "t_ret");
-    }
-    attr.write(H5::PredType::NATIVE_FLOAT, &t_ret);
-    attr.close();
-
-    if(!m_hdf5file.attrExists(dataset+"t_min")) {
-        attr = m_hdf5file.createAttribute(dataset + "t_min", H5::PredType::NATIVE_FLOAT, space);
-    } else {
-        attr = m_hdf5file.openAttribute(dataset + "t_min");
-    }
-    attr.write(H5::PredType::NATIVE_FLOAT, &t_min);
-    attr.close();
-
-    if(!m_hdf5file.attrExists(dataset+"t_max")) {
-        attr = m_hdf5file.createAttribute(dataset + "t_max", H5::PredType::NATIVE_FLOAT, space);
-    } else {
-        attr = m_hdf5file.openAttribute(dataset + "t_max");
-    }
-    attr.write(H5::PredType::NATIVE_FLOAT, &t_max);
+    attr.write(type, value);
     attr.close();
 }
 
