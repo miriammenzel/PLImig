@@ -8,6 +8,7 @@ set(SOURCE
         reader.cpp
         toolbox.cpp
         writer.cpp
+        version.cpp
         cuda/toolbox.cu)
 
 # Set header files
@@ -17,10 +18,11 @@ set(HEADER
         reader.h
         toolbox.h
         writer.h
+        version.h
         cuda/toolbox.cuh)
 
 # Generate executable file
 add_library(PLImig SHARED ${SOURCE})
 target_link_libraries(PLImig ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
         CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu CUDA::nppist
-        OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem)
+        OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem ${PLIM_LIBRARIES})

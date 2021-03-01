@@ -28,7 +28,9 @@
 #include <filesystem>
 #include <H5Cpp.h>
 #include <opencv2/core.hpp>
+#include <plim/AttributeHandler.h>
 #include "reader.h"
+#include "version.h"
 
 /**
  * @file
@@ -79,6 +81,10 @@ namespace PLImg {
          * @brief close
          */
         void close();
+
+        void writePLIMAttributes(std::string transmittance_path, std::string retardation_path,
+                                 std::string output_dataset, std::string input_dataset,
+                                 std::string modality, int argc, char** argv);
     private:
         /**
          * @brief open

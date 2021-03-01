@@ -3,7 +3,7 @@ if (POLICY CMP0048)
 endif (POLICY CMP0048)
 
 cmake_minimum_required(VERSION 3.14)
-project(PLImig LANGUAGES C CXX CUDA)
+project(PLImig LANGUAGES C CXX CUDA VERSION 1.1.0)
 
 # Set a default build type if none was specified
 set(default_build_type "Release")
@@ -30,6 +30,7 @@ find_package(TIFF REQUIRED)
 find_package(NIFTI REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Filesystem REQUIRED)
+find_package(PLIM REQUIRED)
 
 # Add headers to project
 add_subdirectory(extern/CLI11)
@@ -39,11 +40,15 @@ include_directories(${NIFTI_INCLUDE_DIRS})
 include_directories(${HDF5_INCLUDE_DIR})
 include_directories(${OPENMP_C_INCLUDE_DIRS})
 include_directories(${OPENMP_CXX_INCLUDE_DIRS})
+include_directories(${PLIM_INCLUDE_DIRS})
 include_directories(src/)
 
 # Set CXX and C flags for OpenMP
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
 set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} ${OPENMP_C_FLAGS})
+
+include(cmake/version.cmake)
+configure_file(src/version.cpp.in ${PROJECT_SOURCE_DIR}/src/version.cpp)
 
 add_subdirectory(extern)
 add_subdirectory(src)

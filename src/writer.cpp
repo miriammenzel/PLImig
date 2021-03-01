@@ -3,7 +3,7 @@
 //
 
 #include "writer.h"
-
+#include <iostream>
 #include <utility>
 
 PLImg::HDF5Writer::HDF5Writer() {
@@ -161,6 +161,84 @@ void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) 
         if(err.value() != 0) {
             throw std::runtime_error("Output folder " + folder_name + " could not be created! Please check your path and permissions");
         }
+    }
+}
+
+void PLImg::HDF5Writer::writePLIMAttributes(std::string transmittance_path, std::string retardation_path,
+                                            std::string output_dataset, std::string input_dataset,
+                                            std::string modality, int argc, char** argv) {
+    H5::Exception::dontPrint();
+    H5::DataSet dset;
+    try {
+        dset = m_hdf5file.openDataSet(output_dataset);
+
+        plim::AttributeHandler outputHandler(dset.getId());
+
+        outputHandler.setStringAttribute("image_modality", modality);
+        outputHandler.setStringAttribute("creation_time", Version::timeStamp());
+        outputHandler.setStringAttribute("software", argv[0]);
+        outputHandler.setStringAttribute("software_revision", Version::string());
+        std::string software_parameters = "";
+        for(unsigned i = 1; i < argc; ++i) {
+            software_parameters += std::string(argv[i]) + " ";
+        }
+        outputHandler.setStringAttribute("software_parameters", software_parameters);
+
+
+        H5::H5File transmittance;
+        H5::DataSet tr_dset;
+        H5::H5File retardation;
+        H5::DataSet ret_dset;
+        std::unique_ptr<plim::AttributeHandler> transmittance_handler = nullptr;
+        std::unique_ptr<plim::AttributeHandler> retardation_handler = nullptr;
+        bool h5_transmittance = false;
+        bool h5_retardation = false;
+
+        try {
+            if (transmittance_path.find(".h5") != std::string::npos) {
+                transmittance.openFile(transmittance_path, H5F_ACC_RDONLY);
+                tr_dset = transmittance.openDataSet(input_dataset);
+                transmittance_handler = std::make_unique<plim::AttributeHandler>(tr_dset.getId());
+                h5_transmittance = true;
+            }
+            if (retardation_path.find(".h5") != std::string::npos) {
+                retardation.openFile(retardation_path, H5F_ACC_RDONLY);
+                ret_dset = retardation.openDataSet(input_dataset);
+                retardation_handler = std::make_unique<plim::AttributeHandler>(ret_dset.getId());
+                h5_retardation = true;
+            }
+
+            if (h5_retardation) {
+                retardation_handler->copyAllAttributesTo(outputHandler, {});
+            } else if (h5_transmittance) {
+                transmittance_handler->copyAllAttributesTo(outputHandler, {});
+            }
+
+            if (h5_retardation & !h5_transmittance) {
+                outputHandler.setReferenceModalityTo({*retardation_handler});
+            } else if (h5_transmittance & !h5_retardation) {
+                outputHandler.setReferenceModalityTo({*transmittance_handler});
+            } else if (h5_transmittance && h5_retardation) {
+                outputHandler.setReferenceModalityTo({*transmittance_handler, *retardation_handler});
+            }
+
+            outputHandler.addCreator();
+            outputHandler.addId();
+        } catch(...) {
+            std::cerr << "Error during copying attributes with plim. Skipping..." << std::endl;
+        }
+        transmittance_handler = nullptr;
+        retardation_handler = nullptr;
+
+        if(tr_dset.getId() > 0) tr_dset.close();
+        if(transmittance.getId() > 0) transmittance.close();
+
+        if(ret_dset.getId() > 0) ret_dset.close();
+        if(retardation.getId() > 0) retardation.close();
+
+        dset.close();
+    } catch (...) {
+        throw std::runtime_error("Output dataset was not valid!");
     }
 }
 

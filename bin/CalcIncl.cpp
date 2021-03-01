@@ -130,6 +130,7 @@ int main(int argc, char** argv) {
                 // Generate med10Transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, grayMask);
                 writer.write_dataset(dataset + "/", *medTransmittance);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittanceMasked", argc, argv);
                 writer.close();
             } else {
                 medTransmittance = transmittance;
@@ -154,17 +155,38 @@ int main(int argc, char** argv) {
             }
             // Create file and dataset. Write the inclination afterwards.
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
-            writer.create_group(dataset);
             writer.write_attribute("/", "im", inclination.im());
             writer.write_attribute("/", "ic", inclination.ic());
             writer.write_attribute("/", "rmax_W", inclination.rmaxWhite());
             writer.write_attribute("/", "rmax_G", inclination.rmaxGray());
 
-            writer.write_dataset(dataset+"/Inclination", *inclination.inclination());
+            std::string group = dataset.substr(0, dataset.find_last_of('/'));
+            // Create group and dataset
+            writer.create_group(group);
+
+            writer.write_dataset(dataset, *inclination.inclination());
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset, "/Image", "Inclination", argc, argv);
             std::cout << "Inclination generated and written" << std::endl;
+            writer.close();
 
             if(detailed) {
-                writer.write_dataset(dataset+"/Saturation", *inclination.saturation());
+                auto saturation_basename = std::string(mask_basename);
+                if (mask_basename.find("Mask") != std::string::npos) {
+                    saturation_basename = saturation_basename.replace(saturation_basename.find("Mask"), 4, "Saturation");
+                }
+                // Create file and dataset. Write the inclination afterwards.
+                writer.set_path(output_folder+ "/" + saturation_basename + ".h5");
+                writer.write_attribute("/", "im", inclination.im());
+                writer.write_attribute("/", "ic", inclination.ic());
+                writer.write_attribute("/", "rmax_W", inclination.rmaxWhite());
+                writer.write_attribute("/", "rmax_G", inclination.rmaxGray());
+
+                std::string group = dataset.substr(0, dataset.find_last_of('/'));
+                // Create group and dataset
+                writer.create_group(group);
+
+                writer.write_dataset(dataset, *inclination.saturation());
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset, "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;
             }
 

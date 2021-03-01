@@ -118,6 +118,7 @@ int main(int argc, char** argv) {
                 // Create group and dataset
                 writer.create_group(group);
                 writer.write_dataset(dataset + "/", *medTransmittance);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittance", argc, argv);
                 writer.close();
             } else {
                 medTransmittance = transmittance;
@@ -143,18 +144,24 @@ int main(int argc, char** argv) {
             writer.write_attribute("/", "r_tres", generation.tRet());
             writer.write_attribute("/", "I_rmax", generation.tMin());
             writer.write_attribute("/", "I_upper", generation.tMax());
-            
+
             std::cout << "Attributes generated and written" << std::endl;
             writer.write_dataset(dataset + "/White", *generation.whiteMask());
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/White", "/Image", "White mask", argc, argv);
             std::cout << "White mask generated and written" << std::endl;
             writer.write_dataset(dataset + "/Gray", *generation.grayMask());
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Gray", "/Image", "Gray mask", argc, argv);
             std::cout << "Gray mask generated and written" << std::endl;
-            writer.write_dataset(dataset + "/Blurred", *generation.blurredMask());
+
+            writer.write_dataset(dataset + "/Probability", *generation.blurredMask());
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Probability", "/Image", "Probability mask", argc, argv);
             std::cout << "Blurred mask generated and written" << std::endl;
 
             if (detailed) {
-                writer.write_dataset(dataset + "/Full", *generation.fullMask());
+                writer.write_dataset(dataset + "/Mask", *generation.fullMask());
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Mask", "/Image", "Mask", argc, argv);
                 writer.write_dataset(dataset + "/NoNerveFibers", *generation.noNerveFiberMask());
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/NoNerveFibers", "/Image", "No nerve fiber mask", argc, argv);
                 std::cout << "Detailed masks generated and written" << std::endl;
             }
             writer.close();
@@ -173,6 +180,7 @@ int main(int argc, char** argv) {
                 // Generate med10Transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.grayMask());
                 writer.write_dataset(dataset + "/", *medTransmittance);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittanceMasked", argc, argv);
                 transmittance = nullptr;
                 writer.close();
             } else {
