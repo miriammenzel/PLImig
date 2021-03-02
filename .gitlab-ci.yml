@@ -1,53 +1,76 @@
 stages:
+    - build
     - test
-    - install
-    - pack
+    - coverage
+
 
 before_script:
+    - export DEBIAN_FRONTEND=noninteractive
     - apt-get update -qq && apt-get upgrade -y
-    - apt-get install -y python3 python3-pip libgl1-mesa-glx libglib2.0-0
-    - /usr/bin/python3 -m pip install --upgrade pip
+    - apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+    - wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+    - apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main'
+    - apt-get update -qq
+    - apt-get install -y gcc g++ cmake make build-essential file git gcovr
+    - apt-get install -y libgtest-dev
+    - apt-get install -y libopencv-dev libhdf5-dev libnifti-dev
+    - cd /usr/src/gtest
+    - cmake CMakeLists.txt
+    - make
+    - cp ./lib/libgtest*.a /usr/lib
+    - cd -
+    - git submodule update --init --recursive
 
-lint:python3:
-    stage: test
-    allow_failure: true
-    image: cupy/cupy:v8.0.0
+
+build:
+    stage: build
+    image: nvidia/cuda:11.2.0-devel-ubuntu20.04
     script:
-        - pip3 install flake8
-        - flake8 plimg/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        - flake8 plimg/ --count --exit-zero --max-complexity=10 --statistics
+        - mkdir build/
+        - cd build/
+        - cmake ..
+        - make -j4
     tags:
         - docker
         - gpu
-
-test:python3:
-    stage: test
-    image: cupy/cupy:v8.0.0
-    script:
-        - pip3 install tifffile numpy nibabel h5py pillow numba matplotlib pytest pytest-cov opencv-python
-        - pytest --cov=plimg --cov-config=.coveragerc tests --cov-report=html
     artifacts:
-            paths:
-                - htmlcov/
+        paths:
+            - build/
+        expire_in: 20 minutes
+
+
+test:
+    stage: test
+    image: nvidia/cuda:11.2.0-devel-ubuntu20.04
+    script:
+        - cd build/
+        - make test
     tags:
         - docker
-        - gpu 
-        
-install:python3:
-    stage: install
-    image: cupy/cupy:v8.0.0
-    script:
-        - pip3 install .
-    tags:
-    - docker
-    - gpu 
+        - gpu
+    dependencies:
+        - build
+    artifacts:
+        paths:
+            - build/
+        expire_in: 20 minutes
 
-pack:python3:
-    stage: pack
-    image: cupy/cupy:v8.0.0
+
+
+coverage:
+    stage: coverage
+    # Docker image which will be used for this repository
+    image: nvidia/cuda:11.2.0-devel-ubuntu20.04
     script:
-        - pip3 install pep517
-        - python3 -m pep517.build --source --binary --out-dir dist/ .
+        - cd build/
+        - make coverage
     tags:
-    - docker
-    - gpu 
+        - docker
+        - gpu
+    dependencies:
+        - test
+    artifacts:
+        paths:
+            - build/coverage
+
+

@@ -1,0 +1,4 @@
+[submodule "extern/CLI11"]
+	path = extern/CLI11
+	url = https://github.com/CLIUtils/CLI11.git
+    branch = 5cb3efabce007c3a0230e4cc2e27da491c646b6c
