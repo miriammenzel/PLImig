@@ -30,7 +30,15 @@ find_package(TIFF REQUIRED)
 find_package(NIFTI REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Filesystem REQUIRED)
-find_package(PLIM REQUIRED)
+
+option(PLIM_SUBMODULE "Build plim through submodule. If this option is disabled CMake will try to find a local installation of plim" ON)
+if(PLIM_SUBMODULE)
+    add_subdirectory(extern/PLIM)
+    set(PLIM_LIBRARIES plim)
+    set(PLIM_INCLUDE_DIRS extern/PLIM)
+else()
+    find_package(PLIM REQUIRED)
+endif()
 
 # Add headers to project
 add_subdirectory(extern/CLI11)

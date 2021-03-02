@@ -2,3 +2,6 @@
 	path = extern/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
     branch = 5cb3efabce007c3a0230e4cc2e27da491c646b6c
+[submodule "extern/PLIM"]
+	path = extern/PLIM
+	url = git@jugit.fz-juelich.de:inm-1/fa/3d-pli/libraries/PLIM.git
