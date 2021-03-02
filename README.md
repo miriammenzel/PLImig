@@ -19,8 +19,13 @@
 
 # Required programs and packages
 * CMake 3.14+
-* C++-17 capable compiler 
+* C++-17 capable compiler (with OpenMP)
 * Make
+* OpenCV
+* PLIM
+* HDF5
+* libNIFTI
+* CUDA Toolkit (NPP + CUDA)
 
 # Optional programs and packages
 For testing purposes:
@@ -34,6 +39,7 @@ Install all needed dependencies using your package manager or by compiling them 
 ## Setting up the program for execution
 The following install instructions are exemplary for Ubuntu 20.04. Please replace `focal` with the code name or your 
 Ubuntu distribution. The install instructions may vary based on your system.
+
 ### Install dependencies
 ```bash
 apt-get update -qq && apt-get upgrade -y
@@ -75,7 +81,7 @@ cmake ..
 make && make test
 ```
 
-If everything ran successful the generated programs are located at `PLImig/build/` and can be started from there.
+If everything ran successful the generated programs are located at `PLImig/build/bin/` and can be started from there.
 
 ## Changing options
 By default the following options are set:
@@ -102,12 +108,12 @@ PLIMaskGeneration --itra [input-ntransmittance] --iret [input-retardation] --out
 | Argument      | Function                                                                    |
 | -------------- | --------------------------------------------------------------------------- |
 | `--dataset` | Read and write from/to the given dataset instead of `/Image` |
-| `--ttra`  | Transmittance threshold. This threshold is near `tMin` and will be set to the point of maximum curvature between `tMin` and `tMax` |
-| `--tret` | Set the point of maximum curvature in the retardation histogram |
-| `--tmin` | Set the mean value of the transmittance in a connected region of the largest retardation values |
-| `--tmax` | Set the point of maximum curvature near the absolute maximum in the transmittance histogram |
+| `--ilower`  | Transmittance threshold. This threshold is near `I_rmax` and will be set to the point of maximum curvature between `I_rmax` and `I_upper` |
+| `--rtres` | Set the point of maximum curvature in the retardation histogram |
+| `--irmax` | Set the mean value of the transmittance in a connected region of the largest retardation values |
+| `--iupper` | Set the point of maximum curvature near the absolute maximum in the transmittance histogram |
 | `--detailed` | Using this parameter will add two more parameter maps to the output file. This will include a full mask of both the white and gray matter as well as a mask showing an appoximation of regions without any nerve fibers. | 
-| `--with_blurred` | Create a floating point mask indicating regions which can be considered as the transition area between the gray and white matter. This will be used to calculate the inclination image. |
+| `--probability` | Create a floating point mask indicating regions which can be considered as the transition area between the gray and white matter. This will be used to calculate the inclination image. |
 
 ## PLIInclination
 ```
@@ -146,10 +152,10 @@ PLImigPipeline --itra [input-ntransmittance] --iret [input-retardation] --output
 | Argument      | Function                                                                    |
 | -------------- | --------------------------------------------------------------------------- |
 | `--dataset` | Read and write from/to the given dataset instead of `/Image` |
-| `--ttra`  | Transmittance threshold. This threshold is near `tMin` and will be set to the point of maximum curvature between `tMin` and `tMax` |
-| `--tret` | Set the point of maximum curvature in the retardation histogram |
-| `--tmin` | Set the mean value of the transmittance in a connected region of the largest retardation values |
-| `--tmax` | Set the point of maximum curvature near the absolute maximum in the transmittance histogram |
+| `--ilower`  | Transmittance threshold. This threshold is near `I_rmax` and will be set to the point of maximum curvature between `I_rmax` and `I_upper` |
+| `--rtres` | Set the point of maximum curvature in the retardation histogram |
+| `--irmax` | Set the mean value of the transmittance in a connected region of the largest retardation values |
+| `--iupper` | Set the point of maximum curvature near the absolute maximum in the transmittance histogram |
 | `--detailed` | Using this parameter will add two more parameter maps to the output file. This will include a full mask of both the white and gray matter as well as a mask showing an appoximation of regions without any nerve fibers. The inclination file will also include a parameter map indicating saturated pixels. |
 
 # Example
@@ -180,10 +186,10 @@ If a non median filtered NTransmittance is used as input, **PLImig** will genera
 automatically and save it as **[...]_Mask_[...].h5**. The dataset will match the original dataset of the input
 files or is set by the `--dataset` parameter when starting the program.
 
-After reading all files the parameters will be generated independently. Only `tTra` will depend on `tMin`.
+After reading all files the parameters will be generated independently. Only `I_lower` will depend on `I_rmax`.
 
-### tMin
-`tMin` or *minimal transmittance value* is considered as the average value of the transmittance within a connected region in the retardation with the highest values.
+### I_rmax
+`I_rmax` or *minimal transmittance value* is considered as the average value of the transmittance within a connected region in the retardation with the highest values.
 As the highest retardation values represent mostly white matter fibers, this can be used to get a first estimation of the white matter values in the transmittance.
 
 To get the average transmittance value masks based on a difference value are generated. There, the connected components algorithm
@@ -194,7 +200,7 @@ is executed.
 If the number of pixels in the connected region is large enough (0.01% of the number of pixels in the image)
 the resulting mask will be used to calculate the mean transmittance value. Otherwise the difference will be reduced by one bin size $`1/256 = 0.00390625`$
 
-### tMax
+### I_upper
 
 All other parameters rely on the same procedure to calculate the value. As seen in the histograms above,
 both the transmittance and retardation show a somewhat smooth curve. Our interest is the point of maximum curvature
@@ -219,7 +225,7 @@ $`f^{''}(x) = \frac{f(x+1) - 2f(x) + f(x-1)}{h^2}`$
 As we're not able to calculate the maxima of $`\kappa`$ directly we just choose the 
 highest value of $`\kappa`$ for our point of maximum curvature.
 
-`tMax` or *maximum transmittance value* separates the background of the transmittance from the tissue. 
+`I_upper` or *maximum transmittance value* separates the background of the transmittance from the tissue. 
 The background is discernible by a clearly visible peak in the latter half of the histogram. The peak itself and all pixels with a value above the 
 point of maximum curvature represent the background and will not be visible in the white / gray mask.
 
@@ -231,13 +237,13 @@ An example for the resulting mask can be seen below.
 
 ![](./img/tMaxExample.png)
 
-### tRet
+### r_tres
 
 After most of the necessary parameters are generated on the transmittance, one parameter in the retardation is needed to 
-generate the desired white and gray fiber masks. The general procedure follows the algorithm used for `tTra`. However, to ensure that
+generate the desired white and gray fiber masks. The general procedure follows the algorithm used for `I_upper`. However, to ensure that
 the result is not influenced by small interferences or more than one peak, we change the algorithm a bit.
 
-We start using a histogram of only 16 bins to get a first estimation of `tRet`. In each following iteration we increase the number of
+We start using a histogram of only 16 bins to get a first estimation of `r_tres`. In each following iteration we increase the number of
 bins by a factor of 2 up to 256 bins. In each iteration we take the last estimation and choose a interval around the last estimation
 for our current one. This ensures that we do not end in a small dip which becomes visible with higher bin counts.
 
@@ -245,57 +251,57 @@ In addition if there's more than one peak in our interval, we start at the last 
 background peak resulting in erroneous parameters.
 
 The resulting mask can be seen below. This mask generally gets most of the white substance but might still miss a few
-areas. Those will be filled in combination with `tTra`.
+areas. Those will be filled in combination with `I_lower`.
 
 ![](./img/tRetExample.png)
 
-### tTra
+### I_lower
 
-While `tMin` is a good estimation in the transmittance some fine fibers might not be caught by simply using the mean
+While `I_rmax` is a good estimation in the transmittance some fine fibers might not be caught by simply using the mean
 transmittance value. Therefore we use the curvature formula again to estimate a point which contains more finer fibers without
-including too much to the gray matter. Our range will be limited by the next peak starting from `tMin`.
-If not enough values are present to calculate $`\kappa`$ then `tMin` will be used as our value.
+including too much to the gray matter. Our range will be limited by the next peak starting from `I_rmax`.
+If not enough values are present to calculate $`\kappa`$ then `I_rmax` will be used as our value.
 
 ### White mask
 After generating all of our parameters we can finally build our masks which separate the white and gray matter.
 The formula for both masks as well as an example are shown below:
 
-$`M_{white} = ((I_T < tTra) \wedge (I_T > 0)) \vee (r > sRet)`$
+$`M_{white} = ((I_T < I_{lower}) \wedge (I_T > 0)) \vee (r > r_{tres})`$
 ![](./img/WhiteMaskExample.png)
 
 ### Gray mask
-$`M_{grey} = (I_T \geq tTra) \wedge (I_T \leq tMax) \wedge (r \leq tRet)`$
+$`M_{grey} = (I_T \geq I_{lower}) \wedge (I_T \leq I_{upper}) \wedge (r \leq r_{tres})`$
 ![](./img/GrayMaskExample.png)
 
-### Blurred mask
+### Probability mask
 While the parameters generated above are finite and will not change in subsequent executions slight errors due to the camera
 might change the result significantly. In addition, just using the white mask for our inclination calculation will result 
 in sharp edges which do not represent the reality. Therefore the blurred mask is calculated.
 
 Currently 100 iterations on 1/10th of the image size is used as our kernel. 
-In each iteration `tMin` and `tMax` are fix values. A retardation and transmittance image will be generated by choosing random
+In each iteration `I_rmax` and `I_upper` are fix values. A retardation and transmittance image will be generated by choosing random
 pixels from our initial retardation and median filtered transmittance. Pixels can be chosen multiple times. 
 
-After the generation of a random image we calculate `tRet` and `tTra` with our normal procedures and save values which differ
+After the generation of a random image we calculate `r_thres` and `I_lower` with our normal procedures and save values which differ
 from our initial values.
 
 After our number of iterations we calculate each pixel of our blurred mask with the following formula:
 ```math
-tRet_p = \frac{1}{n_1} \cdot \sum_{i=0}^{n_1} tRet_{p, i} \\
-tRet_n = \frac{1}{n_2} \cdot \sum_{i=0}^{n_2} tRet_{n, i} \\
-tTra_p = \frac{1}{n_3} \cdot \sum_{i=0}^{n_3} tTra_{p, i} \\
-tTra_n = \frac{1}{n_4} \cdot \sum_{i=0}^{n_4} tTra_{n, i} \\
+tRet_p = \frac{1}{n_1} \cdot \sum_{i=0}^{n_1} r_{thres_{p, i}} \\
+tRet_n = \frac{1}{n_2} \cdot \sum_{i=0}^{n_2} r_{thres_{p, i}} \\
+tTra_p = \frac{1}{n_3} \cdot \sum_{i=0}^{n_3} I_{lower_{p, i}} \\
+tTra_n = \frac{1}{n_4} \cdot \sum_{i=0}^{n_4} I_{lower_{p, i}} \\
 
 \Delta I_{t, i, j} = 
 \begin{cases}
-    \frac{I_{t, i, j} - tTra}{tTra_p} & I_{t, i, j} - tTra > 0 \\
-    \frac{I_{t, i, j} - tTra}{tTra_m} & I_{t, i, j} - tTra \leq 0 \\
+    \frac{I_{t, i, j} - I_{lower}}{tTra_p} & I_{t, i, j} - I_{lower} > 0 \\
+    \frac{I_{t, i, j} - I_{lower}}{tTra_m} & I_{t, i, j} - I_{lower} \leq 0 \\
 \end{cases} \\
 
 \Delta r_{i, j} = 
 \begin{cases}
-    \frac{r_{i, j} - tRet}{tRet_p} & r_{i, j} - tRet > 0 \\
-    \frac{r_{i, j} - tRet}{tRet_m} & r_{i, j} - tRet \leq 0 \\
+    \frac{r_{i, j} - r_{thres}}{tRet_p} & r_{i, j} - r_{thres} > 0 \\
+    \frac{r_{i, j} - r_{thres}}{tRet_m} & r_{i, j} - r_{thres} \leq 0 \\
 \end{cases} \\
 
 blurred_{i, j} = 0.5 \cdot (-erf(\cos(0.75\cdot\pi - \arctan2(\Delta I_{t, i, j}, \Delta r_{i, j}) \cdot
@@ -304,7 +310,7 @@ blurred_{i, j} = 0.5 \cdot (-erf(\cos(0.75\cdot\pi - \arctan2(\Delta I_{t, i, j}
 i, j \in \mathbb{N}
 ```
 
-An example of a resulting blurred mask is shown below. All values are in range of $`[0, 1]`$.
+An example of a resulting probability mask is shown below. All values are in range of $`[0, 1]`$.
 
 ![](./img/BlurredMaskExample.png)
 
@@ -319,19 +325,19 @@ mean + 2*stddev are considered as a region without any fibers.
 ## Generation of the inclination
 
 ### im
-The `im` value matches the calculation of `tMin` in our mask generation.
+The `im` value matches the calculation of `I_rmax` in our mask generation.
 
 ### ic
 `ic` is considered as the mode of the transmittance in the gray substance. The gray substance is defined by
 our blurred mask with values below 0.01. 
 
 ### rmaxGray
-The `rmaxGray` calculation matches the calculation of `tRet` in our mask generation.
+The `rmaxGray` calculation matches the calculation of `r_tres` in our mask generation.
 This value will be used as our maximum value which is present in the gray substance.
 
 ### rmaxWhite
 `rmaxWhite` will be calculated using the region growing algorithm described above. However, instead of using the resulting mask
-to calculate the mean transmittance value like in `tMin` here the mean retardation value of the mask
+to calculate the mean transmittance value like in `I_lower` here the mean retardation value of the mask
 is calculated.
 
 ### Inclination
