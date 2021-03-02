@@ -3,6 +3,8 @@ stages:
     - test
     - coverage
 
+variables:
+    GIT_SUBMODULE_STRATEGY: recursive
 
 before_script:
     - export DEBIAN_FRONTEND=noninteractive
@@ -19,7 +21,6 @@ before_script:
     - make
     - cp ./lib/libgtest*.a /usr/lib
     - cd -
-    - git submodule update --init --recursive
 
 
 build:
