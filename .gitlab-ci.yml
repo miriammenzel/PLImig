@@ -24,7 +24,7 @@ before_script:
 
 build:
     stage: build
-    image: nvidia/cuda:latest
+    image: nvidia/cuda:11.2.0-devel-ubuntu20.04
     script:
         - mkdir build/
         - cd build/
@@ -41,7 +41,7 @@ build:
 
 test:
     stage: test
-    image: nvidia/cuda:latest
+    image: nvidia/cuda:11.2.0-devel-ubuntu20.04
     script:
         - cd build/
         - make test
@@ -60,7 +60,7 @@ test:
 coverage:
     stage: coverage
     # Docker image which will be used for this repository
-    image: nvidia/cuda:latest
+    image: nvidia/cuda:11.2.0-devel-ubuntu20.04
     script:
         - cd build/
         - make coverage

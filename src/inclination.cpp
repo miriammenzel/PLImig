@@ -65,7 +65,9 @@ void PLImg::Inclination::set_rmaxWhite(float rmaxWhite) {
 
 float PLImg::Inclination::ic() {
     if(!m_ic) {
-        cv::Mat selection = *m_grayMask & *m_blurredMask < 0.01;
+        // ic will be calculated by taking the gray portion of the
+        // transmittance and calculating the maximum value in the histogram
+        cv::Mat selection = *m_grayMask & *m_blurredMask < 0.05;
 
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f};
@@ -83,53 +85,96 @@ float PLImg::Inclination::ic() {
 
 float PLImg::Inclination::im() {
     if(!m_im) {
+        // im is the mean value in the transmittance based on the highest retardation values
         if(!m_regionGrowingMask) {
-            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::imageRegionGrowing(*m_retardation));
+            cv::Mat backgroundMask = *m_whiteMask | *m_grayMask;
+            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::Image::regionGrowing(*m_retardation, backgroundMask));
         }
-        m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask)[0]);
+        m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask & (*m_blurredMask > 0.95))[0]);
     }
     return *m_im;
 }
 
 float PLImg::Inclination::rmaxGray() {
     if(!m_rmaxGray) {
+        float temp_rMax = 0;
         int channels[] = {0};
-        float histBounds[] = {0.0f, 1.0f};
+        float histBounds[] = {0.0f+1e-10f, 1.0f};
         const float* histRange = { histBounds };
-        int histSize = NUMBER_OF_BINS;
+
+        int startPosition, endPosition;
+        startPosition = 0;
+        endPosition = MIN_NUMBER_OF_BINS / 2;
 
         // Generate histogram
-        cv::Mat hist;
-        cv::calcHist(&(*m_retardation), 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
+        cv::Mat fullHist;
+        int histSize = MAX_NUMBER_OF_BINS;
+        cv::calcHist(&(*m_retardation), 1, channels, *m_blurredMask < 0.05, fullHist, 1, &histSize, &histRange, true, false);
 
-        // Create kernel for convolution of histogram
-        int kernelSize = histSize/20;
-        cv::Mat kernel(kernelSize, 1, CV_32FC1);
-        kernel.setTo(cv::Scalar(1.0f/float(kernelSize)));
-        cv::filter2D(hist, hist, -1, kernel, cv::Point(-1, -1), 0, cv::BORDER_REPLICATE);
-        cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
+        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
+            cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
+            #pragma omp parallel for
+            for(unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
+                unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
+                unsigned myEndPos = (i+1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
+                hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos, fullHist.begin<float>() + myEndPos, 0);
+            }
+            cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
-        // TODO: Peaksuche
+            // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
+            auto peaks = PLImg::Histogram::peaks(hist, startPosition, endPosition, 1e-2f);
+            if(peaks.size() > 1) {
+                startPosition = peaks.at(peaks.size() - 1);
+            } else if(peaks.size() == 1) {
+                startPosition = peaks.at(0);
+            }
 
-        m_rmaxGray = std::make_unique<float>(histogramPlateau(hist, -float(kernelSize) / (2.0f * NUMBER_OF_BINS),
-                                                                1.0f - float(kernelSize) / (2.0f * NUMBER_OF_BINS),
-                                                                1, 0, NUMBER_OF_BINS/2));
+            temp_rMax = Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
+
+            startPosition = fmax(0, (temp_rMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
+            endPosition = fmin((temp_rMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1, NUMBER_OF_BINS << 1);
+        }
+        m_rmaxGray = std::make_unique<float>(temp_rMax);
     }
     return *m_rmaxGray;
 }
 
 float PLImg::Inclination::rmaxWhite() {
     if(!m_rmaxWhite) {
+        // rmaxWhite is the mean value in the retardation based on the highest retardation values
         if(!m_regionGrowingMask) {
-            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::imageRegionGrowing(*m_retardation));
+            cv::Mat backgroundMask = *m_whiteMask | *m_grayMask;
+            m_regionGrowingMask = std::make_unique<cv::Mat>(PLImg::Image::regionGrowing(*m_retardation, backgroundMask));
         }
-        m_rmaxWhite = std::make_unique<float>(cv::mean(*m_retardation, *m_regionGrowingMask)[0]);
+        size_t numberOfPixels = cv::countNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.99));
+        size_t threshold = 0.1 * numberOfPixels;
+
+        // Calculate histogram from our region growing mask
+        int channels[] = {0};
+        float histBounds[] = {0.0f, 1.0f+1e-15f};
+        const float* histRange = { histBounds };
+        int histSize = MAX_NUMBER_OF_BINS;
+
+        cv::Mat hist;
+        cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask & (*m_blurredMask > 0.95), hist, 1, &histSize, &histRange, true, false);
+
+        size_t sumOfPixels = 0;
+        int binIdx = MAX_NUMBER_OF_BINS;
+        float mean = 0.0f;
+        while (binIdx > 0 && sumOfPixels < threshold) {
+            sumOfPixels += hist.at<float>(binIdx);
+            mean += hist.at<float>(binIdx) * float(binIdx) / float(histSize);
+            --binIdx;
+        }
+
+        m_rmaxWhite = std::make_unique<float>(mean / float(sumOfPixels));
     }
     return *m_rmaxWhite;
 }
 
 sharedMat PLImg::Inclination::inclination() {
     if(!m_inclination) {
+        std::cout << rmaxWhite() << " " << rmaxGray() << " " << im() << " " << ic() << std::endl;
         m_inclination = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
         float tmpVal;
         float blurredMaskVal;
@@ -137,6 +182,7 @@ sharedMat PLImg::Inclination::inclination() {
         float asinWRmax = asin(rmaxWhite());
         float asinGRMax = asin(rmaxGray());
         float logIcIm = log(ic() / im());
+
         // Generate inclination for every pixel
         #pragma omp parallel for default(shared) private(tmpVal, blurredMaskVal)
         for(int y = 0; y < m_inclination->rows; ++y) {
@@ -144,18 +190,20 @@ sharedMat PLImg::Inclination::inclination() {
                 // If pixel is in tissue
                 if(m_whiteMask->at<bool>(y, x) || m_grayMask->at<bool>(y, x)) {
                     blurredMaskVal = m_blurredMask->at<float>(y, x);
-                    // If our blurred mask of PLImg has really low values, calculate the inclination only with the gray matter
-                    // as it might result in saturation if both formulas are used
-                    if(blurredMaskVal < 1e-3) {
+                    if(blurredMaskVal > 0.95) {
+                        blurredMaskVal = 1;
+                    } else if(blurredMaskVal < 0.05) {
                         blurredMaskVal = 0;
                     }
+                    // If our blurred mask of PLImg has really low values, calculate the inclination only with the gray matter
+                    // as it might result in saturation if both formulas are used
                     tmpVal = sqrt(
                             blurredMaskVal *
                             (
                                     asin(m_retardation->at<float>(y, x)) /
                                     asinWRmax *
                                     logIcIm /
-                                    fmax(1e-15, log(*m_ic / m_transmittance->at<float>(y, x)))
+                                    fmax(1e-15, log(ic() / m_transmittance->at<float>(y, x)))
                             )
                             + (1 - blurredMaskVal) *
                               asin(m_retardation->at<float>(y, x)) /
@@ -182,8 +230,8 @@ sharedMat PLImg::Inclination::saturation() {
         m_saturation = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
         float inc_val;
         #pragma omp parallel for default(shared) private(inc_val)
-        for(uint y = 0; y < m_saturation->rows; ++y) {
-            for(uint x = 0; x < m_saturation->cols; ++x) {
+        for(int y = 0; y < m_saturation->rows; ++y) {
+            for(int x = 0; x < m_saturation->cols; ++x) {
                 inc_val = m_inclination->at<float>(y, x);
                 if(inc_val <= 0 | inc_val >= 90) {
                     if (inc_val <= 0) {

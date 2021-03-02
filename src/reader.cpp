@@ -4,16 +4,19 @@
 
 #include "reader.h"
 
-bool PLImg::reader::fileExists(const std::string& filename) {
+bool PLImg::Reader::fileExists(const std::string& filename) {
     struct stat buffer{};
     return (stat (filename.c_str(), &buffer) == 0);
 }
 
-cv::Mat PLImg::reader::imread(const std::string& filename, const std::string& dataset) {
+cv::Mat PLImg::Reader::imread(const std::string& filename, const std::string& dataset) {
+    // Check if file exists
     if(fileExists(filename)) {
+        // Opening the file has to be handeled differently depending on the file ending.
+        // This will be done here.
         if(filename.substr(filename.size()-2) == "h5") {
             return readHDF5(filename, dataset);
-        } else if(filename.substr(filename.size()-3) == "nii"){
+        } else if(filename.substr(filename.size()-3) == "nii" || filename.substr(filename.size()-6) == "nii.gz"){
             return readNIFTI(filename);
         } else {
             return readTiff(filename);
@@ -23,15 +26,20 @@ cv::Mat PLImg::reader::imread(const std::string& filename, const std::string& da
     }
 }
 
-cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &dataset) {
+cv::Mat PLImg::Reader::readHDF5(const std::string &filename, const std::string &dataset) {
     hid_t file, dspace, dset;
     hsize_t dims[2];
-
+    // Open file read only
     file = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    // Open dataset
     dset = H5Dopen(file, dataset.c_str(), H5P_DEFAULT);
+    // Get dataspace
     dspace = H5Dget_space(dset);
+    // Get image dimensions
     H5Sget_simple_extent_dims(dspace, dims, nullptr);
 
+    // OpenCV does use other names and integers for its own datatype handling.
+    // Check the HDF5 type and convert it to a valid OpenCV mat type.
     hid_t type = H5Dget_type(dset);
     int matType;
     if(H5Tequal(type, H5T_NATIVE_UCHAR)) {
@@ -43,6 +51,7 @@ cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &
     } else {
         throw std::runtime_error("Datatype is currently not supported. Please contact the maintainer of the program!");
     }
+    // Create OpenCV mat and copy content from dataset to mat
     cv::Mat image(dims[0], dims[1], matType);
     H5Dread(dset, type, dspace, H5S_ALL, H5S_ALL, image.data);
 
@@ -54,7 +63,7 @@ cv::Mat PLImg::reader::readHDF5(const std::string &filename, const std::string &
     return image;
 }
 
-cv::Mat PLImg::reader::readNIFTI(const std::string &filename) {
+cv::Mat PLImg::Reader::readNIFTI(const std::string &filename) {
     nifti_image * img = nifti_image_read(filename.c_str(), 1);
     // Get image dimensions
     uint width = img->nx;
@@ -83,6 +92,6 @@ cv::Mat PLImg::reader::readNIFTI(const std::string &filename) {
     return image;
 }
 
-cv::Mat PLImg::reader::readTiff(const std::string &filename) {
+cv::Mat PLImg::Reader::readTiff(const std::string &filename) {
     return cv::imread(filename, cv::IMREAD_ANYDEPTH);
 }

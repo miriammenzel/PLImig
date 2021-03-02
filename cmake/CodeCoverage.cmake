@@ -70,7 +70,7 @@
 #
 # 1. Copy this file into your cmake modules path.
 #
-# 2. Add the following line to your CMakeLists.txt (best inside an if-condition
+# 2. Add the following line to your FindPLIM.cmake (best inside an if-condition
 #    using a CMake option() to enable it just optionally):
 #      include(CodeCoverage)
 #

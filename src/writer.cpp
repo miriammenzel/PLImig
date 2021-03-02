@@ -4,9 +4,9 @@
 
 #include "writer.h"
 #include <iostream>
+#include <utility>
 
 PLImg::HDF5Writer::HDF5Writer() {
-    /* Save old error handler */
     m_filename = "";
 }
 
@@ -21,7 +21,27 @@ void PLImg::HDF5Writer::set_path(const std::string& filename) {
     }
 }
 
-void PLImg::HDF5Writer::write_attributes(std::string dataset, float t_tra, float t_ret, float t_min, float t_max) {
+template<>
+void PLImg::HDF5Writer::write_attribute<float>(std::string dataset, const std::string& parameter_name, float value) {
+    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_FLOAT, &value);
+}
+
+template<>
+void PLImg::HDF5Writer::write_attribute<double>(std::string dataset, const std::string& parameter_name, double value) {
+    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_DOUBLE, &value);
+}
+
+template<>
+void PLImg::HDF5Writer::write_attribute<int>(std::string dataset, const std::string& parameter_name, int value) {
+    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_INT, &value);
+}
+
+template<>
+void PLImg::HDF5Writer::write_attribute<std::string>(std::string dataset, const std::string& parameter_name, std::string value) {
+    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_CHAR, &value);
+}
+
+void PLImg::HDF5Writer::write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::PredType& type, void* value) {
     while(!dataset.empty() && dataset.at(dataset.size()-1) == '/') {
         dataset = dataset.substr(0, dataset.size()-1);
     }
@@ -29,36 +49,12 @@ void PLImg::HDF5Writer::write_attributes(std::string dataset, float t_tra, float
     hsize_t dims[1] = {1};
     H5::Attribute attr;
     H5::DataSpace space(1, dims);
-    if(!m_hdf5file.attrExists(dataset+"t_tra")) {
-        attr = m_hdf5file.createAttribute(dataset + "t_tra", H5::PredType::NATIVE_FLOAT, space);
+    if(!m_hdf5file.attrExists(dataset+"/"+parameter_name)) {
+        attr = m_hdf5file.createAttribute(dataset +"/"+ parameter_name, type, space);
     } else {
-        attr = m_hdf5file.openAttribute(dataset + "t_tra");
+        attr = m_hdf5file.openAttribute(dataset +"/"+ parameter_name);
     }
-    attr.write(H5::PredType::NATIVE_FLOAT, &t_tra);
-    attr.close();
-
-    if(!m_hdf5file.attrExists(dataset+"t_ret")) {
-        attr = m_hdf5file.createAttribute(dataset + "t_ret", H5::PredType::NATIVE_FLOAT, space);
-    } else {
-        attr = m_hdf5file.openAttribute(dataset + "t_ret");
-    }
-    attr.write(H5::PredType::NATIVE_FLOAT, &t_ret);
-    attr.close();
-
-    if(!m_hdf5file.attrExists(dataset+"t_min")) {
-        attr = m_hdf5file.createAttribute(dataset + "t_min", H5::PredType::NATIVE_FLOAT, space);
-    } else {
-        attr = m_hdf5file.openAttribute(dataset + "t_min");
-    }
-    attr.write(H5::PredType::NATIVE_FLOAT, &t_min);
-    attr.close();
-
-    if(!m_hdf5file.attrExists(dataset+"t_max")) {
-        attr = m_hdf5file.createAttribute(dataset + "t_max", H5::PredType::NATIVE_FLOAT, space);
-    } else {
-        attr = m_hdf5file.openAttribute(dataset + "t_max");
-    }
-    attr.write(H5::PredType::NATIVE_FLOAT, &t_max);
+    attr.write(type, value);
     attr.close();
 }
 
@@ -67,6 +63,8 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
     H5::DataSpace dataSpace;
     hsize_t dims[2];
     H5::Exception::dontPrint();
+    // Try to open the dataset.
+    // This will throw an exception if the dataset doesn't exist.
     bool dataSetFound;
     try {
         dset = m_hdf5file.openDataSet(dataset);
@@ -75,6 +73,8 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
         dataSetFound = false;
     }
     if(dataSetFound) {
+        // If the dataset is found, the program cannot delete the existing dataset
+        // Instead we will try to override the existing content if rows and columns do match
         dataSpace = dset.getSpace();
         dataSpace.getSimpleExtentDims(dims);
         if(dims[0] == image.rows && dims[1] == image.cols) {
@@ -85,6 +85,8 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
         dataSpace.close();
         dset.close();
     } else {
+        // Create dataset normally
+        // Check for the datatype from the OpenCV mat to determine the HDF5 datatype
         H5::DataType dtype;
         switch(image.type()) {
             case CV_32FC1:
@@ -97,6 +99,7 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
                 dtype = H5::PredType::NATIVE_UINT8;
                 break;
         }
+        // Write dataset
         dims[0] = static_cast<hsize_t>(image.rows);
         dims[1] = static_cast<hsize_t>(image.cols);
         dataSpace = H5::DataSpace(2, dims);
@@ -116,6 +119,7 @@ void PLImg::HDF5Writer::create_group(const std::string& group) {
 
     H5::Exception::dontPrint();
     H5::Group gr;
+    // Create groups recursively if the group doesn't exist.
     while (std::getline(ss, token, '/')) {
         groupString.append("/").append(token);
         if(!token.empty()) {
@@ -133,8 +137,15 @@ void PLImg::HDF5Writer::close() {
 
 void PLImg::HDF5Writer::open() {
     createDirectoriesIfMissing(m_filename);
-    if(PLImg::reader::fileExists(m_filename)) {
-        m_hdf5file = H5::H5File(m_filename, H5F_ACC_RDWR);
+    // If the file doesn't exist open it with Read-Write.
+    // Otherwise open it with appending so that existing content will not be deleted.
+    if(PLImg::Reader::fileExists(m_filename)) {
+        try {
+            m_hdf5file = H5::H5File(m_filename, H5F_ACC_RDWR);
+        }  catch (...) {
+            H5::Exception::printErrorStack();
+            exit(EXIT_FAILURE);
+        }
     } else {
         m_hdf5file = H5::H5File(m_filename, H5F_ACC_TRUNC);
     }
@@ -148,8 +159,86 @@ void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) 
         std::error_code err;
         std::filesystem::create_directory(folder_name, err);
         if(err.value() != 0) {
-            throw std::runtime_error("Output folder " + folder_name + " could not LE created! Please check your path and permissions");
+            throw std::runtime_error("Output folder " + folder_name + " could not be created! Please check your path and permissions");
         }
+    }
+}
+
+void PLImg::HDF5Writer::writePLIMAttributes(std::string transmittance_path, std::string retardation_path,
+                                            std::string output_dataset, std::string input_dataset,
+                                            std::string modality, int argc, char** argv) {
+    H5::Exception::dontPrint();
+    H5::DataSet dset;
+    try {
+        dset = m_hdf5file.openDataSet(output_dataset);
+
+        plim::AttributeHandler outputHandler(dset.getId());
+
+        outputHandler.setStringAttribute("image_modality", modality);
+        outputHandler.setStringAttribute("creation_time", Version::timeStamp());
+        outputHandler.setStringAttribute("software", argv[0]);
+        outputHandler.setStringAttribute("software_revision", Version::string());
+        std::string software_parameters = "";
+        for(unsigned i = 1; i < argc; ++i) {
+            software_parameters += std::string(argv[i]) + " ";
+        }
+        outputHandler.setStringAttribute("software_parameters", software_parameters);
+
+
+        H5::H5File transmittance;
+        H5::DataSet tr_dset;
+        H5::H5File retardation;
+        H5::DataSet ret_dset;
+        std::unique_ptr<plim::AttributeHandler> transmittance_handler = nullptr;
+        std::unique_ptr<plim::AttributeHandler> retardation_handler = nullptr;
+        bool h5_transmittance = false;
+        bool h5_retardation = false;
+
+        try {
+            if (transmittance_path.find(".h5") != std::string::npos) {
+                transmittance.openFile(transmittance_path, H5F_ACC_RDONLY);
+                tr_dset = transmittance.openDataSet(input_dataset);
+                transmittance_handler = std::make_unique<plim::AttributeHandler>(tr_dset.getId());
+                h5_transmittance = true;
+            }
+            if (retardation_path.find(".h5") != std::string::npos) {
+                retardation.openFile(retardation_path, H5F_ACC_RDONLY);
+                ret_dset = retardation.openDataSet(input_dataset);
+                retardation_handler = std::make_unique<plim::AttributeHandler>(ret_dset.getId());
+                h5_retardation = true;
+            }
+
+            if (h5_retardation) {
+                retardation_handler->copyAllAttributesTo(outputHandler, {});
+            } else if (h5_transmittance) {
+                transmittance_handler->copyAllAttributesTo(outputHandler, {});
+            }
+
+            if (h5_retardation & !h5_transmittance) {
+                outputHandler.setReferenceModalityTo({*retardation_handler});
+            } else if (h5_transmittance & !h5_retardation) {
+                outputHandler.setReferenceModalityTo({*transmittance_handler});
+            } else if (h5_transmittance && h5_retardation) {
+                outputHandler.setReferenceModalityTo({*transmittance_handler, *retardation_handler});
+            }
+
+            outputHandler.addCreator();
+            outputHandler.addId();
+        } catch(...) {
+            std::cerr << "Error during copying attributes with plim. Skipping..." << std::endl;
+        }
+        transmittance_handler = nullptr;
+        retardation_handler = nullptr;
+
+        if(tr_dset.getId() > 0) tr_dset.close();
+        if(transmittance.getId() > 0) transmittance.close();
+
+        if(ret_dset.getId() > 0) ret_dset.close();
+        if(retardation.getId() > 0) retardation.close();
+
+        dset.close();
+    } catch (...) {
+        throw std::runtime_error("Output dataset was not valid!");
     }
 }
 

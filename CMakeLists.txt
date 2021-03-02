@@ -3,31 +3,10 @@ if (POLICY CMP0048)
 endif (POLICY CMP0048)
 
 cmake_minimum_required(VERSION 3.14)
-project(PLImg LANGUAGES C CXX CUDA)
+project(PLImig LANGUAGES C CXX CUDA VERSION 1.1.0)
 
 # Set a default build type if none was specified
 set(default_build_type "Release")
-
-find_package(Git QUIET)
-if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-    set(default_build_type "Debug")
-
-    # Update submodules as needed
-    option(PLIMG_SUBMODULE "Check submodules during build" ON)
-    if(PLIMG_SUBMODULE)
-        message(STATUS "Submodule update")
-        execute_process(
-                COMMAND ${GIT_EXECUTABLE} submodule update --init
-                WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-                RESULT_VARIABLE GIT_SUBMOD_RESULT)
-        if(NOT GIT_SUBMOD_RESULT EQUAL "0")
-            message(
-                    FATAL_ERROR
-                    "git submodule update --init failed with ${GIT_SUBMOD_RESULT}, please checkout submodules"
-            )
-        endif()
-    endif()
-endif()
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
@@ -51,6 +30,7 @@ find_package(TIFF REQUIRED)
 find_package(NIFTI REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Filesystem REQUIRED)
+find_package(PLIM REQUIRED)
 
 # Add headers to project
 add_subdirectory(extern/CLI11)
@@ -60,48 +40,20 @@ include_directories(${NIFTI_INCLUDE_DIRS})
 include_directories(${HDF5_INCLUDE_DIR})
 include_directories(${OPENMP_C_INCLUDE_DIRS})
 include_directories(${OPENMP_CXX_INCLUDE_DIRS})
+include_directories(${PLIM_INCLUDE_DIRS})
 include_directories(src/)
 
 # Set CXX and C flags for OpenMP
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
 set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} ${OPENMP_C_FLAGS})
 
-# Set source files
-set(SOURCE
-        src/inclination.cpp
-        src/maskgeneration.cpp
-        src/reader.cpp
-        src/toolbox.cpp
-        src/writer.cpp
-        src/cuda/toolbox.cu)
+include(cmake/version.cmake)
+configure_file(src/version.cpp.in ${PROJECT_SOURCE_DIR}/src/version.cpp)
 
-# Set header files
-set(HEADER
-        src/inclination.h
-        src/maskgeneration.h
-        src/reader.h
-        src/toolbox.h
-        src/writer.h
-        src/cuda/toolbox.cuh)
-
-# Generate executable file
-add_library(PLImg SHARED ${SOURCE})
-target_link_libraries(PLImg ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
-        CUDA::cudart CUDA::nppidei CUDA::nppif CUDA::nppc CUDA::nppisu CUDA::nppist
-        OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem)
-
-add_executable(PLIMaskGeneration PLImg.cpp)
-target_link_libraries(PLIMaskGeneration PLImg)
-add_executable(PLIInclination CalcIncl.cpp)
-target_link_libraries(PLIInclination PLImg)
-
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    install(TARGETS PLImg LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION lib)
-    install(TARGETS PLIMaskGeneration LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION bin)
-    install(TARGETS PLIInclination LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE DESTINATION bin)
-    install(DIRECTORY DESTINATION include/PLImg)
-    install(FILES ${HEADER} DESTINATION include/PLImg PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
-endif()
+add_subdirectory(extern)
+add_subdirectory(src)
+add_subdirectory(bin)
+add_subdirectory(docs)
 
 if(BUILD_TESTING)
    enable_testing()

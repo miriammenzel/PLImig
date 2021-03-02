@@ -1,0 +1,22 @@
+# Set output folders to bin and lib
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+add_subdirectory(tools)
+
+# normal executables
+add_executable(PLIMaskGeneration MaskGeneration.cpp)
+target_link_libraries(PLIMaskGeneration PLImig)
+add_executable(PLIInclination CalcIncl.cpp)
+target_link_libraries(PLIInclination PLImig)
+add_executable(PLImigPipeline PLImig.cpp)
+target_link_libraries(PLImigPipeline PLImig)
+
+
+# install instructions for CMake
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    install(TARGETS PLImig LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION lib)
+    install(TARGETS PLIMaskGeneration LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ DESTINATION bin)
+    install(TARGETS PLIInclination LIBRARY CONFIGURATIONS Release PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE DESTINATION bin)
+    install(DIRECTORY DESTINATION include/PLImg)
+    install(FILES ${HEADER} DESTINATION include/PLImg PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+endif()

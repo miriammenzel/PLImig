@@ -23,13 +23,13 @@ TEST(TestToolbox, TestHistogramPeakWidth) {
     std::vector<float> test_arr = {0, 0, 0.5, 0.75, 0.8, 0.85, 0.9, 1};
     cv::Mat test_img(test_arr.size(), 1, CV_32FC1);
     test_img.data = (uchar*) test_arr.data();
-    int width = PLImg::histogramPeakWidth(test_img, test_img.rows-1, -1);
+    int width = PLImg::Histogram::peakWidth(test_img, test_img.rows-1, -1);
     ASSERT_EQ(width, 5);
 
     test_arr = {1, 0.9, 0.85, 0.8, 0.75, 0.5, 0, 0};
     test_img = cv::Mat(test_arr.size(), 1, CV_32FC1);
     test_img.data = (uchar*) test_arr.data();
-    width = PLImg::histogramPeakWidth(test_img, 0, 1);
+    width = PLImg::Histogram::peakWidth(test_img, 0, 1);
     ASSERT_EQ(width, 5);
 }
 
@@ -63,13 +63,13 @@ TEST(TestToolbox, TestHistogramPlateauLeft) {
     int channels[] = {0};
     float histBounds[] = {0.0f, 1.0f};
     const float* histRange = { histBounds };
-    int histSize = NUMBER_OF_BINS;
+    int histSize = MAX_NUMBER_OF_BINS;
 
     // Generate histogram
     cv::Mat hist;
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
 
-    float result = PLImg::histogramPlateau(hist, 0, 1, 1, 1, NUMBER_OF_BINS/2);
+    float result = PLImg::Histogram::plateau(hist, 0, 1, 1, 1, MAX_NUMBER_OF_BINS/2);
     ASSERT_FLOAT_EQ(result, 4.0f * (1.0f/256.0f));
 }
 
@@ -103,14 +103,14 @@ TEST(TestToolbox, TestHistogramPlateauRight) {
     int channels[] = {0};
     float histBounds[] = {0.0f, 1.0f};
     const float* histRange = { histBounds };
-    int histSize = NUMBER_OF_BINS;
+    int histSize = MAX_NUMBER_OF_BINS;
 
     // Generate histogram
     cv::Mat hist;
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
     std::reverse(hist.begin<float>(), hist.end<float>());
 
-    float result = PLImg::histogramPlateau(hist, 0, 1, -1, NUMBER_OF_BINS/2, NUMBER_OF_BINS);
+    float result = PLImg::Histogram::plateau(hist, 0, 1, -1, MAX_NUMBER_OF_BINS/2, MAX_NUMBER_OF_BINS);
     ASSERT_FLOAT_EQ(result, 1.0f - 5.0f * (1.0f/256.0f));
 }
 
@@ -130,7 +130,7 @@ TEST(TestToolbox, TestImageRegionGrowing) {
         }
     }
 
-    cv::Mat mask = PLImg::imageRegionGrowing(test_retardation);
+    cv::Mat mask = PLImg::Image::regionGrowing(test_retardation, cv::Mat(), 0.0001);
     for(uint i = 11; i < 20; ++i) {
         for(uint j = 11; j < 15; ++j) {
             ASSERT_TRUE(mask.at<bool>(i, j));
@@ -140,22 +140,18 @@ TEST(TestToolbox, TestImageRegionGrowing) {
 }
 
 TEST(TestToolbox, TestMedianFilter) {
-    std::vector<float> test_arr = {1, 1, 3, 3, 3, 3, 2, 2, 3};
-    cv::Mat test_img(3, 3, CV_32FC1);
-    test_img.data = (uchar*) test_arr.data();
+    auto testImage = cv::imread("../../tests/files/median_filter/median_input.tiff", cv::IMREAD_ANYDEPTH);
+    auto expectedResult = cv::imread("../../tests/files/median_filter/median_expected_result.tiff", cv::IMREAD_ANYDEPTH);
 
-    auto test_img_ptr = std::make_shared<cv::Mat>(test_img);
-    auto result_img = PLImg::cuda::filters::medianFilter(test_img_ptr, 1);
+    auto testImagePtr = std::make_shared<cv::Mat>(testImage);
+    auto medianFilterPtr = PLImg::cuda::filters::medianFilter(testImagePtr);
 
-    std::vector<float> expected_arr = {1, 1, 3, 3, 3, 3, 2, 2, 3};
-    cv::Mat expected_img(3, 3, CV_32FC1);
-    expected_img.data = (uchar*) expected_arr.data();
-
-    for(uint i = 0; i < test_img.rows; ++i) {
-        for(uint j = 0; j < test_img.cols; ++j) {
-            ASSERT_FLOAT_EQ(expected_img.at<float>(i, j), result_img->at<float>(i, j));
+    for(unsigned i = 0; i < expectedResult.rows; ++i) {
+        for(unsigned j = 0; j < expectedResult.cols; ++j) {
+            ASSERT_FLOAT_EQ(medianFilterPtr->at<float>(i, j), expectedResult.at<float>(i, j));
         }
     }
+    cv::imwrite("/tmp/PLImgMedianFiltered.tiff", *medianFilterPtr);
 }
 
 TEST(TestToolbox, TestMedianFilterMasked) {

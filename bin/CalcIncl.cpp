@@ -20,21 +20,21 @@ int main(int argc, char** argv) {
     bool detailed = false;
 
     auto required = app.add_option_group("Required parameters");
-    required->add_option("--itra, itra", transmittance_files, "Input transmittance files")
+    required->add_option("--itra", transmittance_files, "Input transmittance files")
             ->required()
             ->check(CLI::ExistingFile);
-    required->add_option("--iret, iret", retardation_files, "Input retardation files")
+    required->add_option("--iret", retardation_files, "Input retardation files")
             ->required()
             ->check(CLI::ExistingFile);
-    required->add_option("--imask, imask", mask_files, "Input mask files from PLImg")
+    required->add_option("--imask", mask_files, "Input mask files from PLImg")
             ->required()
             ->check(CLI::ExistingFile);
-    required->add_option("-o, --output, ofolder", output_folder, "Output folder")
+    required->add_option("-o, --output", output_folder, "Output folder")
             ->required()
             ->check(CLI::ExistingDirectory);
 
     auto optional = app.add_option_group("Optional parameters");
-    optional->add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
+    optional->add_option("-d, --dataset", dataset, "HDF5 dataset")
             ->default_val("/Image");
     optional->add_flag("--detailed", detailed);
     optional->add_option("--im", im)->default_val(-1);
@@ -54,7 +54,19 @@ int main(int argc, char** argv) {
     for(const auto& transmittance_path : transmittance_files) {
         std::cout << transmittance_path << std::endl;
 
-        transmittance_basename = transmittance_path.substr(transmittance_path.find_last_of('/')+1);
+        unsigned long long int endPosition = transmittance_path.find_last_of('/');
+        if(endPosition != std::string::npos) {
+            transmittance_basename = transmittance_path.substr(endPosition+1);
+        } else {
+            transmittance_basename = transmittance_path;
+        }
+        for(std::string extension : std::array<std::string, 5> {".h5", ".tiff", ".tif", ".nii.gz", ".nii"}) {
+            endPosition = transmittance_basename.rfind(extension);
+            if(endPosition != std::string::npos) {
+                transmittance_basename = transmittance_basename.substr(0, endPosition);
+            }
+        }
+
         // Get name of retardation and check if transmittance has median filer applied.
         retardation_basename = std::string(transmittance_basename);
         if (retardation_basename.find("median10") != std::string::npos) {
@@ -95,14 +107,13 @@ int main(int argc, char** argv) {
             }
 
             // Read all files.
-            std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(PLImg::reader::imread(transmittance_path, dataset));
-            std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(PLImg::reader::imread(retardation_path, dataset));
-            std::shared_ptr<cv::Mat> whiteMask = std::make_shared<cv::Mat>(PLImg::reader::imread(mask_path, dataset+"/White"));
-            std::shared_ptr<cv::Mat> grayMask = std::make_shared<cv::Mat>(PLImg::reader::imread(mask_path, dataset+"/Gray"));;
-            std::shared_ptr<cv::Mat> blurredMask = std::make_shared<cv::Mat>(PLImg::reader::imread(mask_path, dataset+"/Blurred"));;
+            std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(PLImg::Reader::imread(transmittance_path, dataset));
+            std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(PLImg::Reader::imread(retardation_path, dataset));
+            std::shared_ptr<cv::Mat> whiteMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/White"));
+            std::shared_ptr<cv::Mat> grayMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/Gray"));
+            std::shared_ptr<cv::Mat> blurredMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/Probability"));
             std::cout << "Files read" << std::endl;
 
-            std::shared_ptr<cv::Mat> medTransmittanceWhite;
             std::shared_ptr<cv::Mat> medTransmittance;
             // If our given transmittance isn't already median filtered (based on it's file name)
             if (transmittance_path.find("median10") == std::string::npos) {
@@ -115,16 +126,11 @@ int main(int argc, char** argv) {
                 std::string group = dataset.substr(0, dataset.find_last_of('/'));
                 // Create group and dataset
                 writer.create_group(group);
-                writer.create_group(dataset);
 
                 // Generate med10Transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, grayMask);
-                writer.write_dataset(dataset + "/Gray", *medTransmittance);
-                medTransmittanceWhite = PLImg::cuda::filters::medianFilterMasked(transmittance, whiteMask);
-                writer.write_dataset(dataset + "/White", *medTransmittanceWhite);
-                cv::add(*medTransmittance, *medTransmittanceWhite, *medTransmittance, *whiteMask, CV_32FC1);
-                writer.write_dataset(dataset + "/Full", *medTransmittance);
-                medTransmittanceWhite = nullptr;
+                writer.write_dataset(dataset + "/", *medTransmittance);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittanceMasked", argc, argv);
                 writer.close();
             } else {
                 medTransmittance = transmittance;
@@ -149,17 +155,47 @@ int main(int argc, char** argv) {
             }
             // Create file and dataset. Write the inclination afterwards.
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
-            writer.create_group(dataset);
-            writer.write_dataset(dataset+"/Inclination", *inclination.inclination());
+            writer.write_attribute("/", "im", inclination.im());
+            writer.write_attribute("/", "ic", inclination.ic());
+            writer.write_attribute("/", "rmax_W", inclination.rmaxWhite());
+            writer.write_attribute("/", "rmax_G", inclination.rmaxGray());
+
+            std::string group = dataset.substr(0, dataset.find_last_of('/'));
+            // Create group and dataset
+            writer.create_group(group);
+
+            writer.write_dataset(dataset, *inclination.inclination());
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset, "/Image", "Inclination", argc, argv);
             std::cout << "Inclination generated and written" << std::endl;
+            writer.close();
 
             if(detailed) {
-                writer.write_dataset(dataset+"/Saturation", *inclination.saturation());
+                auto saturation_basename = std::string(mask_basename);
+                if (mask_basename.find("Mask") != std::string::npos) {
+                    saturation_basename = saturation_basename.replace(saturation_basename.find("Mask"), 4, "Saturation");
+                }
+                // Create file and dataset. Write the inclination afterwards.
+                writer.set_path(output_folder+ "/" + saturation_basename + ".h5");
+                writer.write_attribute("/", "im", inclination.im());
+                writer.write_attribute("/", "ic", inclination.ic());
+                writer.write_attribute("/", "rmax_W", inclination.rmaxWhite());
+                writer.write_attribute("/", "rmax_G", inclination.rmaxGray());
+
+                std::string group = dataset.substr(0, dataset.find_last_of('/'));
+                // Create group and dataset
+                writer.create_group(group);
+
+                writer.write_dataset(dataset, *inclination.saturation());
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset, "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;
+                writer.close();
             }
 
-            writer.close();
             std::cout << std::endl;
+        } else {
+            std::cerr << "Mask or Retardation not found. Please check your paths!\n";
+            std::cerr << "Retardation : " << retardation_path << "\n";
+            std::cerr << "Mask : " << mask_path << "\n" << std::endl;
         }
     }
 

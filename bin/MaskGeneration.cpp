@@ -20,44 +20,55 @@ int main(int argc, char** argv) {
     float tmin, tmax, tret, ttra;
 
     auto required = app.add_option_group("Required parameters");
-    required->add_option("--itra, itra", transmittance_files, "Input transmittance files")
+    required->add_option("--itra", transmittance_files, "Input transmittance files")
             ->required()
             ->check(CLI::ExistingFile);
-    required->add_option("--iret, iret", retardation_files, "Input retardation files")
+    required->add_option("--iret", retardation_files, "Input retardation files")
             ->required()
             ->check(CLI::ExistingFile);
-    required->add_option("-o, --output, ofolder", output_folder, "Output folder")
+    required->add_option("-o, --output", output_folder, "Output folder")
                     ->required()
                     ->check(CLI::ExistingDirectory);
 
     auto optional = app.add_option_group("Optional parameters");
-    optional->add_option("-d, --dataset, dset", dataset, "HDF5 dataset")
+    optional->add_option("-d, --dataset", dataset, "HDF5 dataset")
                     ->default_val("/Image");
     optional->add_flag("--detailed", detailed);
     optional->add_flag("--with_blurred", blurred);
     auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
-    parameters->add_option("--ttra", ttra, "Average transmittance value of brightest retardation values")
+    parameters->add_option("--ilower", ttra, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--tret", tret, "Plateau in retardation histogram")
+    parameters->add_option("--rthres", tret, "Plateau in retardation histogram")
               ->default_val(-1);
-    parameters->add_option("--tmin", tmin, "Average transmittance value of brightest retardation values")
+    parameters->add_option("--irmax", tmin, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--tmax", tmax, "Separator of gray matter and background")
+    parameters->add_option("--iupper", tmax, "Separator of gray matter and background")
               ->default_val(-1);
     CLI11_PARSE(app, argc, argv);
 
     PLImg::HDF5Writer writer;
     PLImg::MaskGeneration generation;
 
-    std::string transmittance_basename, retardation_basename, mask_basename, inclination_basename;
+    std::string transmittance_basename, retardation_basename, mask_basename;
     std::string retardation_path, mask_path;
-    bool retardation_found, mask_found;
+    bool retardation_found;
 
     for(const auto& transmittance_path : transmittance_files) {
         std::cout << transmittance_path << std::endl;
 
-        transmittance_basename = transmittance_path.substr(transmittance_path.find_last_of('/')+1);
-        transmittance_basename = transmittance_basename.substr(0, transmittance_basename.find_last_of('.'));
+        unsigned long long int endPosition = transmittance_path.find_last_of('/');
+        if(endPosition != std::string::npos) {
+            transmittance_basename = transmittance_path.substr(endPosition+1);
+        } else {
+            transmittance_basename = transmittance_path;
+        }
+        for(std::string extension : std::array<std::string, 5> {".h5", ".tiff", ".tif", ".nii.gz", ".nii"}) {
+            endPosition = transmittance_basename.rfind(extension);
+            if(endPosition != std::string::npos) {
+                transmittance_basename = transmittance_basename.substr(0, endPosition);
+            }
+        }
+
         // Get name of retardation and check if transmittance has median filer applied.
         retardation_basename = std::string(transmittance_basename);
         if (retardation_basename.find("median10") != std::string::npos) {
@@ -84,15 +95,15 @@ int main(int argc, char** argv) {
             }
 
             std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(
-                    PLImg::reader::imread(transmittance_path, dataset));
+                    PLImg::Reader::imread(transmittance_path, dataset));
             std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(
-                    PLImg::reader::imread(retardation_path, dataset));
+                    PLImg::Reader::imread(retardation_path, dataset));
             std::cout << "Files read" << std::endl;
 
             std::shared_ptr<cv::Mat> medTransmittance = transmittance;
             if (transmittance_path.find("median10") == std::string::npos) {
                 // Generate med10Transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilter(transmittance, 10);
+                medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
                 // Write it to a file
                 std::string medTraName(mask_basename);
                 medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittance");
@@ -103,6 +114,7 @@ int main(int argc, char** argv) {
                 // Create group and dataset
                 writer.create_group(group);
                 writer.write_dataset(dataset + "/", *medTransmittance);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittance", argc, argv);
                 writer.close();
             } else {
                 medTransmittance = transmittance;
@@ -125,20 +137,29 @@ int main(int argc, char** argv) {
             }
             writer.set_path(output_folder + "/" + mask_basename + ".h5");
             writer.create_group(dataset);
-            writer.write_attributes("/", generation.tTra(), generation.tRet(), generation.tMin(), generation.tMax());
+            writer.write_attribute("/", "I_lower", generation.tTra());
+            writer.write_attribute("/", "r_tres", generation.tRet());
+            writer.write_attribute("/", "I_rmax", generation.tMin());
+            writer.write_attribute("/", "I_upper", generation.tMax());
+
             std::cout << "Attributes generated and written" << std::endl;
             writer.write_dataset(dataset + "/White", *generation.whiteMask());
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/White", "/Image", "White mask", argc, argv);
             std::cout << "White mask generated and written" << std::endl;
             writer.write_dataset(dataset + "/Gray", *generation.grayMask());
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Gray", "/Image", "Gray mask", argc, argv);
             std::cout << "Gray mask generated and written" << std::endl;
 
             if (blurred) {
-                writer.write_dataset(dataset + "/Blurred", *generation.blurredMask());
+                writer.write_dataset(dataset + "/Probability", *generation.blurredMask());
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Probability", "/Image", "Probability mask", argc, argv);
                 std::cout << "Blurred mask generated and written" << std::endl;
             }
             if (detailed) {
-                writer.write_dataset(dataset + "/Full", *generation.fullMask());
+                writer.write_dataset(dataset + "/Mask", *generation.fullMask());
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Mask", "/Image", "Mask", argc, argv);
                 writer.write_dataset(dataset + "/NoNerveFibers", *generation.noNerveFiberMask());
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/NoNerveFibers", "/Image", "No nerve fiber mask", argc, argv);
                 std::cout << "Detailed masks generated and written" << std::endl;
             }
             writer.close();
