@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
     optional->add_option("-d, --dataset", dataset, "HDF5 dataset")
                     ->default_val("/Image");
     optional->add_flag("--detailed", detailed);
-    optional->add_flag("--with_blurred", blurred);
+    optional->add_flag("--probability", blurred);
     auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
     parameters->add_option("--ilower", ttra, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
