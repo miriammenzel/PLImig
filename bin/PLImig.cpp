@@ -35,13 +35,13 @@ int main(int argc, char** argv) {
                     ->default_val("/Image");
     optional->add_flag("--detailed", detailed);
     auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
-    parameters->add_option("--ttra", ttra, "Average transmittance value of brightest retardation values")
+    parameters->add_option("--ilower", ttra, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--tret", tret, "Plateau in retardation histogram")
+    parameters->add_option("--rtres", tret, "Plateau in retardation histogram")
               ->default_val(-1);
-    parameters->add_option("--tmin", tmin, "Average transmittance value of brightest retardation values")
+    parameters->add_option("--irmax", tmin, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--tmax", tmax, "Separator of gray matter and background")
+    parameters->add_option("--iupper", tmax, "Separator of gray matter and background")
               ->default_val(-1);
     CLI11_PARSE(app, argc, argv);
 
@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
             writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Gray", "/Image", "Gray mask", argc, argv);
             std::cout << "Gray mask generated and written" << std::endl;
 
-            writer.write_dataset(dataset + "/Probability", *generation.blurredMask());
+            writer.write_dataset(dataset + "/Probability", *generation.probabilityMask());
             writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Probability", "/Image", "Probability mask", argc, argv);
             std::cout << "Blurred mask generated and written" << std::endl;
 
@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
             std::cout << "Median10 filtered and masked transmittance generated and written" << std::endl;
 
             // Set our read parameters
-            inclination.setModalities(medTransmittance, retardation, generation.blurredMask(), generation.whiteMask(), generation.grayMask());
+            inclination.setModalities(medTransmittance, retardation, generation.probabilityMask(), generation.whiteMask(), generation.grayMask());
             // If manual parameters were given, apply them here
 
             inclination.set_im(generation.tMin());

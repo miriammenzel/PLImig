@@ -5,8 +5,8 @@
 #include "maskgeneration.h"
 
 PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) :
-    m_retardation(std::move(retardation)), m_transmittance(std::move(transmittance)), m_tMin(nullptr), m_tMax(nullptr),
-    m_tRet(nullptr), m_tTra(nullptr), m_whiteMask(nullptr), m_grayMask(nullptr), m_blurredMask(nullptr) {
+        m_retardation(std::move(retardation)), m_transmittance(std::move(transmittance)), m_tMin(nullptr), m_tMax(nullptr),
+        m_tRet(nullptr), m_tTra(nullptr), m_whiteMask(nullptr), m_grayMask(nullptr), m_probabilityMask(nullptr) {
 }
 
 void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) {
@@ -22,7 +22,7 @@ void PLImg::MaskGeneration::resetParameters() {
     this->m_tTra = nullptr;
     this->m_whiteMask = nullptr;
     this->m_grayMask = nullptr;
-    this->m_blurredMask = nullptr;
+    this->m_probabilityMask = nullptr;
 }
 
 void PLImg::MaskGeneration::set_tMax(float tMax) {
@@ -210,9 +210,9 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
     return std::make_shared<cv::Mat>(mask);
 }
 
-std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
-    if(!m_blurredMask) {
-        m_blurredMask = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
+std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
+    if(!m_probabilityMask) {
+        m_probabilityMask = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
         std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(m_retardation->rows/2, m_retardation->cols/2, CV_32FC1);
         std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(m_transmittance->rows/2, m_transmittance->cols/2, CV_32FC1);
         MaskGeneration generation(small_retardation, small_transmittance);
@@ -237,8 +237,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
 
         float t_ret, t_tra;
 
-        for(unsigned i = 0; i < BLURRED_MASK_ITERATIONS; ++i) {
-            std::cout << "\rBlurred Mask Generation: Iteration " << i << " of " << BLURRED_MASK_ITERATIONS;
+        for(unsigned i = 0; i < PROBABILITY_MASK_ITERATIONS; ++i) {
+            std::cout << "\rProbability Mask Generation: Iteration " << i << " of " << PROBABILITY_MASK_ITERATIONS;
             std::flush(std::cout);
             // Fill transmittance and retardation with random pixels from our base images
             #pragma omp parallel for firstprivate(distribution, selected_element) schedule(static) default(shared)
@@ -318,11 +318,11 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::blurredMask() {
                 } else {
                     diffRet = (diffRet - tRet()) / diff_tRet_p;
                 }
-                m_blurredMask->at<float>(y, x) = (-erf(cos(3.0f*M_PI/4.0f - atan2f(diffTra, diffRet)) *
-                        sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
+                m_probabilityMask->at<float>(y, x) = (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
+                                                           sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
             }
         }
     }
-    return m_blurredMask;
+    return m_probabilityMask;
 }
 

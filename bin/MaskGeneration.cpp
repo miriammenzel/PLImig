@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
             std::cout << "Gray mask generated and written" << std::endl;
 
             if (blurred) {
-                writer.write_dataset(dataset + "/Probability", *generation.blurredMask());
+                writer.write_dataset(dataset + "/Probability", *generation.probabilityMask());
                 writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/Probability", "/Image", "Probability mask", argc, argv);
                 std::cout << "Blurred mask generated and written" << std::endl;
             }

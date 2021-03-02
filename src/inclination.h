@@ -48,7 +48,7 @@ namespace PLImg {
     public:
         /**
          * Default constructor. All parameters will be set to None and have to be defined using
-         * setModalities(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask, sharedMat whiteMask, sharedMat grayMask)
+         * setModalities(sharedMat transmittance, sharedMat retardation, sharedMat probabilityMask, sharedMat whiteMask, sharedMat grayMask)
          * @brief Inclination constructor
          */
         Inclination();
@@ -118,10 +118,10 @@ namespace PLImg {
 
         /**
          * This method will compute the inclination values based on the given parameter maps
-         * through Inclination(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask, sharedMat whiteMask, sharedMat grayMask)
-         * or setModalities(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask, sharedMat whiteMask, sharedMat grayMask).
+         * through Inclination(sharedMat transmittance, sharedMat retardation, sharedMat probabilityMask, sharedMat whiteMask, sharedMat grayMask)
+         * or setModalities(sharedMat transmittance, sharedMat retardation, sharedMat probabilityMask, sharedMat whiteMask, sharedMat grayMask).
          * The inclination will be computed using the four values im(), ic(), rmaxWhite() and rmaxGray(). The white and gray matter both use
-         * different formulas. Regions inbetween the white and gray matter are defined through the blurredMask and use a linear interpolation
+         * different formulas. Regions inbetween the white and gray matter are defined through the probabilityMask and use a linear interpolation
          * of both formulas.
          * The formula is constructed like this \f[
          * \alpha_{x,y} = \cos^{-1} \sqrt{

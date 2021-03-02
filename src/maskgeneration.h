@@ -37,8 +37,8 @@
 
 #include "toolbox.h"
 
-/// Number of iterations that will be used to generate the blurredMask() parameter.
-#define BLURRED_MASK_ITERATIONS 200
+/// Number of iterations that will be used to generate the probabilityMask() parameter.
+#define PROBABILITY_MASK_ITERATIONS 200
 
 /**
  * @file
@@ -48,7 +48,7 @@ namespace PLImg {
     /**
      * This class handles the generation of all parameters needed to create the white matter and gray matter masks based on
      * transmittance and retardation images. This class can be used as a pre-preparation step to separate the background from the actual tissue or
-     * to calculate the Inclination by using additial masks like the blurredMask().
+     * to calculate the Inclination by using additial masks like the probabilityMask().
      * @brief The MaskGeneration class
      */
     class MaskGeneration {
@@ -115,12 +115,12 @@ namespace PLImg {
          */
         void set_tTra(float t_tra);
         /**
-         * Set the tMin value manually. This will reset tTra() and blurredMask().
+         * Set the tMin value manually. This will reset tTra() and probabilityMask().
          * @param t_min tMin value which will be used for further calculations
          */
         void set_tMin(float t_min);
         /**
-         * Set the tMax value manually. This will reset grayMask() and blurredMask().
+         * Set the tMax value manually. This will reset grayMask() and probabilityMask().
          * @param t_max tMax value which will be used for further calculations
          */
         void set_tMax(float t_max);
@@ -161,16 +161,16 @@ namespace PLImg {
          */
         std::shared_ptr<cv::Mat> noNerveFiberMask();
         /**
-         * @brief blurredMask
+         * @brief probabilityMask
          * @return
          */
-        std::shared_ptr<cv::Mat> blurredMask();
+        std::shared_ptr<cv::Mat> probabilityMask();
 
     private:
         std::shared_ptr<cv::Mat> m_retardation, m_transmittance;
         std::unique_ptr<float> m_tRet, m_tTra, m_tMin, m_tMax;
         std::shared_ptr<cv::Mat> m_grayMask, m_whiteMask;
-        std::shared_ptr<cv::Mat> m_blurredMask;
+        std::shared_ptr<cv::Mat> m_probabilityMask;
     };
 }
 
