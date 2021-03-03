@@ -17,19 +17,22 @@ TEST(WriterTest, TestEmpty) {
 TEST(WriterTest, TestWriteAttributes) {
     PLImg::HDF5Writer writer;
     float tra = 0;
-    float ret = 0.1;
-    float min = 0.2;
-    float max = 0.3;
+    double ret = 0.1;
+    std::string min = "0.2";
+    int max = 3;
     writer.set_path("output/writer_test_1.h5");
     writer.write_attribute("/", "t_tra", tra);
-    writer.write_attribute("/", "t_ret",ret);
+    writer.write_attribute("/", "t_ret", ret);
     writer.write_attribute("/", "t_min", min);
     writer.write_attribute("/", "t_max", max);
     writer.close();
 
     auto file = H5::H5File("output/writer_test_1.h5", H5F_ACC_RDONLY);
 
-    float rtra, rret, rmin, rmax;
+    float rtra;
+    double rret;
+    std::string rmin;
+    int rmax;
 
     auto attr = file.openAttribute("t_tra");
     auto datatype = attr.getDataType();
@@ -41,19 +44,19 @@ TEST(WriterTest, TestWriteAttributes) {
     datatype = attr.getDataType();
     attr.read(datatype, &rret);
     attr.close();
-    ASSERT_FLOAT_EQ(rret, ret);
+    ASSERT_DOUBLE_EQ(rret, ret);
 
     attr = file.openAttribute("t_min");
     datatype = attr.getDataType();
     attr.read(datatype, &rmin);
     attr.close();
-    ASSERT_FLOAT_EQ(rmin, min);
+    ASSERT_STRCASEEQ(rmin.c_str(), min.c_str());
 
     attr = file.openAttribute("t_max");
     datatype = attr.getDataType();
     attr.read(datatype, &rmax);
     attr.close();
-    ASSERT_FLOAT_EQ(rmax, max);
+    ASSERT_EQ(rmax, max);
 }
 
 TEST(WriterTest, TestWriteDataset) {

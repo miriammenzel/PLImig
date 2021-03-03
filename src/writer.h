@@ -106,7 +106,7 @@ namespace PLImg {
          */
         static void createDirectoriesIfMissing(const std::string& filename);
 
-        void write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::PredType& datatype, void* value);
+        void write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::AtomType& datatype, void* value);
 
         ///
         std::string m_filename;

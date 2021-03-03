@@ -38,10 +38,11 @@ void PLImg::HDF5Writer::write_attribute<int>(std::string dataset, const std::str
 
 template<>
 void PLImg::HDF5Writer::write_attribute<std::string>(std::string dataset, const std::string& parameter_name, std::string value) {
-    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_CHAR, &value);
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+    this->write_type_attribute(std::move(dataset), parameter_name, str_type, &value);
 }
 
-void PLImg::HDF5Writer::write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::PredType& type, void* value) {
+void PLImg::HDF5Writer::write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::AtomType& type, void* value) {
     while(!dataset.empty() && dataset.at(dataset.size()-1) == '/') {
         dataset = dataset.substr(0, dataset.size()-1);
     }
