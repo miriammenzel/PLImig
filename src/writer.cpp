@@ -184,7 +184,7 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
         outputHandler.setStringAttribute("image_modality", modality);
         outputHandler.setStringAttribute("creation_time", Version::timeStamp());
         outputHandler.setStringAttribute("software", argv[0]);
-        outputHandler.setStringAttribute("software_revision", Version::string());
+        outputHandler.setStringAttribute("software_revision", Version::versionHash());
         std::string software_parameters;
         for(unsigned i = 1; i < argc; ++i) {
             software_parameters += std::string(argv[i]) + " ";

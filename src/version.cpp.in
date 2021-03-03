@@ -1,5 +1,10 @@
 #include "version.h"
 
+/*
+ * NOTE: Do not change version.cpp as all changes will be lost after calling CMake again. If you need to make changes
+ * change version.cpp.in instead!
+ */
+
 const std::string PLImg::Version::PROJECT_NAME = "@PROJECT_NAME@";
 const std::string PLImg::Version::PROJECT_VER = "@PROJECT_VERSION@";
 const std::string PLImg::Version::PROJECT_VER_MAJOR = "@PROJECT_VERSION_MAJOR@";
