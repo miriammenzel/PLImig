@@ -92,9 +92,9 @@ namespace PLImg {
          * @param argc Number of arguments when calling the program
          * @param argv Arguments when calling the program
          */
-        void writePLIMAttributes(std::string transmittance_path, std::string retardation_path,
-                                 std::string output_dataset, std::string input_dataset,
-                                 std::string modality, int argc, char** argv);
+        void writePLIMAttributes(const std::string& transmittance_path, const std::string& retardation_path,
+                                 const std::string& output_dataset, const std::string& input_dataset,
+                                 const std::string& modality, int argc, char** argv);
     private:
         /**
          * @brief open

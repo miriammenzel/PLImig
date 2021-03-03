@@ -94,7 +94,7 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
     } else {
         // Create dataset normally
         // Check for the datatype from the OpenCV mat to determine the HDF5 datatype
-        H5::DataType dtype;
+        H5::PredType dtype = H5::PredType::NATIVE_FLOAT;
         switch(image.type()) {
             case CV_32FC1:
                 dtype = H5::PredType::NATIVE_FLOAT;
@@ -171,9 +171,9 @@ void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) 
     }
 }
 
-void PLImg::HDF5Writer::writePLIMAttributes(std::string transmittance_path, std::string retardation_path,
-                                            std::string output_dataset, std::string input_dataset,
-                                            std::string modality, int argc, char** argv) {
+void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_path, const std::string& retardation_path,
+                                            const std::string& output_dataset, const std::string& input_dataset,
+                                            const std::string& modality, const int argc, char** argv) {
     H5::Exception::dontPrint();
     H5::DataSet dset;
     try {
@@ -185,7 +185,7 @@ void PLImg::HDF5Writer::writePLIMAttributes(std::string transmittance_path, std:
         outputHandler.setStringAttribute("creation_time", Version::timeStamp());
         outputHandler.setStringAttribute("software", argv[0]);
         outputHandler.setStringAttribute("software_revision", Version::string());
-        std::string software_parameters = "";
+        std::string software_parameters;
         for(unsigned i = 1; i < argc; ++i) {
             software_parameters += std::string(argv[i]) + " ";
         }
