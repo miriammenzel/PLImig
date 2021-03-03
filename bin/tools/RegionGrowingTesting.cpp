@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
                 std::cout << "Iteration: " << it << " / " << maxPercent << std::endl;
                 std::flush(std::cout);
 
-                cv::Mat mask = PLImg::Image::regionGrowing(*retardation, cv::Mat(), it);
+                cv::Mat mask = PLImg::Image::largestAreaConnectedComponents(*retardation, cv::Mat(), it);
                 cv::Scalar mean = cv::mean(*medTransmittance, mask);
                 tMin = mean[0];
                 numberOfMaskPixels = cv::countNonZero(mask);

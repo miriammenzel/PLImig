@@ -118,7 +118,7 @@ float PLImg::MaskGeneration::tRet() {
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
         cv::Mat backgroundMask = *m_transmittance > 0 & *m_transmittance < tMax() & *m_retardation > 0;
-        cv::Mat mask = Image::regionGrowing(*m_retardation, backgroundMask);
+        cv::Mat mask = Image::largestAreaConnectedComponents(*m_retardation, backgroundMask);
 
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);

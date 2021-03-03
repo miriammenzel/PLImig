@@ -3,7 +3,6 @@
 //
 
 #include "toolbox.h"
-#include <iostream>
 
 int PLImg::Histogram::peakWidth(cv::Mat hist, int peakPosition, float direction, float targetHeight) {
     float height = hist.at<float>(peakPosition) * targetHeight;
@@ -111,10 +110,11 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
     return peaks;
 }
 
-cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, const cv::Mat& mask, float percentPixels) {
+cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::Mat mask, float percentPixels) {
     float pixelThreshold;
     if(mask.empty()) {
         pixelThreshold = float(image.cols) * float(image.rows) * percentPixels / 100;
+        mask = cv::Mat::ones(image.rows, image.cols, CV_8UC1);
     } else {
         std::cout << float(cv::countNonZero(mask)) << " " << float(image.cols) * float(image.rows) << std::endl;
         pixelThreshold = float(cv::countNonZero(mask)) * percentPixels / 100;
@@ -138,25 +138,29 @@ cv::Mat PLImg::Image::regionGrowing(const cv::Mat& image, const cv::Mat& mask, f
     cv::Mat cc_mask, labels;
     std::pair<cv::Mat, int> component;
     while(front_bin > 0) {
-        cc_mask = image > float(front_bin)/MAX_NUMBER_OF_BINS;
-        labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
-        cc_mask.release();
+        cc_mask = image > float(front_bin)/MAX_NUMBER_OF_BINS & mask;
+        if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
+            labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
+            cc_mask.release();
 
-        component = PLImg::cuda::labeling::largestComponent(labels);
-        labels.release();
+            component = PLImg::cuda::labeling::largestComponent(labels);
+            labels.release();
 
-        std::cout << "\r" << component.second << " " << pixelThreshold;
-        std::flush(std::cout);
+            std::cout << "\r" << component.second << " " << pixelThreshold;
+            std::flush(std::cout);
 
-        if(component.second < pixelThreshold) {
-            int difference = int(pixelThreshold) - component.second;
-            while(difference > 0) {
-                --front_bin;
-                difference = difference - int(hist.at<float>(front_bin));
+            if (component.second < pixelThreshold) {
+                int difference = int(pixelThreshold) - component.second;
+                while (difference > 0) {
+                    --front_bin;
+                    difference = difference - int(hist.at<float>(front_bin));
+                }
+            } else {
+                std::cout << std::endl;
+                return component.first;
             }
         } else {
-            std::cout << std::endl;
-            return component.first;
+            --front_bin;
         }
     }
     std::cout << std::endl;
