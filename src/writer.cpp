@@ -49,10 +49,16 @@ void PLImg::HDF5Writer::write_type_attribute(std::string dataset, const std::str
     hsize_t dims[1] = {1};
     H5::Attribute attr;
     H5::DataSpace space(1, dims);
-    if(!m_hdf5file.attrExists(dataset+"/"+parameter_name)) {
-        attr = m_hdf5file.createAttribute(dataset +"/"+ parameter_name, type, space);
+    std::string path_appendix;
+    if(dataset.find_last_of('/') == dataset.size()-1) {
+        path_appendix = "";
     } else {
-        attr = m_hdf5file.openAttribute(dataset +"/"+ parameter_name);
+        path_appendix = "/";
+    }
+    if(!m_hdf5file.attrExists(dataset+path_appendix+parameter_name)) {
+        attr = m_hdf5file.createAttribute(dataset +path_appendix+ parameter_name, type, space);
+    } else {
+        attr = m_hdf5file.openAttribute(dataset+path_appendix+ parameter_name);
     }
     attr.write(type, value);
     attr.close();

@@ -43,26 +43,27 @@ namespace PLImg {
     class HDF5Writer {
     public:
         /**
-         * @brief HDF5Writer
+         * @brief HDF5Writer Default constructor for the HDF5Writer
+         * Default constructor for the HDF5Writer. This class will be used to write HDF5 files.
          */
         HDF5Writer();
         /**
-         * @brief path
-         * @return
+         * @brief path Get currently set path
+         * @return Currently set path via the set_path(const std::string& filename) method
          */
         std::string path();
         /**
-         * @brief set_path
-         * @param filename
+         * @brief set_path Set HDF5 path. If path exists, open the file
+         * @param filename Path of the file which will be written
+         * Set the desired path of the HDF5 file which will be written. The file will be created if it doesn't exist.
+         * If the file already exists, open it in append mode.
          */
         void set_path(const std::string& filename);
         /**
          * @brief write_attributes
          * @param dataset
-         * @param t_tra
-         * @param t_ret
-         * @param t_min
-         * @param t_max
+         * @param parameter_name
+         * @param value
          */
         template<typename T>
         void write_attribute(std::string dataset, const std::string& parameter_name, T value);
@@ -78,10 +79,19 @@ namespace PLImg {
          */
         void create_group(const std::string& group);
         /**
-         * @brief close
+         * @brief close Closes currently opened file.
          */
         void close();
-
+        /**
+         *
+         * @param transmittance_path Original transmittance path used for the call of the program
+         * @param retardation_path Original retardation path used for the call of the program
+         * @param output_dataset Dataset which will be written to
+         * @param input_dataset Dataset which will be used to copy most attributes
+         * @param modality Name of the modality which will be written (NTransmittance, Retardation, ...)
+         * @param argc Number of arguments when calling the program
+         * @param argv Arguments when calling the program
+         */
         void writePLIMAttributes(std::string transmittance_path, std::string retardation_path,
                                  std::string output_dataset, std::string input_dataset,
                                  std::string modality, int argc, char** argv);

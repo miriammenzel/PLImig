@@ -146,12 +146,13 @@ TEST(TestToolbox, TestMedianFilter) {
     auto testImagePtr = std::make_shared<cv::Mat>(testImage);
     auto medianFilterPtr = PLImg::cuda::filters::medianFilter(testImagePtr);
 
+    cv::imwrite("/tmp/PLImgMedianFiltered.tiff", *medianFilterPtr);
+
     for(unsigned i = 0; i < expectedResult.rows; ++i) {
         for(unsigned j = 0; j < expectedResult.cols; ++j) {
             ASSERT_FLOAT_EQ(medianFilterPtr->at<float>(i, j), expectedResult.at<float>(i, j));
         }
     }
-    cv::imwrite("/tmp/PLImgMedianFiltered.tiff", *medianFilterPtr);
 }
 
 TEST(TestToolbox, TestMedianFilterMasked) {
