@@ -69,7 +69,7 @@ TEST(TestToolbox, TestHistogramPlateauLeft) {
     cv::Mat hist;
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
 
-    float result = PLImg::Histogram::plateau(hist, 0, 1, 1, 1, MAX_NUMBER_OF_BINS/2);
+    float result = PLImg::Histogram::maxCurvature(hist, 0, 1, 1, 1, MAX_NUMBER_OF_BINS / 2);
     ASSERT_FLOAT_EQ(result, 4.0f * (1.0f/256.0f));
 }
 
@@ -110,7 +110,7 @@ TEST(TestToolbox, TestHistogramPlateauRight) {
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
     std::reverse(hist.begin<float>(), hist.end<float>());
 
-    float result = PLImg::Histogram::plateau(hist, 0, 1, -1, MAX_NUMBER_OF_BINS/2, MAX_NUMBER_OF_BINS);
+    float result = PLImg::Histogram::maxCurvature(hist, 0, 1, -1, MAX_NUMBER_OF_BINS / 2, MAX_NUMBER_OF_BINS);
     ASSERT_FLOAT_EQ(result, 1.0f - 5.0f * (1.0f/256.0f));
 }
 
@@ -145,8 +145,6 @@ TEST(TestToolbox, TestMedianFilter) {
 
     auto testImagePtr = std::make_shared<cv::Mat>(testImage);
     auto medianFilterPtr = PLImg::cuda::filters::medianFilter(testImagePtr);
-
-    cv::imwrite("/tmp/PLImgMedianFiltered.tiff", *medianFilterPtr);
 
     for(unsigned i = 0; i < expectedResult.rows; ++i) {
         for(unsigned j = 0; j < expectedResult.cols; ++j) {

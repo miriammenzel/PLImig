@@ -21,7 +21,7 @@ int PLImg::Histogram::peakWidth(cv::Mat hist, int peakPosition, float direction,
     }
 }
 
-float PLImg::Histogram::plateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop) {
+float PLImg::Histogram::maxCurvature(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop) {
     float stepSize = (histHigh - histLow) / float(hist.rows);
     if(stop - start > 3) {
         auto maxIterator = std::max_element(hist.begin<float>() + start, hist.begin<float>() + stop);

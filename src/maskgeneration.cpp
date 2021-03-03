@@ -61,7 +61,8 @@ float PLImg::MaskGeneration::tTra() {
         auto peaks = Histogram::peaks(hist, startPosition, endPosition);
         if(peaks.size() > 0) {
             endPosition = std::min_element(hist.begin<float>() + startPosition, hist.begin<float>() + peaks.at(0)) - hist.begin<float>();
-            this->m_tTra = std::make_unique<float>(Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition));
+            this->m_tTra = std::make_unique<float>(
+                    Histogram::maxCurvature(hist, 0.0f, 1.0f, 1, startPosition, endPosition));
         } else {
             this->m_tTra = std::make_unique<float>(temp_tTra);
         }
@@ -103,7 +104,7 @@ float PLImg::MaskGeneration::tRet() {
                 startPosition = peaks.at(0);
             }
 
-            temp_tRet = Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
+            temp_tRet = Histogram::maxCurvature(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
 
             startPosition = fmax(0, (temp_tRet * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
             endPosition = fmin((temp_tRet * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1, NUMBER_OF_BINS << 1);
@@ -146,7 +147,7 @@ float PLImg::MaskGeneration::tMax() {
             startPosition = MAX_NUMBER_OF_BINS / 2;
         }
 
-        //If the transmittance was masked, we should see a large plateau with 0 values after the highest peak
+        //If the transmittance was masked, we should see a large maxCurvature with 0 values after the highest peak
         if(endPosition - startPosition < 2) {
             this->m_tMax = std::make_unique<float>(float(startPosition)/MAX_NUMBER_OF_BINS);
         }
@@ -168,7 +169,7 @@ float PLImg::MaskGeneration::tMax() {
                 }
                 cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
 
-                temp_tMax = Histogram::plateau(hist, 0.0f, 1.0f, -1, startPosition, endPosition);
+                temp_tMax = Histogram::maxCurvature(hist, 0.0f, 1.0f, -1, startPosition, endPosition);
 
                 startPosition = fmax(0, (temp_tMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
                 endPosition = fmax((temp_tMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1,

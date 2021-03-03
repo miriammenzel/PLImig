@@ -30,11 +30,11 @@
 #include <omp.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
 #include <vector>
 
-/// Number of bins used for histogram algorithms
+/// Minimum number of bins used for the calculation of tRet() and tTra()
 #define MIN_NUMBER_OF_BINS 16
+/// Maximum number of bins used for the calculation of tRet() and tTra(). This value will also be used as the default number of bins for all other operations.
 #define MAX_NUMBER_OF_BINS 256
 
 /**
@@ -44,26 +44,33 @@
 namespace PLImg {
     namespace Histogram {
         /**
-         * @brief histogramPeakWidth
-         * @param hist
-         * @param peakPosition
-         * @param direction
-         * @param targetHeight
-         * @return
+         * @brief peakWidth Determine the one-sided peak width of a given peak position based on its height.
+         * @param hist Histogram which was calculated using OpenCV functions
+         * @param peakPosition Peak position in histogram of which the width shall be calculated
+         * @param direction +1 -> ++peakPosition , -1 -> --peakPosition
+         * @param targetHeight Target height for the peak width. 0.5 = 50%.
+         * @return Integer number describing the width in bins
          */
         int peakWidth(cv::Mat hist, int peakPosition, float direction, float targetHeight = 0.5f);
 
         /**
-         * @brief histogramPlateau
-         * @param hist
-         * @param histLow
-         * @param histHigh
-         * @param direction
-         * @param start
-         * @param stop
-         * @return
+         * This method calculates the floating point value of the maximum curvature in a given histogram between two bounds.
+         * To achieve this, the curvature is determined using numerical differentiation with the following formula
+         * \f[ \kappa = \frac{y^{''}}{(1+(y^{'})^2)^{3/2}} \f]
+         * The maximum position of \f$ \kappa \f$ is our maximum curvature and will be returned.
+         * Note: This method will calculate the peak width of the highest position in the histogram and will only
+         * search in a search interval between peak and 10 times the peak width.
+         * If stop - start < 3 the algorithm will return start converted to a floating point value.
+         * @brief maxCurvature Calculate the maximum curvature floating point value of a histogram
+         * @param hist OpenCV calculated histogram
+         * @param histLow Bin value at bin number 0
+         * @param histHigh Bin value at last bin
+         * @param direction Search for the maximum curvature to the left or to the right
+         * @param start Start position in histogram
+         * @param stop End position in histogram.
+         * @return Floating point value describing where the maximum curvature is located in the histogram.
          */
-        float plateau(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop);
+        float maxCurvature(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop);
 
         /**
          * @brief histogramPeaks

@@ -27,11 +27,10 @@
 
 #include <filesystem>
 #include <hdf5.h>
+#include <nifti/nifti1_io.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <sys/stat.h>
-#include <tiffio.h>
-#include <nifti/nifti1_io.h>
 
 /**
  * @file

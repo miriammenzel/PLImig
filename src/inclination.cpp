@@ -129,7 +129,7 @@ float PLImg::Inclination::rmaxGray() {
                 startPosition = peaks.at(0);
             }
 
-            temp_rMax = Histogram::plateau(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
+            temp_rMax = Histogram::maxCurvature(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
 
             startPosition = fmax(0, (temp_rMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
             endPosition = fmin((temp_rMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1, NUMBER_OF_BINS << 1);

@@ -24,15 +24,11 @@
 #ifndef PLIMG_MASKGENERATION_H
 #define PLIMG_MASKGENERATION_H
 
-#include <chrono>
 #include <cmath>
-#include <ctime>
 #include <iostream>
 #include <memory>
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
 #include <omp.h>
-#include <utility>
+#include <opencv2/core.hpp>
 #include <random>
 
 #include "toolbox.h"
