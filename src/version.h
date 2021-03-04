@@ -6,7 +6,6 @@
 #define PLIMIG_VERSION_H_IN
 
 #include <string>
-#include <sstream>
 #include <ctime>
 #include <chrono>
 
