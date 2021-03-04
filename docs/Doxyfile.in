@@ -1,5 +1,5 @@
 OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@/doc/
-INPUT                  = @PROJECT_SOURCE_DIR@/README.md @PROJECT_SOURCE_DIR@/src/ @PROJECT_SOURCE_DIR@/src/cuda/ @PROJECT_SOURCE_DIR@/docs
+INPUT                  = @PROJECT_SOURCE_DIR@/README.md @PROJECT_SOURCE_DIR@/src @PROJECT_SOURCE_DIR@/docs
 USE_MDFILE_AS_MAINPAGE = @PROJECT_SOURCE_DIR@/README.md
 PROJECT_NAME	       = PLImg
 PROJECT_BRIEF	       = "3D-Polarized Light Imaging Mask Generation: Generate masks and compute the inclination with this toolbox."

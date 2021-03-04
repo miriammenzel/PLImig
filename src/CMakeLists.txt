@@ -9,7 +9,7 @@ set(SOURCE
         toolbox.cpp
         writer.cpp
         version.cpp
-        cuda/toolbox.cu)
+        cuda/cuda_toolbox.cu)
 
 # Set header files
 set(HEADER

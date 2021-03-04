@@ -21,23 +21,19 @@ void PLImg::HDF5Writer::set_path(const std::string& filename) {
     }
 }
 
-template<>
-void PLImg::HDF5Writer::write_attribute<float>(std::string dataset, const std::string& parameter_name, float value) {
+void PLImg::HDF5Writer::write_attribute(std::string dataset, const std::string& parameter_name, float value) {
     this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_FLOAT, &value);
 }
 
-template<>
-void PLImg::HDF5Writer::write_attribute<double>(std::string dataset, const std::string& parameter_name, double value) {
+void PLImg::HDF5Writer::write_attribute(std::string dataset, const std::string& parameter_name, double value) {
     this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_DOUBLE, &value);
 }
 
-template<>
-void PLImg::HDF5Writer::write_attribute<int>(std::string dataset, const std::string& parameter_name, int value) {
+void PLImg::HDF5Writer::write_attribute(std::string dataset, const std::string& parameter_name, int value) {
     this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_INT, &value);
 }
 
-template<>
-void PLImg::HDF5Writer::write_attribute<std::string>(std::string dataset, const std::string& parameter_name, std::string value) {
+void PLImg::HDF5Writer::write_attribute(std::string dataset, const std::string& parameter_name, std::string value) {
     H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
     this->write_type_attribute(std::move(dataset), parameter_name, str_type, &value);
 }

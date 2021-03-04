@@ -24,7 +24,7 @@
 #ifndef PLIMG_TOOLBOX_H
 #define PLIMG_TOOLBOX_H
 
-#include "cuda/toolbox.h"
+#include "cuda/cuda_toolbox.h"
 #include <npp.h>
 #include <numeric>
 #include <omp.h>
