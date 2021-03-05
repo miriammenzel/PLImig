@@ -150,38 +150,43 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
 
     uint front_bin = hist.rows - 1;
     uint pixelSum = 0;
-    while(pixelSum < pixelThreshold && front_bin > 0) {
+    while(pixelSum < 2 * pixelThreshold && front_bin > 0) {
         pixelSum += uint(hist.at<float>(front_bin));
         --front_bin;
     }
 
     cv::Mat cc_mask, labels;
     std::pair<cv::Mat, int> component;
-    while(front_bin > 0) {
+
+    uint front_bin_max = front_bin;
+    uint front_bin_min = 0;
+
+    while(int(front_bin_max) - int(front_bin_min) > 0) {
         cc_mask = (image > float(front_bin)/MAX_NUMBER_OF_BINS) & mask;
         if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
             labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
             cc_mask.release();
-
             component = PLImg::cuda::labeling::largestComponent(labels);
             labels.release();
 
-            std::cout << "\r" << component.second << " " << pixelThreshold;
+            std::cout << component.second << " " << pixelThreshold << std::endl;
             std::flush(std::cout);
 
-            if (component.second < pixelThreshold) {
-                int difference = int(pixelThreshold) - component.second;
-                while (difference > 0) {
-                    --front_bin;
-                    difference = difference - int(hist.at<float>(front_bin));
-                }
+            if (component.second < pixelThreshold * 0.9) {
+                front_bin_max = front_bin;
+                front_bin = fmin(front_bin - float(front_bin_max - front_bin_min) / 2, front_bin - 1);
+            } else if (component.second > pixelThreshold * 1.1) {
+                front_bin_min = front_bin;
+                front_bin = fmax(front_bin + 1, front_bin + float(front_bin_max - front_bin_min) / 2);
             } else {
                 std::cout << std::endl;
                 return component.first;
             }
         } else {
-            --front_bin;
+            front_bin = front_bin - 1;
         }
+
+        std::cout << "front bin = " << front_bin << std::endl;
     }
     std::cout << std::endl;
     return cv::Mat::ones(image.rows, image.cols, CV_8UC1);
