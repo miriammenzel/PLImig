@@ -158,7 +158,7 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     cv::Mat cc_mask, labels;
     std::pair<cv::Mat, int> component;
     while(front_bin > 0) {
-        cc_mask = image > float(front_bin)/MAX_NUMBER_OF_BINS & mask;
+        cc_mask = (image > float(front_bin)/MAX_NUMBER_OF_BINS) & mask;
         if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
             labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
             cc_mask.release();
@@ -294,14 +294,13 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     Npp32u *deviceResult;
     Npp8u *deviceBuffer, *deviceImage;
     Npp32s nSrcStep, nDstStep, pSrcOffset, pDstOffset;
-    Npp32s bufferSize;
     NppiSize roi;
     Npp32s xMin, xMax, yMin, yMax;
     Npp32s nextLabelNumber = 0;
     Npp32s maxLabelNumber = 0;
     cv::Mat subImage, subResult, subMask, croppedImage;
     for(Npp32u it = 0; it < numberOfChunks; ++it) {
-        std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
+        //std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
         std::flush(std::cout);
         // Calculate image boarders
         xMin = (it % chunksPerDim) * image.cols / chunksPerDim;

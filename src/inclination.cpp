@@ -233,8 +233,6 @@ sharedMat PLImg::Inclination::inclination() {
                     );
                     if (tmpVal > 1) {
                         tmpVal = 1;
-                    } else if (tmpVal < -1) {
-                        tmpVal = -1;
                     }
                     m_inclination->at<float>(y, x) = acos(tmpVal) * 180 / M_PI;
                 // Else set inclination value to 90°
