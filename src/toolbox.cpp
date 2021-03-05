@@ -185,11 +185,14 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
         } else {
             front_bin = front_bin - 1;
         }
-
-        std::cout << "front bin = " << front_bin << std::endl;
+        std::cout << "front bin = " << front_bin / MAX_NUMBER_OF_BINS << std::endl;
     }
-    std::cout << std::endl;
-    return cv::Mat::ones(image.rows, image.cols, CV_8UC1);
+    // No search result during the while loop
+    if (component.first.empty()) {
+        return cv::Mat::ones(image.rows, image.cols, CV_8UC1);
+    } else {
+        return component.first;
+    }
 }
 
 bool PLImg::cuda::runCUDAchecks() {
