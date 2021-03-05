@@ -203,7 +203,7 @@ sharedMat PLImg::Inclination::inclination() {
         // Those parameters are static and can be calculated ahead of time to save some computing time
         float asinWRmax = asin(rmaxWhite());
         float asinGRMax = asin(rmaxGray());
-        float logIcIm = log(ic() / im());
+        float logIcIm = log(fmax(1e-15, ic() / im()));
 
         // Generate inclination for every pixel
         #pragma omp parallel for default(shared) private(tmpVal, blurredMaskVal)
@@ -219,22 +219,26 @@ sharedMat PLImg::Inclination::inclination() {
                     }
                     // If our blurred mask of PLImg has really low values, calculate the inclination only with the gray matter
                     // as it might result in saturation if both formulas are used
-                    tmpVal = sqrt(
-                            blurredMaskVal *
-                            (
+                    tmpVal = blurredMaskVal *
+                             (
                                     asin(m_retardation->at<float>(y, x)) /
                                     asinWRmax *
                                     logIcIm /
-                                    fmax(1e-15, log(ic() / m_transmittance->at<float>(y, x)))
-                            )
-                            + (1 - blurredMaskVal) *
+                                    fmax(1e-15, logf(ic() / m_transmittance->at<float>(y, x)))
+                             )
+                             + (1.0f - blurredMaskVal) *
                               asin(m_retardation->at<float>(y, x)) /
-                              asinGRMax
-                    );
-                    if (tmpVal > 1) {
-                        tmpVal = 1;
+                              asinGRMax;
+                    // Prevent negative values for NaN due to sqrt
+                    if(tmpVal < 0.0f) {
+                        tmpVal = 0.0f;
                     }
-                    m_inclination->at<float>(y, x) = acos(tmpVal) * 180 / M_PI;
+                    tmpVal = sqrtf(tmpVal);
+                    // Prevent values above 1 because of NaN due to acos
+                    if(tmpVal > 1.0f) {
+                        tmpVal = 1.0f;
+                    }
+                    m_inclination->at<float>(y, x) = acosf(tmpVal) * 180 / M_PI;
                 // Else set inclination value to 90°
                 } else {
                     m_inclination->at<float>(y, x) = 90.0f;
