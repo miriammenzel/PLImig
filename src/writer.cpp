@@ -41,44 +41,47 @@ void PLImg::HDF5Writer::set_path(const std::string& filename) {
     }
 }
 
-void PLImg::HDF5Writer::write_attribute(std::string dataset, const std::string& parameter_name, float value) {
-    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_FLOAT, &value);
+void PLImg::HDF5Writer::write_attribute(const std::string& dataset, const std::string& parameter_name, float value) {
+    this->write_type_attribute(dataset, parameter_name, H5::PredType::NATIVE_FLOAT, &value);
 }
 
-void PLImg::HDF5Writer::write_attribute(std::string dataset, const std::string& parameter_name, double value) {
-    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_DOUBLE, &value);
+void PLImg::HDF5Writer::write_attribute(const std::string& dataset, const std::string& parameter_name, double value) {
+    this->write_type_attribute(dataset, parameter_name, H5::PredType::NATIVE_DOUBLE, &value);
 }
 
-void PLImg::HDF5Writer::write_attribute(std::string dataset, const std::string& parameter_name, int value) {
-    this->write_type_attribute(std::move(dataset), parameter_name, H5::PredType::NATIVE_INT, &value);
+void PLImg::HDF5Writer::write_attribute(const std::string& dataset, const std::string& parameter_name, int value) {
+    this->write_type_attribute(dataset, parameter_name, H5::PredType::NATIVE_INT, &value);
 }
 
-void PLImg::HDF5Writer::write_attribute(std::string dataset, const std::string& parameter_name, std::string value) {
+void PLImg::HDF5Writer::write_attribute(const std::string& dataset, const std::string& parameter_name, std::string value) {
     H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-    this->write_type_attribute(std::move(dataset), parameter_name, str_type, &value);
+    this->write_type_attribute(dataset, parameter_name, str_type, &value);
 }
 
-void PLImg::HDF5Writer::write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::AtomType& type, void* value) {
-    while(!dataset.empty() && dataset.at(dataset.size()-1) == '/') {
-        dataset = dataset.substr(0, dataset.size()-1);
-    }
-
+void PLImg::HDF5Writer::write_type_attribute(const std::string& dataset, const std::string& parameter_name, const H5::AtomType& type, void* value) {
     hsize_t dims[1] = {1};
     H5::Attribute attr;
     H5::DataSpace space(1, dims);
     std::string path_appendix;
-    if(dataset.find_last_of('/') == dataset.size()-1) {
-        path_appendix = "";
-    } else {
-        path_appendix = "/";
+    if(m_hdf5file.exists(dataset)) {
+        try {
+            H5::Group grp = m_hdf5file.openGroup(dataset);
+            if (!grp.attrExists(parameter_name)) {
+                attr = grp.createAttribute(parameter_name, type, space);
+            } else {
+                attr = grp.openAttribute(parameter_name);
+            }
+        } catch(H5::FileIException& exception) {
+            H5::DataSet dset = m_hdf5file.openDataSet(dataset);
+            if (!dset.attrExists(parameter_name)) {
+                attr = dset.createAttribute(parameter_name, type, space);
+            } else {
+                attr = dset.openAttribute(parameter_name);
+            }
+        }
+        attr.write(type, value);
+        attr.close();
     }
-    if(!m_hdf5file.attrExists(dataset+path_appendix+parameter_name)) {
-        attr = m_hdf5file.createAttribute(dataset +path_appendix+ parameter_name, type, space);
-    } else {
-        attr = m_hdf5file.openAttribute(dataset+path_appendix+ parameter_name);
-    }
-    attr.write(type, value);
-    attr.close();
 }
 
 void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat& image) {
@@ -191,19 +194,45 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
                                             const std::string& output_dataset, const std::string& input_dataset,
                                             const std::string& modality, const int argc, char** argv) {
     H5::Exception::dontPrint();
+    hid_t id;
+    H5::Group grp;
     H5::DataSet dset;
     try {
+        grp = m_hdf5file.openGroup(output_dataset);
+        id = grp.getId();
+    } catch(H5::FileIException& exception) {
         dset = m_hdf5file.openDataSet(output_dataset);
+        id = dset.getId();
+    }
 
-        plim::AttributeHandler outputHandler(dset.getId());
-
+    try {
+        plim::AttributeHandler outputHandler(id);
+        if(outputHandler.doesAttributeExist("image_modality")) {
+            outputHandler.deleteAttribute("image_modality");
+        }
         outputHandler.setStringAttribute("image_modality", modality);
+
+        if(outputHandler.doesAttributeExist("creation_time")) {
+            outputHandler.deleteAttribute("creation_time");
+        }
         outputHandler.setStringAttribute("creation_time", Version::timeStamp());
+
+        if(outputHandler.doesAttributeExist("software")) {
+            outputHandler.deleteAttribute("software");
+        }
         outputHandler.setStringAttribute("software", argv[0]);
+
+        if(outputHandler.doesAttributeExist("software_revision")) {
+            outputHandler.deleteAttribute("software_revision");
+        }
         outputHandler.setStringAttribute("software_revision", Version::versionHash());
+
         std::string software_parameters;
         for(unsigned i = 1; i < argc; ++i) {
             software_parameters += std::string(argv[i]) + " ";
+        }
+        if(outputHandler.doesAttributeExist("software_parameters")) {
+            outputHandler.deleteAttribute("software_parameters");
         }
         outputHandler.setStringAttribute("software_parameters", software_parameters);
 
@@ -258,11 +287,12 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
 
         if(ret_dset.getId() > 0) ret_dset.close();
         if(retardation.getId() > 0) retardation.close();
-
-        dset.close();
     } catch (...) {
         throw std::runtime_error("Output dataset was not valid!");
     }
+
+    grp.close();
+    dset.close();
 }
 
 

@@ -72,7 +72,7 @@ namespace PLImg {
          * @param parameter_name Parameter name for the attribute in the dataset
          * @param value Value that will be written to the dataset
          */
-        void write_attribute(std::string dataset, const std::string& parameter_name, float value);
+        void write_attribute(const std::string& dataset, const std::string& parameter_name, float value);
         /**
          * HDF5 files support attributes in addition to storing raw data. This methods allows to set attributes for
          * a given dataset. Here, a double attribute will be written to the parameter_name in the dataset.
@@ -80,7 +80,7 @@ namespace PLImg {
          * @param parameter_name Parameter name for the attribute in the dataset
          * @param value Value that will be written to the dataset
          */
-        void write_attribute(std::string dataset, const std::string& parameter_name, double value);
+        void write_attribute(const std::string& dataset, const std::string& parameter_name, double value);
         /**
          * HDF5 files support attributes in addition to storing raw data. This methods allows to set attributes for
          * a given dataset. Here, an int attribute will be written to the parameter_name in the dataset.
@@ -88,7 +88,7 @@ namespace PLImg {
          * @param parameter_name Parameter name for the attribute in the dataset
          * @param value Value that will be written to the dataset
          */
-        void write_attribute(std::string dataset, const std::string& parameter_name, int value);
+        void write_attribute(const std::string& dataset, const std::string& parameter_name, int value);
         /**
          * HDF5 files support attributes in addition to storing raw data. This methods allows to set attributes for
          * a given dataset. Here, a string attribute will be written to the parameter_name in the dataset.
@@ -96,7 +96,7 @@ namespace PLImg {
          * @param parameter_name Parameter name for the attribute in the dataset
          * @param value Value that will be written to the dataset
          */
-        void write_attribute(std::string dataset, const std::string& parameter_name, std::string value);
+        void write_attribute(const std::string& dataset, const std::string& parameter_name, std::string value);
         /**
          * This method allows to write an OpenCV matrix to a HDF5 file. The image will be written to a given dataset.
          * If the dataset doesn't exist yet the method will create the dataset and write the data.
@@ -139,7 +139,7 @@ namespace PLImg {
 
         static void createDirectoriesIfMissing(const std::string& filename);
 
-        void write_type_attribute(std::string dataset, const std::string& parameter_name, const H5::AtomType& datatype, void* value);
+        void write_type_attribute(const std::string& dataset, const std::string& parameter_name, const H5::AtomType& datatype, void* value);
 
         ///
         std::string m_filename;
