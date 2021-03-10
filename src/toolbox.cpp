@@ -302,10 +302,12 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     Npp32s nSrcStep, nDstStep, pSrcOffset, pDstOffset;
     NppiSize roi;
     Npp32s xMin, xMax, yMin, yMax;
+
+    cv::Mat subImage, subResult, subMask, croppedImage;
     Npp32s nextLabelNumber = 0;
     Npp32s maxLabelNumber = 0;
-    cv::Mat subImage, subResult, subMask, croppedImage;
-    for(Npp32u it = 0; it < numberOfChunks; ++it) {
+
+    for (Npp32u it = 0; it < numberOfChunks; ++it) {
         //std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
         std::flush(std::cout);
         // Calculate image boarders
@@ -345,7 +347,8 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         nDstStep = sizeof(Npp32u) * subImage.cols;
 
         // Copy image from CPU to GPU
-        err = cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice);
+        err = cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(),
+                         cudaMemcpyHostToDevice);
         if (err != cudaSuccess) {
             std::cerr << "Could not copy image from host to device \n";
             std::cerr << cudaGetErrorName(err) << std::endl;
@@ -365,14 +368,16 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
             exit(EXIT_FAILURE);
         }
 
-        errCode = nppiLabelMarkersUF_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset, nDstStep, roi, nppiNormInf, deviceBuffer);
+        errCode = nppiLabelMarkersUF_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset,
+                                               nDstStep, roi, nppiNormInf, deviceBuffer);
         if (errCode != NPP_SUCCESS) {
             printf("NPP error: Could not create labeling : %d\n", errCode);
             exit(EXIT_FAILURE);
         }
         cudaFree(deviceImage);
 
-        errCode = nppiCompressMarkerLabels_32u_C1IR(deviceResult + pDstOffset, nDstStep, roi, roi.height * roi.width, &maxLabelNumber, deviceBuffer);
+        errCode = nppiCompressMarkerLabels_32u_C1IR(deviceResult + pDstOffset, nDstStep, roi,
+                                                    roi.height * roi.width, &maxLabelNumber, deviceBuffer);
         if (errCode != NPP_SUCCESS) {
             printf("NPP error: Could not compress label markers : %d\n", errCode);
             exit(EXIT_FAILURE);
@@ -399,7 +404,11 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
         subResult(srcRect).copyTo(result(dstRect));
     }
-
+    // Set values of our result labeling to 0 if those originally were caused by the background.
+    // Sometimes NPP still does use those pixels for the labeling with connected components.
+    // However this behaviour is not deterministic.
+    result.setTo(0, image == 0);
+    // Merge labels if more than one chunk were needed. This fixes any issues where there might be an overlap.
     connectedComponentsMergeChunks(result, numberOfChunks);
     return result;
 }
