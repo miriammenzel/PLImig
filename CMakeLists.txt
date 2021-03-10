@@ -27,9 +27,10 @@ find_package(OpenCV REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C CXX HL)
 find_package(CUDAToolkit REQUIRED)
 find_package(TIFF REQUIRED)
-find_package(NIFTI REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Filesystem REQUIRED)
+find_package(NIFTI REQUIRED)
+
 
 option(PLIM_SUBMODULE "Build plim through submodule. If this option is disabled CMake will try to find a local installation of plim" ON)
 if(PLIM_SUBMODULE)

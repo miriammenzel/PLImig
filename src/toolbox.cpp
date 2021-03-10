@@ -161,7 +161,7 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     uint front_bin_max = front_bin;
     uint front_bin_min = 0;
 
-    while(int(front_bin_max) - int(front_bin_min) > 0) {
+    while(int(front_bin_max) - int(front_bin_min) > 2) {
         cc_mask = (image > float(front_bin)/MAX_NUMBER_OF_BINS) & mask;
         if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
             labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
@@ -170,7 +170,6 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
             labels.release();
 
             std::cout << component.second << " " << pixelThreshold << std::endl;
-            std::flush(std::cout);
 
             if (component.second < pixelThreshold * 0.9) {
                 front_bin_max = front_bin;
@@ -179,13 +178,12 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
                 front_bin_min = front_bin;
                 front_bin = fmax(front_bin + 1, front_bin + float(front_bin_max - front_bin_min) / 2);
             } else {
-                std::cout << std::endl;
                 return component.first;
             }
         } else {
             front_bin = front_bin - 1;
         }
-        std::cout << "front bin = " << front_bin / MAX_NUMBER_OF_BINS << std::endl;
+        std::cout << "front bin = " << front_bin << std::endl;
     }
     // No search result during the while loop
     if (component.first.empty()) {
@@ -402,64 +400,117 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         subResult(srcRect).copyTo(result(dstRect));
     }
 
+    connectedComponentsMergeChunks(result, numberOfChunks);
+    return result;
+}
+
+void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int numberOfChunks) {
     // Iterate along the borders of each chunk to check if any labels overlap there. If that's the case
     // replace the higher numbered label by the lower numbered label. Only apply if more than one chunk is present.
     if(numberOfChunks > 1) {
-        bool somethingDidChange = true;
-        int minVal;
-        while(somethingDidChange) {
-            somethingDidChange = false;
-            for (uint chunk = 0; chunk < numberOfChunks; ++chunk) {
-                xMin = (chunk % chunksPerDim) * result.cols / chunksPerDim;
-                xMax = fmin((chunk % chunksPerDim + 1) * result.cols / chunksPerDim, result.cols-1);
-                yMin = (chunk / chunksPerDim) * image.rows / chunksPerDim;
-                yMax = fmin((chunk / chunksPerDim + 1) * result.rows / chunksPerDim, result.rows-1);
+        int chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
+        std::set<std::pair<int, int>> labelLUT;
+        std::cout << "Fixing chunks" << std::endl;
 
-                // Check upper and lower border
-                for (uint x = xMin; x < xMax; ++x) {
-                    if (result.at<int>(yMin, x) > 0 && yMin - 1 >= 0) {
-                        if (result.at<int>(yMin - 1, x) > 0 && result.at<int>(yMin, x) != result.at<int>(yMin - 1, x)) {
-                            minVal = fmin(result.at<int>(yMin, x), result.at<int>(yMin - 1, x));
-                            result.setTo(minVal, result == result.at<int>(yMin, x));
-                            result.setTo(minVal, result == result.at<int>(yMin - 1, x));
-                            somethingDidChange = true;
-                        }
-                    }
+        for (uint chunk = 0; chunk < numberOfChunks; ++chunk) {
+            int xMin = (chunk % chunksPerDim) * image.cols / chunksPerDim;
+            int xMax = fmin((chunk % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols-1);
+            int yMin = (chunk / chunksPerDim) * image.rows / chunksPerDim;
+            int yMax = fmin((chunk / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows-1);
 
-                    if (result.at<int>(yMax, x) > 0 && yMax + 1 < result.rows) {
-                        if (result.at<int>(yMax + 1, x) > 0 && result.at<int>(yMax, x) != result.at<int>(yMax + 1, x)) {
-                            minVal = fmin(result.at<int>(yMax, x), result.at<int>(yMax + 1, x));
-                            result.setTo(minVal, result == result.at<int>(yMax, x));
-                            result.setTo(minVal, result == result.at<int>(yMax + 1, x));
-                            somethingDidChange = true;
+            int curIdx;
+            int otherIdx;
+            // Check upper and lower border
+            for (uint x = xMin; x < xMax; ++x) {
+                curIdx = image.at<int>(yMin, x);
+                if (curIdx > 0 && yMin - 1 >= 0) {
+                    otherIdx = image.at<int>(yMin - 1, x);
+                    if (otherIdx > 0) {
+                        if(otherIdx > curIdx) {
+                            labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
+                        } else if(otherIdx < curIdx) {
+                            labelLUT.insert(std::pair<int, int> {curIdx, otherIdx});
                         }
                     }
                 }
 
-                // Check left and right border
-                for (uint y = yMin; y < yMax; ++y) {
-                    if (result.at<int>(y, xMin) > 0 && xMin - 1 >= 0) {
-                        if (result.at<int>(y, xMin - 1) > 0 && result.at<int>(y, xMin) != result.at<int>(y, xMin - 1)) {
-                            minVal = fmin(result.at<int>(y, xMin),result.at<int>(y, xMin - 1));
-                            result.setTo(minVal, result == result.at<int>(y, xMin));
-                            result.setTo(minVal, result == result.at<int>(y, xMin - 1));
-                            somethingDidChange = true;
+                curIdx = image.at<int>(yMax, x);
+                if (curIdx > 0 && yMax + 1 < image.rows) {
+                    otherIdx = image.at<int>(yMax + 1, x);
+                    if (otherIdx > 0) {
+                        if(otherIdx > curIdx) {
+                            labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
+                        } else if(otherIdx < curIdx) {
+                            labelLUT.insert(std::pair<int, int> {curIdx, otherIdx});
                         }
                     }
+                }
+            }
 
-                    if (result.at<int>(y, xMax) > 0 && xMax + 1 < result.cols) {
-                        if (result.at<int>(y, xMax+1) > 0 && result.at<int>(y, xMax+1) != result.at<int>(y, xMax)) {
-                            minVal = fmin(result.at<int>(y, xMax), result.at<int>(y, xMax+1));
-                            result.setTo(minVal, result == result.at<int>(y, xMax));
-                            result.setTo(minVal, result == result.at<int>(y, xMax+1));
-                            somethingDidChange = true;
+            // Check left and right border
+            for (uint y = yMin; y < yMax; ++y) {
+                curIdx = image.at<int>(y, xMin);
+                if (curIdx > 0 && xMin - 1 >= 0) {
+                    otherIdx = image.at<int>(y, xMin - 1);
+                    if (otherIdx > 0) {
+                        if(otherIdx > curIdx) {
+                            labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
+                        } else if(otherIdx < curIdx) {
+                            labelLUT.insert(std::pair<int, int> {curIdx, otherIdx});
+                        }
+                    }
+                }
+
+                curIdx = image.at<int>(y, xMax);
+                if (curIdx > 0 && xMax + 1 < image.cols) {
+                    otherIdx = image.at<int>(y, xMax + 1);
+                    if (otherIdx > 0) {
+                        if(otherIdx > curIdx) {
+                            labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
+                        } else if(otherIdx < curIdx) {
+                            labelLUT.insert(std::pair<int, int> {curIdx, otherIdx});
+                        }
+                    }
+                }
+            }
+        }
+
+        if(!labelLUT.empty()) {
+            // Reduce the number of iterations within the LUT
+            bool lutChanged = true;
+            while (lutChanged) {
+                lutChanged = false;
+                std::cout << "Iteration" << std::endl;
+                auto newLabelLut = std::set(labelLUT.begin(), labelLUT.end());
+
+                for (auto pair = labelLUT.begin(); pair != labelLUT.end(); ++pair) {
+                    for (std::pair<int, int> comparator : labelLUT) {
+                        if(pair->second == comparator.first) {
+                            newLabelLut.erase(*pair);
+                            newLabelLut.insert(std::pair<int, int> {pair->first, comparator.second});
+                            lutChanged = true;
+                        }
+                    }
+                }
+
+                labelLUT = newLabelLut;
+            }
+
+            // Apply LUT
+            #pragma omp parallel for schedule(guided)
+            for(int x = 0; x < image.cols; ++x) {
+                for(int y = 0; y < image.rows; ++y) {
+                    if(image.at<int>(y, x) > 0) {
+                        for (std::pair<int, int> pair : labelLUT) {
+                            if(image.at<int>(y, x) == pair.first) {
+                                image.at<int>(y, x) = pair.second;
+                            }
                         }
                     }
                 }
             }
         }
     }
-    return result;
 }
 
 std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &connectedComponentsImage) {
