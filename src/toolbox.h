@@ -30,6 +30,7 @@
 #include <omp.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <set>
 #include <vector>
 
 /// Minimum number of bins used for the calculation of tRet() and tTra()
@@ -156,6 +157,16 @@ namespace PLImg {
              * @return OpenCV matrix with the resulting labels of the input image
              */
             cv::Mat connectedComponents (const cv::Mat& image);
+            /**
+             * If the original image is too large for the connected component algorithm on the GPU the image will be
+             * split into chunks to allow the execution. However, labels on the edges of the chunks might be
+             * wrong because they are split due to the chunk choice. This method fixes the wrong labels by checking
+             * border regions for labels on both sides and creating a lookup table to fix those labels.
+             * The input image itself will be altered in this operation. Please keep this in mind.
+             * @param image Chunked image which contains possible wrong labeling
+             * @param numberOfChunks Number of chunks which were used to generate the image.
+             */
+            void connectedComponentsMergeChunks(cv::Mat& image, int numberOfChunks);
             /**
              * connectedComponents (const cv::Mat& image) will return a labeled image which can be further analyzed.
              * This functions allows to find the largest region and will return a mask of it in combination with its
