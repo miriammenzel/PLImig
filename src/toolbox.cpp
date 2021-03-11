@@ -542,36 +542,27 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
 
     // If more than one label is present, continue to find the largest component
     if(numLabels > 1) {
-        std::vector<int> hist(numLabels + 1, 0);
-
-        #pragma omp parallel
-        {
-            std::vector<int> threadHist(numLabels + 1, 0);
-            int start = connectedComponentsImage.cols / omp_get_num_threads() * omp_get_thread_num();
-            int end = fmin(connectedComponentsImage.cols, connectedComponentsImage.cols / omp_get_num_threads() * (omp_get_thread_num() + 1));
-
-            for (int x = start; x < end; ++x) {
-                for (int y = 0; y < connectedComponentsImage.rows; ++y) {
-                    ++hist.at(connectedComponentsImage.at<int>(y, x));
-                }
-            }
-
-            #pragma omp critical
-            for(int index = 0; index < hist.size(); ++index) {
-                hist.at(index) += threadHist.at(index);
-            }
-        };
+        cv::Mat hist;
+        cv::Mat convertedImage;
+        connectedComponentsImage.convertTo(convertedImage, CV_32FC1);
+        // Generate histogram for potential correction of tMin for tTra
+        int channels[] = {0};
+        float histBounds[] = {0, numLabels + 1.0f};
+        const float* histRange = { histBounds };
+        int histSize = MAX_NUMBER_OF_BINS;
+        cv::calcHist(&convertedImage, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange);
+        convertedImage.release();
 
         // Create vector of maxima to get the maximum of maxima
         std::vector<std::pair<int, int>> threadMaxLabels(numThreads);
         #pragma omp parallel private(maxLabel)
         {
             uint myThread = omp_get_thread_num();
-            uint numElements = hist.end() - hist.begin() - 1;
+            uint numElements = hist.end<float>() - hist.begin<float>() - 1;
             uint myStart = numElements / numThreads * myThread;
             uint myEnd = fmin(numElements, numElements / numThreads * (myThread + 1));
-            maxLabel = std::distance(hist.begin(), std::max_element(hist.begin() + 1 + myStart, hist.begin() + 1 + myEnd));
-            std::pair<int, int> myMaxLabel = std::pair<int, int>(maxLabel, hist.at(maxLabel));
+            maxLabel = std::distance(hist.begin<float>(), std::max_element(hist.begin<float>() + 1 + myStart, hist.begin<float>() + 1 + myEnd));
+            std::pair<int, int> myMaxLabel = std::pair<int, int>(maxLabel, hist.at<float>(maxLabel));
             threadMaxLabels.at(myThread) = myMaxLabel;
         }
 
@@ -582,7 +573,7 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
             }
         }
         maxLabel = threadMaxLabels.at(maxLabel).first;
-        return std::pair<cv::Mat, int>(connectedComponentsImage == maxLabel, hist.at(maxLabel));
+        return std::pair<cv::Mat, int>(connectedComponentsImage == maxLabel, hist.at<float>(maxLabel));
     } else if(numLabels == 1){
         return std::pair<cv::Mat, int>(connectedComponentsImage == 1, cv::countNonZero(connectedComponentsImage));
     } else {
