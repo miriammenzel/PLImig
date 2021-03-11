@@ -549,7 +549,7 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
         int channels[] = {0};
         float histBounds[] = {0, numLabels + 1.0f};
         const float* histRange = { histBounds };
-        int histSize = MAX_NUMBER_OF_BINS;
+        int histSize = numLabels + 1;
         cv::calcHist(&convertedImage, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange);
         convertedImage.release();
 
