@@ -63,25 +63,27 @@ void PLImg::HDF5Writer::write_type_attribute(const std::string& dataset, const s
     H5::Attribute attr;
     H5::DataSpace space(1, dims);
     std::string path_appendix;
-    if(m_hdf5file.exists(dataset)) {
+    try {
+        H5::Group grp = m_hdf5file.openGroup(dataset);
+        if (!grp.attrExists(parameter_name)) {
+            attr = grp.createAttribute(parameter_name, type, space);
+        } else {
+            attr = grp.openAttribute(parameter_name);
+        }
+    } catch(H5::FileIException& exception) {
         try {
-            H5::Group grp = m_hdf5file.openGroup(dataset);
-            if (!grp.attrExists(parameter_name)) {
-                attr = grp.createAttribute(parameter_name, type, space);
-            } else {
-                attr = grp.openAttribute(parameter_name);
-            }
-        } catch(H5::FileIException& exception) {
             H5::DataSet dset = m_hdf5file.openDataSet(dataset);
             if (!dset.attrExists(parameter_name)) {
                 attr = dset.createAttribute(parameter_name, type, space);
             } else {
                 attr = dset.openAttribute(parameter_name);
             }
+        } catch(H5::FileIException& exception) {
+            return;
         }
-        attr.write(type, value);
-        attr.close();
     }
+    attr.write(type, value);
+    attr.close();
 }
 
 void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat& image) {
