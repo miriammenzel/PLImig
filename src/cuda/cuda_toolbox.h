@@ -27,6 +27,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include "define.h"
 #include <driver_types.h>
 #include <iostream>
 #include <memory>

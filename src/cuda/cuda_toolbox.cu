@@ -132,20 +132,12 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
     // Expand borders of input image inplace to ensure that the median algorithm can run correcly
     cv::copyMakeBorder(*image, *image, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
 
-    // Error objects
-    cudaError_t err;
-
     // The image might be too large to be saved completely in the video memory.
     // Therefore chunks will be used if the amount of memory is too small.
     uint numberOfChunks = 1;
     // Check the free video memory
     ulong freeMem;
-    err = cudaMemGetInfo(&freeMem, nullptr);
-    if(err != cudaSuccess) {
-        std::cerr << "Could not get free memory! \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
+    CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
     // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
     // with the power of four (1, 4, 16, 256, 1024, ...)
     if(double(image->total()) * image->elemSize() * 2.1 > double(freeMem)) {
@@ -185,31 +177,16 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
         cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
 
         // Allocate GPU memory for the original image and its result
-        err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
-        if (err != cudaSuccess) {
-            std::cerr << "Could not allocate enough memory for original transmittance \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize()));
         // Length of columns
         nSrcStep = subImage.cols;
 
-        err = cudaMalloc((void **) &deviceResult, subImage.total() * subImage.elemSize());
-        if (err != cudaSuccess) {
-            std::cerr << "Could not allocate enough memory for resulting image \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMalloc((void **) &deviceResult, subImage.total() * subImage.elemSize()));
         // Length of columns
         nResStep = subResult.cols;
 
         // Copy image from CPU to GPU
-        err = cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice);
-        if (err != cudaSuccess) {
-            std::cerr << "Could not copy image from host to device \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice));
 
         // Apply median filter
         subImageDims = {subImage.cols, subImage.rows};
@@ -221,16 +198,12 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::s
                                                            subImageDims);
 
         // Copy result from GPU back to CPU
-        err = cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost);
-        if (err != cudaSuccess) {
-            std::cerr << "Could not copy image from device to host \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost));
 
         // Free reserved memory
-        cudaFree(deviceImage);
-        cudaFree(deviceResult);     
+        CHECK_CUDA(cudaFree(deviceImage));
+        CHECK_CUDA(cudaFree(deviceResult));
+        CHECK_CUDA(cudaDeviceSynchronize());
 
         // Calculate the range where the median filter was applied and where the chunk will be placed.
         cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, xMax - xMin, yMax - yMin);
@@ -253,20 +226,12 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const 
     cv::copyMakeBorder(*image, *image, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
     cv::copyMakeBorder(*mask, *mask, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
 
-    // Error objects
-    cudaError_t err;
-
     // The image might be too large to be saved completely in the video memory.
     // Therefore chunks will be used if the amount of memory is too small.
     uint numberOfChunks = 1;
     ulong freeMem;
     // Check the free video memory
-    err = cudaMemGetInfo(&freeMem, nullptr);
-    if(err != cudaSuccess) {
-        std::cerr << "Could not get free memory! \n";
-        std::cerr << cudaGetErrorName(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
+    CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
     // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
     // with the power of four (1, 4, 16, 256, 1024, ...)
     if(double(image->total()) * image->elemSize() * 3.1 > double(freeMem)) {
@@ -308,47 +273,21 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const 
         cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
 
         // Allocate GPU memory for the original image, mask and its result
-        err = cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize());
-        if (err != cudaSuccess) {
-            std::cerr << "Could not allocate enough memory for original transmittance \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize()));
         // Length of columns
         nSrcStep = subImage.cols;
 
-        err = cudaMalloc((void **) &deviceMask, subMask.total() * subMask.elemSize());
-        if (err != cudaSuccess) {
-            std::cerr << "Could not allocate enough memory for mask \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMalloc((void **) &deviceMask, subMask.total() * subMask.elemSize()));
         // Length of columns
         nMaskStep = subMask.cols;
 
-        err = cudaMalloc((void **) &deviceResult, subImage.total() * subImage.elemSize());
-        if (err != cudaSuccess) {
-            std::cerr << "Could not allocate enough memory for resulting image \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMalloc((void **) &deviceResult, subImage.total() * subImage.elemSize()));
         // Length of columns
         nResStep = subResult.cols;
 
         // Copy image from CPU to GPU
-        err = cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice);
-        if (err != cudaSuccess) {
-            std::cerr << "Could not copy image from host to device \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
-
-        err = cudaMemcpy(deviceMask, subMask.data, subMask.total() * subMask.elemSize(), cudaMemcpyHostToDevice);
-        if (err != cudaSuccess) {
-            std::cerr << "Could not copy mask from host to device \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(deviceMask, subMask.data, subMask.total() * subMask.elemSize(), cudaMemcpyHostToDevice));
 
         // Apply median filter
         subImageDims = {subImage.cols, subImage.rows};
@@ -360,17 +299,13 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilterMasked(const 
                                                                  deviceMask, nMaskStep,
                                                                  subImageDims);
 
-        err = cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost);
-        if (err != cudaSuccess) {
-            std::cerr << "Could not copy image from device to host \n";
-            std::cerr << cudaGetErrorName(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CHECK_CUDA(cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost));
 
         // Free reserved memory
-        cudaFree(deviceImage);
-        cudaFree(deviceResult);
-        cudaFree(deviceMask);
+        CHECK_CUDA(cudaFree(deviceImage));
+        CHECK_CUDA(cudaFree(deviceResult));
+        CHECK_CUDA(cudaFree(deviceMask));
+        CHECK_CUDA(cudaDeviceSynchronize());
 
         cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, subResult.cols - 2*MEDIAN_KERNEL_SIZE, subResult.rows - 2*MEDIAN_KERNEL_SIZE);
         cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);

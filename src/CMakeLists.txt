@@ -19,7 +19,8 @@ set(HEADER
         toolbox.h
         writer.h
         version.h
-        cuda/toolbox.cuh)
+        cuda/cuda_toolbox.h
+        cuda/define.h)
 
 # Generate executable file
 add_library(PLImig SHARED ${SOURCE})
