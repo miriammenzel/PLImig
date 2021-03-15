@@ -31,6 +31,8 @@
 #include <driver_types.h>
 #include <iostream>
 #include <memory>
+#include <thrust/device_vector.h>
+#include <thrust/unique.h>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
@@ -58,6 +60,10 @@ namespace PLImg::cuda::filters {
      */
     std::shared_ptr<cv::Mat> callCUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image,
                                                         const std::shared_ptr<cv::Mat>& mask);
+}
+
+namespace PLImg::cuda::labeling {
+    cv::Mat callCUDAConnectedComponents(const cv::Mat& image);
 }
 
 #endif //PLIMG_TOOLBOX_CUH

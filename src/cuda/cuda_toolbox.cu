@@ -123,7 +123,107 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
             result_image[x + y * result_image_stride] = 0;
         }
     }
+}
 
+__global__ void connectedComponentsInitializeMask(const int* image, int image_stride,
+                                                  uint* mask, int mask_stride,
+                                                  int line_width) {
+    // Calculate actual position in image based on thread number and block number
+    uint x = blockIdx.x * blockDim.x + threadIdx.x;
+    uint y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if(image[x + y * image_stride] > 0) {
+        mask[x + y * mask_stride] = y * line_width + x + 1;
+    } else {
+        mask[x + y * mask_stride] = 0;
+    }
+}
+
+__global__ void connectedComponentsIteration(uint* mask, int mask_stride, int2 maskDims, volatile bool* changeOccured) {
+    // Calculate actual position in image based on thread number and block number
+    uint x = blockIdx.x * blockDim.x + threadIdx.x;
+    uint y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    uint minVal;
+    if(mask[x + y * mask_stride] > 0) {
+        minVal = mask[x + y * mask_stride];
+
+        if(int(x - 1) >= 0 && mask[x-1 + y * mask_stride] > 0) {
+            minVal = min(minVal, mask[x-1 + y * mask_stride]);
+        }
+        if(int(x + 1) < maskDims.x && mask[x+1 + y * mask_stride] > 0) {
+            minVal = min(minVal, mask[x+1 + y * mask_stride]);
+        }
+        if(int(y - 1) >= 0 && mask[x + (y-1) * mask_stride] > 0) {
+            minVal = min(minVal, mask[x + (y-1) * mask_stride]);
+        }
+        if(int(y + 1) < maskDims.y && mask[x + (y+1) * mask_stride] > 0) {
+            minVal = min(minVal, mask[x + (y+1) * mask_stride]);
+        }
+
+        if(minVal != mask[x + y * mask_stride]) {
+            mask[x + y * mask_stride] = minVal;
+            *changeOccured = true;
+        }
+    }
+}
+
+__global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
+                                                    const uint* lutKeys,
+                                                    const uint lutSize) {
+    // Calculate actual position in image based on thread number and block number
+    uint x = blockIdx.x * blockDim.x + threadIdx.x;
+    uint y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    for (uint i = 0; i < lutSize; ++i) {
+        if(mask[x + y * mask_stride] == lutKeys[i]) {
+            mask[x + y * mask_stride] = i;
+            break;
+        }
+    }
+}
+
+cv::Mat PLImg::cuda::labeling::callCUDAConnectedComponents(const cv::Mat& image) {
+    cv::Mat result = cv::Mat(image.rows, image.cols, CV_32SC1);
+
+    int* deviceImage;
+    uint* deviceMask;
+    bool* deviceChangeOccured;
+    bool changeOccured;
+
+    CHECK_CUDA(cudaMalloc(&deviceImage, image.total() * sizeof(int)));
+    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * sizeof(int), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMalloc(&deviceMask, image.total() * sizeof(uint)));
+    CHECK_CUDA(cudaMalloc(&deviceChangeOccured, sizeof(bool)));
+
+    dim3 threadsPerBlock, numBlocks;
+    threadsPerBlock = dim3(1, 1);
+    numBlocks = dim3(ceil(float(image.cols) / threadsPerBlock.x), ceil(float(image.rows) / threadsPerBlock.y));
+
+    connectedComponentsInitializeMask<<<numBlocks, threadsPerBlock>>>(deviceImage, image.cols, deviceMask, image.cols, image.cols);
+    CHECK_CUDA(cudaFree(deviceImage));
+    do {
+        CHECK_CUDA(cudaMemset(deviceChangeOccured, false, sizeof(bool)));
+        connectedComponentsIteration<<<numBlocks, threadsPerBlock>>>(deviceMask, image.cols, {image.cols, image.rows},
+                                                                     deviceChangeOccured);
+        CHECK_CUDA(cudaMemcpy(&changeOccured, deviceChangeOccured, sizeof(bool), cudaMemcpyDeviceToHost));
+    } while(changeOccured);
+
+    uint* deviceUniqueMask;
+    CHECK_CUDA(cudaMalloc(&deviceUniqueMask, image.total() * sizeof(uint)));
+    CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, image.total() * sizeof(uint), cudaMemcpyDeviceToDevice));
+    thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + image.total());
+    uint* newEnd = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + image.total());
+
+    connectedComponentsReduceComponents<<<numBlocks, threadsPerBlock>>>(deviceMask, image.cols,
+                                                                        deviceUniqueMask,
+                                                                        thrust::distance(deviceUniqueMask, newEnd));
+
+    // Copy result from GPU back to CPU
+    CHECK_CUDA(cudaMemcpy(result.data, deviceMask, image.total() * sizeof(uint), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaFree(deviceMask));
+
+    return result;
 }
 
 std::shared_ptr<cv::Mat> PLImg::cuda::filters::callCUDAmedianFilter(const std::shared_ptr<cv::Mat>& image) {
