@@ -163,7 +163,7 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     while(int(front_bin_max) - int(front_bin_min) > 2) {
         cc_mask = (image > float(front_bin)/MAX_NUMBER_OF_BINS) & mask;
         if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
-            labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
+            labels = PLImg::cuda::labeling::callCUDAConnectedComponents(cc_mask);
             cc_mask.release();
             component = PLImg::cuda::labeling::largestComponent(labels);
             labels.release();

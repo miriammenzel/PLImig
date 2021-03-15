@@ -158,6 +158,35 @@ TEST(TestToolbox, TestMedianFilterMasked) {
     ASSERT_TRUE(true);
 }
 
+TEST(TestToolbox, TestConnectedComponents) {
+    cv::Mat exampleMask = (cv::Mat1s(7, 11) <<
+            1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0,
+            1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0,
+            0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1,
+            0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0,
+            1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1,
+            1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1,
+            0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1);
+    exampleMask.convertTo(exampleMask, CV_8UC1);
+
+    cv::Mat resultMask = (cv::Mat1s(7, 11) <<
+            1, 1, 1, 0, 0, 0, 2, 0, 3, 3, 0,
+            1, 0, 0, 0, 4, 0, 2, 2, 0, 0, 0,
+            0, 0, 4, 4, 4, 0, 2, 0, 5, 5, 5,
+            0, 0, 4, 4, 4, 0, 2, 0, 0, 0, 0,
+            6, 0, 0, 0, 0, 0, 2, 0, 7, 0, 7,
+            6, 6, 6, 6, 6, 0, 0, 0, 7, 7, 7,
+            0, 0, 6, 6, 6, 0, 0, 0, 7, 7, 7);
+    resultMask.convertTo(resultMask, CV_32SC1);
+    cv::Mat result = PLImg::cuda::labeling::callCUDAConnectedComponents(exampleMask);
+
+    for(uint x = 0; x < resultMask.cols; ++x) {
+        for(uint y = 0; y < resultMask.rows; ++y) {
+            EXPECT_EQ(result.at<int>(y, x), resultMask.at<int>(y, x)) << x << "," << y;
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
