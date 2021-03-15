@@ -149,7 +149,7 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
 
     uint front_bin = hist.rows - 1;
     uint pixelSum = 0;
-    while(pixelSum < 2 * pixelThreshold && front_bin > 0) {
+    while(pixelSum < 1.5 * pixelThreshold && front_bin > 0) {
         pixelSum += uint(hist.at<float>(front_bin));
         --front_bin;
     }
@@ -163,12 +163,12 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     while(int(front_bin_max) - int(front_bin_min) > 2) {
         cc_mask = (image > float(front_bin)/MAX_NUMBER_OF_BINS) & mask;
         if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
-            labels = PLImg::cuda::labeling::callCUDAConnectedComponents(cc_mask);
+            labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
             cc_mask.release();
             component = PLImg::cuda::labeling::largestComponent(labels);
             labels.release();
 
-            std::cout << component.second << " " << pixelThreshold << std::endl;
+            std::cout << "Area size = " << component.second << ", Threshold range is: " << pixelThreshold * 0.9 << " -- " << pixelThreshold * 1.1 << std::endl;
 
             if (component.second < pixelThreshold * 0.9) {
                 front_bin_max = front_bin;
@@ -182,7 +182,7 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
         } else {
             front_bin = front_bin - 1;
         }
-        std::cout << "front bin = " << front_bin << std::endl;
+        std::cout << "Next front bin = " << front_bin << std::endl;
     }
     // No search result during the while loop
     if (component.first.empty()) {
@@ -196,10 +196,6 @@ bool PLImg::cuda::runCUDAchecks() {
     static bool didRunCudaChecks = false;
     if(!didRunCudaChecks) {
         printf("Checking if CUDA is running as expected.\n");
-
-        const NppLibraryVersion *libVer = nppGetLibVersion();
-        printf("NPP  Library Version: %d.%d.%d\n", libVer->major, libVer->minor,
-               libVer->build);
 
         int driverVersion, runtimeVersion;
         CHECK_CUDA(cudaDriverGetVersion(&driverVersion));
@@ -252,9 +248,9 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     cv::Mat result = cv::Mat(image.rows, image.cols, CV_32SC1);
 
     // Calculate the number of chunks for the Connected Components algorithm
-    Npp32u numberOfChunks = 1;
-    Npp32u chunksPerDim;
-    Npp32f predictedMemoryUsage = float(image.total()) * float(image.elemSize()) + 2 * float(image.total()) * float(sizeof(Npp32u))
+    unsigned numberOfChunks = 1;
+    unsigned chunksPerDim;
+    float predictedMemoryUsage = float(image.total()) * float(image.elemSize()) + 2 * float(image.total()) * float(sizeof(uint))
                                     + float(size_t(image.rows) * size_t(image.cols) * 9);
     if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
@@ -263,18 +259,14 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
 
     // Chunked connected components algorithm.
     // Labels right on the edges will be wrong. This will be fixed in the next step.
-    Npp32u *deviceResult;
-    Npp8u *deviceBuffer, *deviceImage;
-    Npp32s nSrcStep, nDstStep, pSrcOffset, pDstOffset;
-    NppiSize roi;
-    Npp32s xMin, xMax, yMin, yMax;
+    int xMin, xMax, yMin, yMax;
 
     cv::Mat subImage, subResult, subMask, croppedImage;
-    Npp32s nextLabelNumber = 0;
-    Npp32s maxLabelNumber = 0;
+    uint nextLabelNumber = 0;
+    uint maxLabelNumber = 0;
 
-    for (Npp32u it = 0; it < numberOfChunks; ++it) {
-        //std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
+    for (uint it = 0; it < numberOfChunks; ++it) {
+        std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
         std::flush(std::cout);
         // Calculate image boarders
         xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
@@ -291,38 +283,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         cv::copyMakeBorder(subImage, subImage, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
         cv::copyMakeBorder(subResult, subResult, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
 
-        // Reserve memory on GPU for image and result image
-        // Image
-        CHECK_CUDA(cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize()));
-        // Length of columns
-        nSrcStep = sizeof(Npp8u) * subImage.cols;
-
-        // Result
-        CHECK_CUDA(cudaMalloc((void **) &deviceResult, subImage.total() * sizeof(Npp32u)));
-        // Length of columns
-        nDstStep = sizeof(Npp32u) * subImage.cols;
-
-        // Copy image from CPU to GPU
-        CHECK_CUDA(cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(),
-                         cudaMemcpyHostToDevice));
-
-        roi = {subImage.cols - 2, subImage.rows - 2};
-        // Calculate offsets for image and result. Starting at the edge would result in errors because we would
-        // go out of bounds.
-        pSrcOffset = 1 + 1 * nSrcStep / sizeof(Npp8u);
-        pDstOffset = 1 + 1 * nDstStep / sizeof(Npp32u);
-
-        CHECK_CUDA(cudaMalloc((void **) &deviceBuffer, size_t(roi.width) * size_t(roi.height) * 9));
-        CHECK_NPP(nppiLabelMarkersUF_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset,
-                                               nDstStep, roi, nppiNormInf, deviceBuffer));
-
-        CHECK_CUDA(cudaFree(deviceImage));
-        CHECK_NPP(nppiCompressMarkerLabels_32u_C1IR(deviceResult + pDstOffset, nDstStep, roi,
-                                                       roi.height * roi.width, &maxLabelNumber, deviceBuffer));
-
-        // Copy the result back to the CPU
-        CHECK_CUDA(cudaMemcpy(subResult.data, deviceResult, subImage.total() * sizeof(Npp32u), cudaMemcpyDeviceToHost));
-        CHECK_CUDA(cudaDeviceSynchronize());
+        subResult = PLImg::cuda::labeling::callCUDAConnectedComponents(subImage, &maxLabelNumber);
 
         // Increase label number according to the previous chunk. Set background back to 0
         subMask = subResult == 0;
@@ -330,16 +291,11 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         subResult.setTo(0, subMask);
         nextLabelNumber = nextLabelNumber + maxLabelNumber;
 
-        // Free reserved memory
-        CHECK_CUDA(cudaFree(deviceResult));
-        CHECK_CUDA(cudaFree(deviceBuffer));
-        CHECK_CUDA(cudaDeviceSynchronize());
-
         cv::Rect srcRect = cv::Rect(1, 1, subResult.cols - 2, subResult.rows - 2);
         cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
         subResult(srcRect).copyTo(result(dstRect));
     }
-    std::cout << nextLabelNumber << std::endl;
+    std::cout << "\nNumber of labels: " << nextLabelNumber << std::endl;
 
     // Set values of our result labeling to 0 if those originally were caused by the background.
     // Sometimes NPP still does use those pixels for the labeling with connected components.

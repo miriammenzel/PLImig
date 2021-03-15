@@ -159,6 +159,7 @@ TEST(TestToolbox, TestMedianFilterMasked) {
 }
 
 TEST(TestToolbox, TestConnectedComponents) {
+    uint maxNumber;
     cv::Mat exampleMask = (cv::Mat1s(7, 11) <<
             1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0,
             1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0,
@@ -178,13 +179,14 @@ TEST(TestToolbox, TestConnectedComponents) {
             6, 6, 6, 6, 6, 0, 0, 0, 7, 7, 7,
             0, 0, 6, 6, 6, 0, 0, 0, 7, 7, 7);
     resultMask.convertTo(resultMask, CV_32SC1);
-    cv::Mat result = PLImg::cuda::labeling::callCUDAConnectedComponents(exampleMask);
+    cv::Mat result = PLImg::cuda::labeling::callCUDAConnectedComponents(exampleMask, &maxNumber);
 
     for(uint x = 0; x < resultMask.cols; ++x) {
         for(uint y = 0; y < resultMask.rows; ++y) {
-            EXPECT_EQ(result.at<int>(y, x), resultMask.at<int>(y, x)) << x << "," << y;
+            ASSERT_EQ(result.at<int>(y, x), resultMask.at<int>(y, x)) << x << "," << y;
         }
     }
+    ASSERT_EQ(maxNumber, 7);
 }
 
 int main(int argc, char** argv) {

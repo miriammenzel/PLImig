@@ -63,7 +63,7 @@ namespace PLImg::cuda::filters {
 }
 
 namespace PLImg::cuda::labeling {
-    cv::Mat callCUDAConnectedComponents(const cv::Mat& image);
+    cv::Mat callCUDAConnectedComponents(const cv::Mat& image, uint* maxLabelNumber);
 }
 
 #endif //PLIMG_TOOLBOX_CUH

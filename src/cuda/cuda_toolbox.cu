@@ -183,49 +183,70 @@ __global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
     }
 }
 
-cv::Mat PLImg::cuda::labeling::callCUDAConnectedComponents(const cv::Mat& image) {
-    cv::Mat result = cv::Mat(image.rows, image.cols, CV_32SC1);
+cv::Mat PLImg::cuda::labeling::callCUDAConnectedComponents(const cv::Mat& image, uint* maxLabelNumber) {
+    // Prepare image for CUDA kernel
+    cv::Mat kernelImage;
+    // 1. Convert it to 8 bit unsigned integer values
+    image.convertTo(kernelImage, CV_8UC1);
+    // 2. Check if the image needs padding to allow the execution of our CUDA kernel
+    uint heightPadding = CUDA_KERNEL_NUM_THREADS - kernelImage.rows % CUDA_KERNEL_NUM_THREADS;
+    uint widthPadding = CUDA_KERNEL_NUM_THREADS - kernelImage.cols % CUDA_KERNEL_NUM_THREADS;
+    cv::copyMakeBorder(kernelImage, kernelImage, heightPadding, 0, widthPadding, 0, cv::BORDER_CONSTANT, 0);
+
+    // Create output resulting image for our needs
+    cv::Mat result = cv::Mat(kernelImage.rows, kernelImage.cols, CV_32SC1);
 
     uchar* deviceImage;
     uint* deviceMask;
     bool* deviceChangeOccured;
     bool changeOccured;
 
-    CHECK_CUDA(cudaMalloc(&deviceImage, image.total() * sizeof(uchar)));
-    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * sizeof(uchar), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMalloc(&deviceMask, image.total() * sizeof(uint)));
+    CHECK_CUDA(cudaMalloc(&deviceImage, kernelImage.total() * sizeof(uchar)));
+    CHECK_CUDA(cudaMemcpy(deviceImage, kernelImage.data, kernelImage.total() * sizeof(uchar), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMalloc(&deviceMask, kernelImage.total() * sizeof(uint)));
     CHECK_CUDA(cudaMalloc(&deviceChangeOccured, sizeof(bool)));
 
     dim3 threadsPerBlock, numBlocks;
-    threadsPerBlock = dim3(1, 1);
-    numBlocks = dim3(ceil(float(image.cols) / threadsPerBlock.x), ceil(float(image.rows) / threadsPerBlock.y));
+    threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
+    numBlocks = dim3(ceil(float(kernelImage.cols) / threadsPerBlock.x), ceil(float(kernelImage.rows) / threadsPerBlock.y));
 
-    connectedComponentsInitializeMask<<<numBlocks, threadsPerBlock>>>(deviceImage, image.cols, deviceMask, image.cols, image.cols);
+    std::cout << numBlocks.x * threadsPerBlock.x << " " << numBlocks.y * threadsPerBlock.y << std::endl;
+    std::cout << kernelImage.cols << " " << kernelImage.rows << std::endl;
+    std::cout << int(heightPadding) << " " << int(widthPadding) << std::endl;
+
+    connectedComponentsInitializeMask<<<numBlocks, threadsPerBlock>>>(deviceImage, kernelImage.cols, deviceMask, kernelImage.cols, kernelImage.cols);
     CHECK_CUDA(cudaFree(deviceImage));
-    uint i = 0;
     do {
-        std::cout << std::to_string(++i) + "th step..." << std::endl;
         CHECK_CUDA(cudaMemset(deviceChangeOccured, false, sizeof(bool)));
-        connectedComponentsIteration<<<numBlocks, threadsPerBlock>>>(deviceMask, image.cols, {image.cols, image.rows},
+        connectedComponentsIteration<<<numBlocks, threadsPerBlock>>>(deviceMask, kernelImage.cols, {kernelImage.cols, kernelImage.rows},
                                                                      deviceChangeOccured);
         CHECK_CUDA(cudaMemcpy(&changeOccured, deviceChangeOccured, sizeof(bool), cudaMemcpyDeviceToHost));
     } while(changeOccured);
     CHECK_CUDA(cudaFree(deviceChangeOccured));
 
     uint* deviceUniqueMask;
-    CHECK_CUDA(cudaMalloc(&deviceUniqueMask, image.total() * sizeof(uint)));
-    CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, image.total() * sizeof(uint), cudaMemcpyDeviceToDevice));
-    thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + image.total());
-    uint* newEnd = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + image.total());
+    CHECK_CUDA(cudaMalloc(&deviceUniqueMask, kernelImage.total() * sizeof(uint)));
+    CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToDevice));
+    thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
+    uint* deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
 
-    connectedComponentsReduceComponents<<<numBlocks, threadsPerBlock>>>(deviceMask, image.cols,
+    uint distance = thrust::distance(deviceUniqueMask, deviceMaxUniqueLabel);
+    connectedComponentsReduceComponents<<<numBlocks, threadsPerBlock>>>(deviceMask, kernelImage.cols,
                                                                         deviceUniqueMask,
-                                                                        thrust::distance(deviceUniqueMask, newEnd));
+                                                                        distance);
     CHECK_CUDA(cudaFree(deviceUniqueMask));
 
+    uint* deviceMaxLabel = thrust::max_element(thrust::device, deviceMask, deviceMask + kernelImage.total());
+    CHECK_CUDA(cudaMemcpy(maxLabelNumber, deviceMaxLabel, sizeof(uint), cudaMemcpyDeviceToHost));
+
     // Copy result from GPU back to CPU
-    CHECK_CUDA(cudaMemcpy(result.data, deviceMask, image.total() * sizeof(uint), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(result.data, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaFree(deviceMask));
+
+    CHECK_CUDA(cudaDeviceSynchronize());
+
+    cv::Mat croppedImage = cv::Mat(result, cv::Rect(widthPadding, heightPadding, result.cols - widthPadding, result.rows - heightPadding));
+    croppedImage.copyTo(result);
 
     return result;
 }
