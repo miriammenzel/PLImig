@@ -255,7 +255,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     Npp32u numberOfChunks = 1;
     Npp32u chunksPerDim;
     Npp32f predictedMemoryUsage = float(image.total()) * float(image.elemSize()) + 2 * float(image.total()) * float(sizeof(Npp32u))
-                                    + float(size_t(image.rows) * size_t(image.cols) * 12);
+                                    + float(size_t(image.rows) * size_t(image.cols) * 9);
     if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
@@ -312,14 +312,13 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         pSrcOffset = 1 + 1 * nSrcStep / sizeof(Npp8u);
         pDstOffset = 1 + 1 * nDstStep / sizeof(Npp32u);
 
-        CHECK_CUDA(cudaMalloc((void **) &deviceBuffer, size_t(roi.width) * size_t(roi.height) * 12));
-
+        CHECK_CUDA(cudaMalloc((void **) &deviceBuffer, size_t(roi.width) * size_t(roi.height) * 9));
         CHECK_NPP(nppiLabelMarkersUF_8u32u_C1R(deviceImage + pSrcOffset, nSrcStep, deviceResult + pDstOffset,
                                                nDstStep, roi, nppiNormInf, deviceBuffer));
 
         CHECK_CUDA(cudaFree(deviceImage));
-        CHECK_NPP(nppiCompressMarkerLabelsUF_32u_C1IR(deviceResult, roi.width * sizeof(Npp32u), roi,
-                                                    roi.height * roi.width, &maxLabelNumber, deviceBuffer));
+        CHECK_NPP(nppiCompressMarkerLabels_32u_C1IR(deviceResult + pDstOffset, nDstStep, roi,
+                                                       roi.height * roi.width, &maxLabelNumber, deviceBuffer));
 
         // Copy the result back to the CPU
         CHECK_CUDA(cudaMemcpy(subResult.data, deviceResult, subImage.total() * sizeof(Npp32u), cudaMemcpyDeviceToHost));
