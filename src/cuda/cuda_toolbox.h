@@ -27,6 +27,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include "cuda_kernels.h"
 #include "define.h"
 #include <driver_types.h>
 #include <iostream>
@@ -38,32 +39,34 @@
 
 /// Number of CUDA Kernel threads used for kernel execution
 #define CUDA_KERNEL_NUM_THREADS 32
-/// Fixed median kernel size
-#define MEDIAN_KERNEL_SIZE 10
 
 /**
  * @file
  * @brief PLImg::cuda::filters functions
  */
-namespace PLImg::cuda::filters {
-    /**
-     * @brief callCUDAmedianFilter
-     * @param image
-     * @return
-     */
-    std::shared_ptr<cv::Mat> callCUDAmedianFilter(const std::shared_ptr<cv::Mat>& image);
-    /**
-     * @brief callCUDAmedianFilterMasked
-     * @param image
-     * @param mask
-     * @return
-     */
-    std::shared_ptr<cv::Mat> callCUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image,
-                                                        const std::shared_ptr<cv::Mat>& mask);
-}
+namespace PLImg::cuda::raw {
+    namespace labeling {
+        cv::Mat CUDAConnectedComponents(const cv::Mat& image, uint* maxLabelNumber);
+    }
 
-namespace PLImg::cuda::labeling {
-    cv::Mat callCUDAConnectedComponents(const cv::Mat& image, uint* maxLabelNumber);
+    namespace filters {
+        /**
+         * @brief CUDAmedianFilter
+         * @param image
+         * @return
+         */
+        std::shared_ptr<cv::Mat> CUDAmedianFilter(const std::shared_ptr<cv::Mat>& image);
+        /**
+         * @brief CUDAmedianFilterMasked
+         * @param image
+         * @param mask
+         * @return
+         */
+        std::shared_ptr<cv::Mat> CUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image,
+                                                        const std::shared_ptr<cv::Mat>& mask);
+    }
+
+    cv::Mat CUDAhistogram(const cv::Mat& image, uint* minLabel, uint* maxLabel);
 }
 
 #endif //PLIMG_TOOLBOX_CUH

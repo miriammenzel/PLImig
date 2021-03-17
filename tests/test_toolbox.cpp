@@ -179,7 +179,7 @@ TEST(TestToolbox, TestConnectedComponents) {
             6, 6, 6, 6, 6, 0, 0, 0, 7, 7, 7,
             0, 0, 6, 6, 6, 0, 0, 0, 7, 7, 7);
     resultMask.convertTo(resultMask, CV_32SC1);
-    cv::Mat result = PLImg::cuda::labeling::callCUDAConnectedComponents(exampleMask, &maxNumber);
+    cv::Mat result = PLImg::cuda::raw::labeling::CUDAConnectedComponents(exampleMask, &maxNumber);
 
     for(uint x = 0; x < resultMask.cols; ++x) {
         for(uint y = 0; y < resultMask.rows; ++y) {

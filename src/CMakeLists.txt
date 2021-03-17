@@ -9,7 +9,8 @@ set(SOURCE
         toolbox.cpp
         writer.cpp
         version.cpp
-        cuda/cuda_toolbox.cu)
+        cuda/cuda_toolbox.cu
+        cuda/cuda_kernels.cu)
 
 # Set header files
 set(HEADER
@@ -20,6 +21,7 @@ set(HEADER
         writer.h
         version.h
         cuda/cuda_toolbox.h
+        cuda/cuda_kernels.h
         cuda/define.h)
 
 # Generate executable file
