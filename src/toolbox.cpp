@@ -147,7 +147,7 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     cv::Mat hist;
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
 
-    uint front_bin = hist.rows - 1;
+    uint front_bin = MAX_NUMBER_OF_BINS - 1;
     uint pixelSum = 0;
     while(pixelSum < 1.5 * pixelThreshold && front_bin > 0) {
         pixelSum += uint(hist.at<float>(front_bin));
@@ -160,7 +160,7 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     uint front_bin_max = front_bin;
     uint front_bin_min = 0;
 
-    while(int(front_bin_max) - int(front_bin_min) > 1) {
+    while(int(front_bin_max) - int(front_bin_min) > 1 && front_bin < MAX_NUMBER_OF_BINS) {
         cc_mask = (image > float(front_bin)/MAX_NUMBER_OF_BINS) & mask;
         if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
             labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
@@ -429,9 +429,9 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
     #pragma omp parallel private(maxLabel)
     {
         uint myThread = omp_get_thread_num();
-        uint numElements = hist.end<int>() - hist.begin<int>() - 1;
+        uint numElements = hist.total();
         uint myStart = numElements / numThreads * myThread;
-        uint myEnd = fmin(numElements, numElements / numThreads * (myThread + 1));
+        uint myEnd = fmin(numElements, ceil(float(numElements) / numThreads) * (myThread + 1));
         maxLabel = std::distance(hist.begin<int>(), std::max_element(hist.begin<int>() + 1 + myStart, hist.begin<int>() + 1 + myEnd));
         std::pair<int, int> myMaxLabel = std::pair<int, int>(maxLabel, hist.at<int>(maxLabel));
         threadMaxLabels.at(myThread) = myMaxLabel;

@@ -130,7 +130,7 @@ TEST(TestToolbox, TestImageRegionGrowing) {
         }
     }
 
-    cv::Mat mask = PLImg::Image::largestAreaConnectedComponents(test_retardation, cv::Mat(), 0.01);
+    cv::Mat mask = PLImg::Image::largestAreaConnectedComponents(test_retardation, cv::Mat());
     for(uint i = 11; i < 20; ++i) {
         for(uint j = 11; j < 15; ++j) {
             ASSERT_TRUE(mask.at<bool>(i, j));

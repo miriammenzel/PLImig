@@ -384,10 +384,10 @@ cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, uint *minLabel, ui
     cv::Mat hostHistogram(numBins, 1, CV_32SC1);
     if(numBins * sizeof(uint) < 49152) {
         histogramSharedMem<<<numBlocks, threadsPerBlock, numBins * sizeof(uint)>>>(deviceImage, image.cols, image.rows,
-                                                                                   deviceHistogram, *minLabel, *maxLabel);
+                                                                                   deviceHistogram, *minLabel, *maxLabel + 1);
     } else {
         histogram<<<numBlocks, threadsPerBlock>>>(deviceImage, image.cols, image.rows, deviceHistogram, *minLabel,
-                                                  *maxLabel);
+                                                  *maxLabel + 1);
     }
     CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaMemcpy(hostHistogram.data, deviceHistogram, numBins * sizeof(uint), cudaMemcpyDeviceToHost));
