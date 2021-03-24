@@ -171,15 +171,16 @@ TEST(TestToolbox, TestConnectedComponents) {
     exampleMask.convertTo(exampleMask, CV_8UC1);
 
     cv::Mat resultMask = (cv::Mat1s(7, 11) <<
-            1, 1, 1, 0, 0, 0, 2, 0, 3, 3, 0,
-            1, 0, 0, 0, 4, 0, 2, 2, 0, 0, 0,
-            0, 0, 4, 4, 4, 0, 2, 0, 5, 5, 5,
-            0, 0, 4, 4, 4, 0, 2, 0, 0, 0, 0,
-            6, 0, 0, 0, 0, 0, 2, 0, 7, 0, 7,
+            2, 2, 2, 0, 0, 0, 5, 0, 1, 1, 0,
+            2, 0, 0, 0, 4, 0, 5, 5, 0, 0, 0,
+            0, 0, 4, 4, 4, 0, 5, 0, 3, 3, 3,
+            0, 0, 4, 4, 4, 0, 5, 0, 0, 0, 0,
+            6, 0, 0, 0, 0, 0, 5, 0, 7, 0, 7,
             6, 6, 6, 6, 6, 0, 0, 0, 7, 7, 7,
             0, 0, 6, 6, 6, 0, 0, 0, 7, 7, 7);
     resultMask.convertTo(resultMask, CV_32SC1);
     cv::Mat result = PLImg::cuda::raw::labeling::CUDAConnectedComponents(exampleMask, &maxNumber);
+    cv::imwrite("output.tiff", result);
 
     for(uint x = 0; x < resultMask.cols; ++x) {
         for(uint y = 0; y < resultMask.rows; ++y) {
@@ -187,6 +188,37 @@ TEST(TestToolbox, TestConnectedComponents) {
         }
     }
     ASSERT_EQ(maxNumber, 7);
+}
+
+TEST(TestToolbox, TestConnectedComponentsUF) {
+    uint maxNumber;
+    cv::Mat exampleMask = (cv::Mat1s(7, 11) <<
+            1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0,
+            1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0,
+            0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1,
+            0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0,
+            1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1,
+            1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1,
+            0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1);
+    exampleMask.convertTo(exampleMask, CV_8UC1);
+
+    cv::Mat resultMask = (cv::Mat1s(7, 11) <<
+            1, 1, 1, 0, 0, 0, 2, 0, 2, 2, 0,
+            1, 0, 0, 0, 3, 0, 2, 2, 0, 0, 0,
+            0, 0, 3, 3, 3, 0, 2, 0, 2, 2, 2,
+            0, 0, 3, 3, 3, 0, 2, 0, 0, 0, 0,
+            4, 0, 0, 0, 0, 0, 2, 0, 5, 0, 5,
+            4, 4, 4, 4, 4, 0, 0, 0, 5, 5, 5,
+            0, 0, 4, 4, 4, 0, 0, 0, 5, 5, 5);
+    resultMask.convertTo(resultMask, CV_32SC1);
+    cv::Mat result = PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(exampleMask, &maxNumber);
+
+    for(uint x = 0; x < resultMask.cols; ++x) {
+        for(uint y = 0; y < resultMask.rows; ++y) {
+            ASSERT_EQ(result.at<int>(y, x), resultMask.at<int>(y, x)) << x << "," << y;
+        }
+    }
+    ASSERT_EQ(maxNumber, 6);
 }
 
 int main(int argc, char** argv) {
