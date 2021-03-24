@@ -51,10 +51,6 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponents(const cv::Mat& image
     threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
     numBlocks = dim3(ceil(float(kernelImage.cols) / threadsPerBlock.x), ceil(float(kernelImage.rows) / threadsPerBlock.y));
 
-    std::cout << numBlocks.x * threadsPerBlock.x << " " << numBlocks.y * threadsPerBlock.y << std::endl;
-    std::cout << kernelImage.cols << " " << kernelImage.rows << std::endl;
-    std::cout << int(heightPadding) << " " << int(widthPadding) << std::endl;
-
     connectedComponentsInitializeMask<<<numBlocks, threadsPerBlock>>>(deviceImage, kernelImage.cols, deviceMask, kernelImage.cols, kernelImage.cols);
     CHECK_CUDA(cudaFree(deviceImage));
     do {
@@ -85,6 +81,81 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponents(const cv::Mat& image
     CHECK_CUDA(cudaFree(deviceMask));
 
     CHECK_CUDA(cudaDeviceSynchronize());
+
+    cv::Mat croppedImage = cv::Mat(result, cv::Rect(widthPadding, heightPadding, result.cols - widthPadding, result.rows - heightPadding));
+    croppedImage.copyTo(result);
+
+    return result;
+}
+
+cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &image, uint *maxLabelNumber) {
+    // Prepare image for CUDA kernel
+    cv::Mat kernelImage;
+    // 1. Convert it to 8 bit unsigned integer values
+    image.convertTo(kernelImage, CV_8UC1);
+    // 2. Check if the image needs padding to allow the execution of our CUDA kernel
+    uint heightPadding = CUDA_KERNEL_NUM_THREADS - kernelImage.rows % CUDA_KERNEL_NUM_THREADS;
+    uint widthPadding = CUDA_KERNEL_NUM_THREADS - kernelImage.cols % CUDA_KERNEL_NUM_THREADS;
+    cv::copyMakeBorder(kernelImage, kernelImage, heightPadding, 0, widthPadding, 0, cv::BORDER_CONSTANT, 0);
+
+    // Create output resulting image for our needs
+    cv::Mat result = cv::Mat(kernelImage.rows, kernelImage.cols, CV_32SC1);
+    uint* deviceMask;
+
+    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
+    cudaArray* imageArray;
+    CHECK_CUDA(cudaMallocArray(&imageArray, &channelDesc, kernelImage.cols, kernelImage.rows));
+    CHECK_CUDA(cudaMemcpy2DToArray(imageArray, 0, 0, kernelImage.data, kernelImage.cols * sizeof(uchar), kernelImage.cols * sizeof(uchar), kernelImage.rows, cudaMemcpyHostToDevice));
+
+    // Step 1. Specify texture
+    struct cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = imageArray;
+    // Step 2. Specify texture object parameters
+    struct cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.addressMode[0] = cudaAddressModeClamp;
+    texDesc.addressMode[1] = cudaAddressModeClamp;
+    texDesc.filterMode = cudaFilterModePoint;
+    texDesc.readMode = cudaReadModeElementType;
+    texDesc.normalizedCoords = 0;
+
+    // Step 3: Create texture object
+    cudaTextureObject_t texObj = 0;
+    CHECK_CUDA(cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL));
+    CHECK_CUDA(cudaMalloc(&deviceMask, kernelImage.total() * sizeof(uint)));
+
+    // Define CUDA kernel parameters
+    dim3 threadsPerBlock, numBlocks;
+    threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
+    numBlocks = dim3(ceil(float(kernelImage.cols) / threadsPerBlock.x), ceil(float(kernelImage.rows) / threadsPerBlock.y));
+
+    // First step. Do local connected components on each block
+    connectedComponentsUFLocalMerge<<<numBlocks, threadsPerBlock>>>(texObj, kernelImage.cols, kernelImage.rows, deviceMask, kernelImage.cols);
+    CHECK_CUDA(cudaDeviceSynchronize());
+    // Second step. Fix lines between each block.
+    connectedComponentsUFGlobalMerge<<<numBlocks, threadsPerBlock>>>(texObj, kernelImage.cols, kernelImage.rows, deviceMask, kernelImage.cols);
+    CHECK_CUDA(cudaDeviceSynchronize());
+    // Third step. Fix paths which might be wrong after the global merge
+    connectedComponentsUFPathCompression<<<numBlocks, threadsPerBlock>>>(texObj, kernelImage.cols, kernelImage.rows, deviceMask, kernelImage.cols);
+    CHECK_CUDA(cudaDeviceSynchronize());
+    // Fourth step. Reduce label numbers to reasonable numbers.
+    uint* deviceUniqueMask;
+    CHECK_CUDA(cudaMalloc(&deviceUniqueMask, kernelImage.total() * sizeof(uint)));
+    CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToDevice));
+    thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
+    uint* deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
+    // Save the new maximum label as a return value for the user
+    uint distance = thrust::distance(deviceUniqueMask, deviceMaxUniqueLabel);
+    *maxLabelNumber = distance;
+    // Reduce numbers in label image to low numbers for following algorithms
+    connectedComponentsReduceComponents<<<numBlocks, threadsPerBlock>>>(deviceMask, kernelImage.cols,
+                                                                        deviceUniqueMask,
+                                                                        distance);
+    CHECK_CUDA(cudaDeviceSynchronize());
+    CHECK_CUDA(cudaMemcpy(result.data, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaFree(deviceMask));
 
     cv::Mat croppedImage = cv::Mat(result, cv::Rect(widthPadding, heightPadding, result.cols - widthPadding, result.rows - heightPadding));
     croppedImage.copyTo(result);
@@ -296,28 +367,32 @@ cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, uint *minLabel, ui
     CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * sizeof(uint), cudaMemcpyHostToDevice));
 
     uint* deviceMinLabel = nullptr;
-    uint *deviceMaxLabel = nullptr;
+    uint* deviceMaxLabel = nullptr;
     deviceMaxLabel = thrust::max_element(thrust::device, deviceImage, deviceImage + image.total());
     deviceMinLabel = thrust::min_element(thrust::device, deviceImage, deviceImage + image.total());
     CHECK_CUDA(cudaMemcpy(minLabel, deviceMinLabel, sizeof(uint), cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaMemcpy(maxLabel, deviceMaxLabel, sizeof(uint), cudaMemcpyDeviceToHost));
 
     std::cout << "Min Label = " << *minLabel << ", Max Label = " << *maxLabel << std::endl;
-    std::cout << (*maxLabel - *minLabel) << std::endl;
-
-    CHECK_CUDA(cudaMalloc(&deviceHistogram, (*maxLabel - *minLabel) * sizeof(uint)));
-    CHECK_CUDA(cudaMemset(deviceHistogram, 0, (*maxLabel - *minLabel) * sizeof(uint)));
+    uint numBins = *maxLabel - *minLabel + 1;
+    CHECK_CUDA(cudaMalloc(&deviceHistogram, numBins * sizeof(uint)));
+    CHECK_CUDA(cudaMemset(deviceHistogram, 0, numBins * sizeof(uint)));
 
     dim3 threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
     dim3 numBlocks = dim3(ceil(float(image.cols) / threadsPerBlock.x), ceil(float(image.rows) / threadsPerBlock.y));
 
-    histogram<<<numBlocks, threadsPerBlock>>>(deviceImage, image.cols, image.rows, deviceHistogram, *minLabel, *maxLabel);
-    CHECK_CUDA(cudaFree(deviceImage));
-
-    cv::Mat hostHistogram(*maxLabel - *minLabel, 1, CV_32SC1);
-
-    CHECK_CUDA(cudaMemcpy(hostHistogram.data, deviceHistogram, (*maxLabel - *minLabel) * sizeof(uint), cudaMemcpyDeviceToHost));
+    cv::Mat hostHistogram(numBins, 1, CV_32SC1);
+    if(numBins * sizeof(uint) < 49152) {
+        histogramSharedMem<<<numBlocks, threadsPerBlock, numBins * sizeof(uint)>>>(deviceImage, image.cols, image.rows,
+                                                                                   deviceHistogram, *minLabel, *maxLabel);
+    } else {
+        histogram<<<numBlocks, threadsPerBlock>>>(deviceImage, image.cols, image.rows, deviceHistogram, *minLabel,
+                                                  *maxLabel);
+    }
+    CHECK_CUDA(cudaDeviceSynchronize());
+    CHECK_CUDA(cudaMemcpy(hostHistogram.data, deviceHistogram, numBins * sizeof(uint), cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaFree(deviceHistogram));
+    CHECK_CUDA(cudaFree(deviceImage));
 
     return hostHistogram;
 }

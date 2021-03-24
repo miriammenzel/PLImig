@@ -37,9 +37,6 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
-/// Number of CUDA Kernel threads used for kernel execution
-#define CUDA_KERNEL_NUM_THREADS 32
-
 /**
  * @file
  * @brief PLImg::cuda::filters functions
@@ -47,6 +44,7 @@
 namespace PLImg::cuda::raw {
     namespace labeling {
         cv::Mat CUDAConnectedComponents(const cv::Mat& image, uint* maxLabelNumber);
+        cv::Mat CUDAConnectedComponentsUF(const cv::Mat& image, uint* maxLabelNumber);
     }
 
     namespace filters {

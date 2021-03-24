@@ -26,10 +26,14 @@
 #define PLIMIG_CUDA_KERNELS_H
 
 #include <cuda.h>
+#include <cassert>
 #include <cuda_runtime_api.h>
+#include <cstdio>
 
 /// Fixed median kernel size
 #define MEDIAN_KERNEL_SIZE 10
+/// Number of CUDA Kernel threads used for kernel execution
+#define CUDA_KERNEL_NUM_THREADS 32
 
 __device__ void shellSort(float* array, uint low, uint high);
 
@@ -42,16 +46,26 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
                                          const unsigned char* mask, int mask_stride,
                                          int2 imageDims);
 
+//// NEW CONNECTED COMPONENTS ALGORITHM
+__global__ void connectedComponentsUFLocalMerge(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
+                                                uint* labelMap, uint label_stride);
+__global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
+                                                uint* labelMap, uint label_stride);
+__global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
+                                                uint* labelMap, uint label_stride);
+__device__ void connectedComponentsUFUnion(uint* L, uint a, uint b);
+__device__ uint connectedComponentsUFFind(uint* L, uint index);
+
+//// OLD CONNECTED COMPONENTS ALGORITHM
 __global__ void connectedComponentsInitializeMask(const unsigned char* image, int image_stride,
                                                   uint* mask, int mask_stride,
                                                   int line_width);
-
 __global__ void connectedComponentsIteration(uint* mask, int mask_stride, int2 maskDims, volatile bool* changeOccured);
-
 __global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
                                                     const uint* lutKeys,
                                                     uint lutSize);
 
 __global__ void histogram(uint* image, int image_width, int image_height, uint* histogram, uint min, uint max);
+__global__ void histogramSharedMem(uint* image, int image_width, int image_height, uint* histogram, uint min, uint max);
 
 #endif //PLIMIG_CUDA_KERNELS_H

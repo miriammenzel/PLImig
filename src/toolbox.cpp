@@ -160,7 +160,7 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     uint front_bin_max = front_bin;
     uint front_bin_min = 0;
 
-    while(int(front_bin_max) - int(front_bin_min) > 2) {
+    while(int(front_bin_max) - int(front_bin_min) > 1) {
         cc_mask = (image > float(front_bin)/MAX_NUMBER_OF_BINS) & mask;
         if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
             labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
@@ -250,8 +250,8 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     // Calculate the number of chunks for the Connected Components algorithm
     unsigned numberOfChunks = 1;
     unsigned chunksPerDim;
-    float predictedMemoryUsage = float(image.total()) * float(image.elemSize()) + 2 * float(image.total()) * float(sizeof(uint))
-                                    + float(size_t(image.rows) * size_t(image.cols) * 9);
+    float predictedMemoryUsage = float(image.total()) * sizeof(unsigned char) + 2.0f * image.total() * sizeof(uint) +
+            CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * (sizeof(uint) + sizeof(unsigned char));
     if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
@@ -283,7 +283,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
         cv::copyMakeBorder(subImage, subImage, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
         cv::copyMakeBorder(subResult, subResult, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
 
-        subResult = PLImg::cuda::raw::labeling::CUDAConnectedComponents(subImage, &maxLabelNumber);
+        subResult = PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(subImage, &maxLabelNumber);
 
         // Increase label number according to the previous chunk. Set background back to 0
         subMask = subResult == 0;
