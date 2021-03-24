@@ -31,6 +31,8 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <set>
+#include <thrust/device_vector.h>
+#include <thrust/unique.h>
 #include <vector>
 
 /// Minimum number of bins used for the calculation of tRet() and tTra()

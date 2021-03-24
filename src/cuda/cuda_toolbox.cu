@@ -79,7 +79,6 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponents(const cv::Mat& image
     // Copy result from GPU back to CPU
     CHECK_CUDA(cudaMemcpy(result.data, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaFree(deviceMask));
-
     CHECK_CUDA(cudaDeviceSynchronize());
 
     cv::Mat croppedImage = cv::Mat(result, cv::Rect(widthPadding, heightPadding, result.cols - widthPadding, result.rows - heightPadding));
@@ -140,6 +139,10 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
     // Third step. Fix paths which might be wrong after the global merge
     connectedComponentsUFPathCompression<<<numBlocks, threadsPerBlock>>>(texObj, kernelImage.cols, kernelImage.rows, deviceMask, kernelImage.cols);
     CHECK_CUDA(cudaDeviceSynchronize());
+
+    CHECK_CUDA(cudaDestroyTextureObject(texObj));
+    CHECK_CUDA(cudaFreeArray(imageArray));
+
     // Fourth step. Reduce label numbers to reasonable numbers.
     uint* deviceUniqueMask;
     CHECK_CUDA(cudaMalloc(&deviceUniqueMask, kernelImage.total() * sizeof(uint)));
@@ -154,6 +157,7 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
                                                                         deviceUniqueMask,
                                                                         distance);
     CHECK_CUDA(cudaDeviceSynchronize());
+    CHECK_CUDA(cudaFree(deviceUniqueMask));
     CHECK_CUDA(cudaMemcpy(result.data, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaFree(deviceMask));
 
@@ -359,22 +363,14 @@ std::shared_ptr<cv::Mat> PLImg::cuda::raw::filters::CUDAmedianFilterMasked(const
     return std::make_shared<cv::Mat>(result);
 }
 
-cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, uint *minLabel, uint *maxLabel) {
+cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, uint minLabel, uint maxLabel) {
     uint* deviceImage;
     uint* deviceHistogram;
 
     CHECK_CUDA(cudaMalloc(&deviceImage, image.total() * sizeof(uint)));
     CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * sizeof(uint), cudaMemcpyHostToDevice));
 
-    uint* deviceMinLabel = nullptr;
-    uint* deviceMaxLabel = nullptr;
-    deviceMaxLabel = thrust::max_element(thrust::device, deviceImage, deviceImage + image.total());
-    deviceMinLabel = thrust::min_element(thrust::device, deviceImage, deviceImage + image.total());
-    CHECK_CUDA(cudaMemcpy(minLabel, deviceMinLabel, sizeof(uint), cudaMemcpyDeviceToHost));
-    CHECK_CUDA(cudaMemcpy(maxLabel, deviceMaxLabel, sizeof(uint), cudaMemcpyDeviceToHost));
-
-    std::cout << "Min Label = " << *minLabel << ", Max Label = " << *maxLabel << std::endl;
-    uint numBins = *maxLabel - *minLabel + 1;
+    uint numBins = maxLabel - minLabel + 1;
     CHECK_CUDA(cudaMalloc(&deviceHistogram, numBins * sizeof(uint)));
     CHECK_CUDA(cudaMemset(deviceHistogram, 0, numBins * sizeof(uint)));
 
@@ -384,10 +380,10 @@ cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, uint *minLabel, ui
     cv::Mat hostHistogram(numBins, 1, CV_32SC1);
     if(numBins * sizeof(uint) < 49152) {
         histogramSharedMem<<<numBlocks, threadsPerBlock, numBins * sizeof(uint)>>>(deviceImage, image.cols, image.rows,
-                                                                                   deviceHistogram, *minLabel, *maxLabel + 1);
+                                                                                   deviceHistogram, minLabel, maxLabel + 1);
     } else {
-        histogram<<<numBlocks, threadsPerBlock>>>(deviceImage, image.cols, image.rows, deviceHistogram, *minLabel,
-                                                  *maxLabel + 1);
+        histogram<<<numBlocks, threadsPerBlock>>>(deviceImage, image.cols, image.rows, deviceHistogram, minLabel,
+                                                  maxLabel + 1);
     }
     CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaMemcpy(hostHistogram.data, deviceHistogram, numBins * sizeof(uint), cudaMemcpyDeviceToHost));

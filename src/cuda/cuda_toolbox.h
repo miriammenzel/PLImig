@@ -64,7 +64,8 @@ namespace PLImg::cuda::raw {
                                                         const std::shared_ptr<cv::Mat>& mask);
     }
 
-    cv::Mat CUDAhistogram(const cv::Mat& image, uint* minLabel, uint* maxLabel);
+    cv::Mat CUDAhistogram(const cv::Mat& image, uint minLabel, uint maxLabel);
 }
+
 
 #endif //PLIMG_TOOLBOX_CUH
