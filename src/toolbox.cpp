@@ -467,7 +467,7 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
     cv::minMaxIdx(connectedComponentsImage, &minLabel, &maxLabel);
     std::cout << "Min label = " << minLabel << ", Max label = " << maxLabel << std::endl;
 
-    cv::Mat hist = PLImg::cuda::histogram(connectedComponentsImage, minLabel, maxLabel, maxLabel - minLabel + 1);
+    cv::Mat hist = PLImg::cuda::histogram(connectedComponentsImage, minLabel, maxLabel + 1, maxLabel - minLabel + 1);
 
     // Create vector of maxima to get the maximum of maxima
     std::vector<std::pair<int, int>> threadMaxLabels(numThreads);
