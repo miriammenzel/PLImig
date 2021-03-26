@@ -363,14 +363,13 @@ std::shared_ptr<cv::Mat> PLImg::cuda::raw::filters::CUDAmedianFilterMasked(const
     return std::make_shared<cv::Mat>(result);
 }
 
-cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, uint minLabel, uint maxLabel) {
-    uint* deviceImage;
+cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, float minLabel, float maxLabel, uint numBins) {
+    float* deviceImage;
     uint* deviceHistogram;
 
-    CHECK_CUDA(cudaMalloc(&deviceImage, image.total() * sizeof(uint)));
-    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * sizeof(uint), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMalloc(&deviceImage, image.total() * sizeof(float)));
+    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * sizeof(float), cudaMemcpyHostToDevice));
 
-    uint numBins = maxLabel - minLabel + 1;
     CHECK_CUDA(cudaMalloc(&deviceHistogram, numBins * sizeof(uint)));
     CHECK_CUDA(cudaMemset(deviceHistogram, 0, numBins * sizeof(uint)));
 
@@ -379,11 +378,11 @@ cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, uint minLabel, uin
 
     cv::Mat hostHistogram(numBins, 1, CV_32SC1);
     if(numBins * sizeof(uint) < 49152) {
-        histogramSharedMem<<<numBlocks, threadsPerBlock, numBins * sizeof(uint)>>>(deviceImage, image.cols, image.rows,
-                                                                                   deviceHistogram, minLabel, maxLabel + 1);
+        histogramSharedMem<<<numBlocks, threadsPerBlock, numBins * sizeof(uint)>>>
+        (deviceImage, image.cols, image.rows, deviceHistogram, minLabel, maxLabel, numBins);
     } else {
-        histogram<<<numBlocks, threadsPerBlock>>>(deviceImage, image.cols, image.rows, deviceHistogram, minLabel,
-                                                  maxLabel + 1);
+        histogram<<<numBlocks, threadsPerBlock>>>
+        (deviceImage, image.cols, image.rows, deviceHistogram, minLabel, maxLabel, numBins);
     }
     CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaMemcpy(hostHistogram.data, deviceHistogram, numBins * sizeof(uint), cudaMemcpyDeviceToHost));

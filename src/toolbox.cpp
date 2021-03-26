@@ -231,6 +231,46 @@ ulong PLImg::cuda::getTotalMemory() {
     return total;
 }
 
+cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLabel, uint numBins) {
+    PLImg::cuda::runCUDAchecks();
+
+    cv::Mat histImage;
+    image.convertTo(histImage, CV_32FC1);
+    cv::Mat hist(numBins, 1, CV_32SC1);
+    hist.setTo(0);
+
+    // Calculate the number of chunks for the Connected Components algorithm
+    unsigned numberOfChunks = 1;
+    unsigned chunksPerDim;
+    float predictedMemoryUsage = float(CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * numBins +
+            histImage.total()) * sizeof(float);
+    if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
+        numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
+    }
+    chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
+
+    // Chunked connected components algorithm.
+    // Labels right on the edges will be wrong. This will be fixed in the next step.
+    int xMin, xMax, yMin, yMax;
+
+    cv::Mat subImage, croppedImage;
+    for (uint it = 0; it < numberOfChunks; ++it) {
+        // Calculate image boarders
+        xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
+        xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
+        yMin = (it / chunksPerDim) * image.rows / chunksPerDim;
+        yMax = fmin((it / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
+
+        croppedImage = cv::Mat(histImage, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subImage);
+        croppedImage.release();
+        cv::Mat subHist = PLImg::cuda::raw::CUDAhistogram(subImage, minLabel, maxLabel, numBins);
+        cv::add(hist, subHist, hist);
+    }
+
+    return hist;
+}
+
 std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_ptr<cv::Mat>& image) {
     PLImg::cuda::runCUDAchecks();
     return PLImg::cuda::raw::filters::CUDAmedianFilter(image);
@@ -416,6 +456,8 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
 }
 
 std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &connectedComponentsImage) {
+    PLImg::cuda::runCUDAchecks();
+
     // Get the number of threads for all following steps
     uint numThreads;
     #pragma omp parallel
@@ -424,39 +466,8 @@ std::pair<cv::Mat, int> PLImg::cuda::labeling::largestComponent(const cv::Mat &c
     double minLabel, maxLabel;
     cv::minMaxIdx(connectedComponentsImage, &minLabel, &maxLabel);
     std::cout << "Min label = " << minLabel << ", Max label = " << maxLabel << std::endl;
-    cv::Mat hist(maxLabel - minLabel + 1, 1, CV_32SC1);
-    hist.setTo(0);
 
-    // Calculate the number of chunks for the Connected Components algorithm
-    unsigned numberOfChunks = 1;
-    unsigned chunksPerDim;
-    float predictedMemoryUsage = float(CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * hist.total() +
-                                        connectedComponentsImage.total()) * sizeof(uint);
-    if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
-        numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
-    }
-    chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
-
-    // Chunked connected components algorithm.
-    // Labels right on the edges will be wrong. This will be fixed in the next step.
-    int xMin, xMax, yMin, yMax;
-
-    cv::Mat subImage, croppedImage;
-    for (uint it = 0; it < numberOfChunks; ++it) {
-        // Calculate image boarders
-        xMin = (it % chunksPerDim) * connectedComponentsImage.cols / chunksPerDim;
-        xMax = fmin((it % chunksPerDim + 1) * connectedComponentsImage.cols / chunksPerDim,
-                    connectedComponentsImage.cols);
-        yMin = (it / chunksPerDim) * connectedComponentsImage.rows / chunksPerDim;
-        yMax = fmin((it / chunksPerDim + 1) * connectedComponentsImage.rows / chunksPerDim,
-                    connectedComponentsImage.rows);
-
-        croppedImage = cv::Mat(connectedComponentsImage, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subImage);
-        croppedImage.release();
-        cv::Mat subHist = PLImg::cuda::raw::CUDAhistogram(subImage, minLabel, maxLabel);
-        cv::add(hist, subHist, hist);
-    }
+    cv::Mat hist = PLImg::cuda::histogram(connectedComponentsImage, minLabel, maxLabel, maxLabel - minLabel + 1);
 
     // Create vector of maxima to get the maximum of maxima
     std::vector<std::pair<int, int>> threadMaxLabels(numThreads);

@@ -122,6 +122,8 @@ namespace PLImg {
          */
         ulong getFreeMemory();
 
+        cv::Mat histogram(const cv::Mat& image, float minLabel, float maxLabel, uint numBins);
+
         namespace filters {
             /**
              * This method applies a circular median filter with a radius of 10 to the given image.

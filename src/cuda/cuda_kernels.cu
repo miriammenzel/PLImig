@@ -300,42 +300,43 @@ __global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTe
     }
 }
 
-
-__global__ void histogram(uint* image, int image_width, int image_height, uint* histogram, uint min, uint max) {
+__global__ void histogram(float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins) {
     // Calculate actual position in image based on thread number and block number
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
     const uint y = blockIdx.y * blockDim.y + threadIdx.y;
 
+    const float binWidth = (float(max) - float(min)) / float(numBins);
     if(x < image_width && y < image_height) {
-        uint pixelValue = image[x + y * image_width];
-        atomicAdd(&histogram[pixelValue - min], uint(1));
+        uint bin = floor(image[x + y * image_width] / binWidth);
+        atomicAdd(&histogram[bin], uint(1));
     }
 }
 
-__global__ void histogramSharedMem(uint* image, int image_width, int image_height, uint* histogram, uint min, uint max) {
+__global__ void histogramSharedMem(float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins) {
     // Calculate actual position in image based on thread number and block number
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
     const uint y = blockIdx.y * blockDim.y + threadIdx.y;
 
     const uint locId = threadIdx.y*blockDim.x+threadIdx.x;
+    const float binWidth = (float(max) - float(min)) / float(numBins);
 
     extern __shared__ uint localHistogram[];
     #pragma unroll
-    for(unsigned i = locId; i < max - min; i += blockDim.x * blockDim.y) {
+    for(unsigned i = locId; i < numBins; i += blockDim.x * blockDim.y) {
         localHistogram[i] = 0;
     }
 
     __syncthreads();
 
     if(x < image_width && y < image_height) {
-        uint pixelValue = image[x + y * image_width];
-        atomicAdd(&localHistogram[pixelValue - min], uint(1));
+        uint bin = image[x + y * image_width] / binWidth;
+        atomicAdd(&localHistogram[bin], uint(1));
     }
 
     __syncthreads();
 
     #pragma unroll
-    for(unsigned i = locId; i < max - min; i += blockDim.x * blockDim.y) {
+    for(unsigned i = locId; i < numBins; i += blockDim.x * blockDim.y) {
         atomicAdd(&histogram[i], localHistogram[i]);
     }
 }

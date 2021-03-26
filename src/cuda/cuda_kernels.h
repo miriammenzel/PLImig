@@ -65,7 +65,7 @@ __global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
                                                     const uint* lutKeys,
                                                     uint lutSize);
 
-__global__ void histogram(uint* image, int image_width, int image_height, uint* histogram, uint min, uint max);
-__global__ void histogramSharedMem(uint* image, int image_width, int image_height, uint* histogram, uint min, uint max);
+__global__ void histogram(float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins);
+__global__ void histogramSharedMem(float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins);
 
 #endif //PLIMIG_CUDA_KERNELS_H
