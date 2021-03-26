@@ -308,7 +308,9 @@ __global__ void histogram(float* image, int image_width, int image_height, uint*
     const float binWidth = (float(max) - float(min)) / float(numBins);
     if(x < image_width && y < image_height) {
         uint bin = floor(image[x + y * image_width] / binWidth);
-        atomicAdd(&histogram[bin], uint(1));
+        if(bin < numBins) {
+            atomicAdd(&histogram[bin], uint(1));
+        }
     }
 }
 
@@ -330,7 +332,9 @@ __global__ void histogramSharedMem(float* image, int image_width, int image_heig
 
     if(x < image_width && y < image_height) {
         uint bin = image[x + y * image_width] / binWidth;
-        atomicAdd(&localHistogram[bin], uint(1));
+        if(bin < numBins) {
+            atomicAdd(&localHistogram[bin], uint(1));
+        }
     }
 
     __syncthreads();
