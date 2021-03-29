@@ -54,7 +54,7 @@ __global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTextur
 __global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
                                                 uint* labelMap, uint label_stride);
 __device__ void connectedComponentsUFUnion(uint* L, uint a, uint b);
-__device__ uint connectedComponentsUFFind(uint* L, uint index);
+__device__ uint connectedComponentsUFFind(const uint* L, uint index);
 
 //// OLD CONNECTED COMPONENTS ALGORITHM
 __global__ void connectedComponentsInitializeMask(const unsigned char* image, int image_stride,
@@ -65,7 +65,7 @@ __global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
                                                     const uint* lutKeys,
                                                     uint lutSize);
 
-__global__ void histogram(float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins);
-__global__ void histogramSharedMem(float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins);
+__global__ void histogram(const float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins);
+__global__ void histogramSharedMem(const float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins);
 
 #endif //PLIMIG_CUDA_KERNELS_H

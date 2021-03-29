@@ -175,7 +175,7 @@ __global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
     }
 }
 
-__device__ uint connectedComponentsUFFind(uint* L, uint index) {
+__device__ uint connectedComponentsUFFind(const uint* L, uint index) {
     uint label = L[index];
     assert(label > 0);
     while (label - 1 != index) {
@@ -300,7 +300,7 @@ __global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTe
     }
 }
 
-__global__ void histogram(float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins) {
+__global__ void histogram(const float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins) {
     // Calculate actual position in image based on thread number and block number
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
     const uint y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -314,7 +314,7 @@ __global__ void histogram(float* image, int image_width, int image_height, uint*
     }
 }
 
-__global__ void histogramSharedMem(float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins) {
+__global__ void histogramSharedMem(const float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins) {
     // Calculate actual position in image based on thread number and block number
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
     const uint y = blockIdx.y * blockDim.y + threadIdx.y;
