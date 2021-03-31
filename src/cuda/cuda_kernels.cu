@@ -314,13 +314,13 @@ __global__ void histogram(const float* image, int image_width, int image_height,
     }
 }
 
-__global__ void histogramSharedMem(const float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins) {
+__global__ void histogramSharedMem(const float* image, int image_width, int image_height, uint* histogram, float minVal, float maxVal, uint numBins) {
     // Calculate actual position in image based on thread number and block number
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
     const uint y = blockIdx.y * blockDim.y + threadIdx.y;
 
     const uint locId = threadIdx.y*blockDim.x+threadIdx.x;
-    const float binWidth = (float(max) - float(min)) / float(numBins);
+    const float binWidth = (float(maxVal) - float(minVal)) / float(numBins);
 
     extern __shared__ uint localHistogram[];
     #pragma unroll
@@ -331,10 +331,8 @@ __global__ void histogramSharedMem(const float* image, int image_width, int imag
     __syncthreads();
 
     if(x < image_width && y < image_height) {
-        uint bin = image[x + y * image_width] / binWidth;
-        if(bin < numBins) {
-            atomicAdd(&localHistogram[bin], uint(1));
-        }
+        uint bin = min(uint(image[x + y * image_width] / binWidth), numBins - 1);
+        atomicAdd(&localHistogram[bin], uint(1));
     }
 
     __syncthreads();

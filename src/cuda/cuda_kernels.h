@@ -29,6 +29,7 @@
 #include <cassert>
 #include <cuda_runtime_api.h>
 #include <cstdio>
+#include <cmath>
 
 /// Fixed median kernel size
 #define MEDIAN_KERNEL_SIZE 10
@@ -66,6 +67,6 @@ __global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
                                                     uint lutSize);
 
 __global__ void histogram(const float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins);
-__global__ void histogramSharedMem(const float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins);
+__global__ void histogramSharedMem(const float* image, int image_width, int image_height, uint* histogram, float minVal, float maxVal, uint numBins);
 
 #endif //PLIMIG_CUDA_KERNELS_H

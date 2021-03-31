@@ -167,6 +167,9 @@ namespace PLImg {
         std::unique_ptr<float> m_tRet, m_tTra, m_tMin, m_tMax;
         std::shared_ptr<cv::Mat> m_grayMask, m_whiteMask;
         std::shared_ptr<cv::Mat> m_probabilityMask;
+
+        double m_minTransmittance, m_maxTransmittance;
+        double m_minRetardation, m_maxRetardation;
     };
 }
 

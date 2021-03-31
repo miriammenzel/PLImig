@@ -43,9 +43,12 @@ int PLImg::Histogram::peakWidth(cv::Mat hist, int peakPosition, float direction,
 float PLImg::Histogram::maxCurvature(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop) {
     float stepSize = (histHigh - histLow) / float(hist.rows);
     if(stop - start > 3) {
-        auto maxIterator = std::max_element(hist.begin<float>() + start, hist.begin<float>() + stop);
-        int maxPos = maxIterator - hist.begin<float>();
-        int width = fmax(1.0f, peakWidth(hist, maxPos, direction));
+        cv::Mat curvatureHist;
+        hist.convertTo(curvatureHist, CV_32FC1);
+
+        auto maxIterator = std::max_element(curvatureHist.begin<float>() + start, curvatureHist.begin<float>() + stop + 1);
+        int maxPos = maxIterator - curvatureHist.begin<float>();
+        int width = fmax(1.0f, peakWidth(curvatureHist, maxPos, direction));
 
         int roiStart, roiEnd;
         if(direction > 0) {
@@ -55,15 +58,15 @@ float PLImg::Histogram::maxCurvature(cv::Mat hist, float histLow, float histHigh
             roiStart = std::max(start, maxPos - 10 * width);
             roiEnd = maxPos;
         }
+
         cv::Mat kappa;
         if(roiEnd - roiStart > 3) {
             kappa = cv::Mat(roiEnd - roiStart, 1, CV_32FC1);
             float d1, d2;
-            #pragma omp parallel for private(d1, d2)
             for (int i = 1; i < kappa.rows - 1; ++i) {
-                d1 = (hist.at<float>(roiStart + i + 1) - hist.at<float>(roiStart + i)) / stepSize;
-                d2 = (hist.at<float>(roiStart + i + 1) - 2 * hist.at<float>(roiStart + i) +
-                      hist.at<float>(roiStart + i - 1)) / pow(stepSize, 2.0f);
+                d1 = (curvatureHist.at<float>(roiStart + i + 1) - curvatureHist.at<float>(roiStart + i)) / stepSize;
+                d2 = (curvatureHist.at<float>(roiStart + i + 1) - 2 * curvatureHist.at<float>(roiStart + i) +
+                        curvatureHist.at<float>(roiStart + i - 1)) / pow(stepSize, 2.0f);
                 kappa.at<float>(i) = d2 / pow(1 + pow(d1, 2.0f), 3.0f / 2.0f);
             }
         } else {
@@ -78,50 +81,52 @@ float PLImg::Histogram::maxCurvature(cv::Mat hist, float histLow, float histHigh
 }
 
 std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop, float minSignificance) {
+    cv::Mat peakHist;
+    hist.convertTo(peakHist, CV_32FC1);
     std::vector<unsigned> peaks;
 
     int posAhead;
     // find all peaks
     for(int pos = start + 1; pos < stop-1; ++pos) {
-        if(hist.at<int>(pos) - hist.at<int>(pos-1) > 0) {
+        if(peakHist.at<float>(pos) - peakHist.at<float>(pos-1) > 0) {
             posAhead = pos + 1;
 
-            while(posAhead < hist.rows && hist.at<int>(pos) == hist.at<int>(posAhead)) {
+            while(posAhead < hist.rows && peakHist.at<float>(pos) == peakHist.at<float>(posAhead)) {
                 ++posAhead;
             }
 
-            if(hist.at<int>(pos) - hist.at<int>(posAhead) > 0) {
+            if(peakHist.at<float>(pos) - peakHist.at<float>(posAhead) > 0) {
                 peaks.push_back((pos + posAhead - 1) / 2);
             }
         }
     }
 
-    float maxElem = *std::max_element(hist.begin<float>(), hist.end<float>());
+    float maxElem = *std::max_element(peakHist.begin<float>() + start, peakHist.begin<float>() + stop);
 
     // filter peaks by prominence
     for(int i = peaks.size()-1; i >= 0; --i) {
-        float left_min = hist.at<float>(peaks.at(i));
+        float left_min = peakHist.at<float>(peaks.at(i));
         if(left_min == maxElem) {
             continue;
         }
         int left_i = peaks.at(i) - 1;
-        while(left_i > 0 && hist.at<float>(left_i) <= hist.at<float>(peaks.at(i))) {
-            if(hist.at<float>(left_i) < left_min) {
-                left_min = hist.at<float>(left_i);
+        while(left_i > 0 && peakHist.at<float>(left_i) <= peakHist.at<float>(peaks.at(i))) {
+            if(peakHist.at<float>(left_i) < left_min) {
+                left_min = peakHist.at<float>(left_i);
             }
             --left_i;
         }
 
-        float right_min = hist.at<float>(peaks.at(i));
+        float right_min = peakHist.at<float>(peaks.at(i));
         int right_i = peaks.at(i) + 1;
-        while(right_i < hist.rows && hist.at<float>(right_i) <= hist.at<float>(peaks.at(i))) {
-            if(hist.at<float>(right_i) < right_min) {
-                right_min = hist.at<float>(right_i);
+        while(right_i < hist.rows && peakHist.at<float>(right_i) <= peakHist.at<float>(peaks.at(i))) {
+            if(peakHist.at<float>(right_i) < right_min) {
+                right_min = peakHist.at<float>(right_i);
             }
             ++right_i;
         }
 
-        float prominence = hist.at<float>(peaks.at(i)) - fmax(left_min, right_min);
+        float prominence = float(peakHist.at<float>(peaks.at(i)) - fmax(left_min, right_min)) / maxElem;
         if(prominence < minSignificance) {
             peaks.erase(peaks.begin() + i);
         }
@@ -139,18 +144,14 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
         pixelThreshold = float(cv::countNonZero(mask)) * percentPixels / 100;
     }
 
-    int channels[] = {0};
-    float histBounds[] = {0.0f, 1.0f};
-    const float* histRange = { histBounds };
-    int histSize = MAX_NUMBER_OF_BINS;
-
-    cv::Mat hist;
-    cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
+    double minVal, maxVal;
+    cv::minMaxIdx(image, &minVal, &maxVal);
+    cv::Mat hist = PLImg::cuda::histogram(image, minVal, maxVal, MAX_NUMBER_OF_BINS);
 
     uint front_bin = MAX_NUMBER_OF_BINS - 1;
     uint pixelSum = 0;
     while(pixelSum < 1.5 * pixelThreshold && front_bin > 0) {
-        pixelSum += uint(hist.at<float>(front_bin));
+        pixelSum += hist.at<int>(front_bin);
         --front_bin;
     }
 
@@ -161,26 +162,23 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     uint front_bin_min = 0;
 
     while(int(front_bin_max) - int(front_bin_min) > 1 && front_bin < MAX_NUMBER_OF_BINS) {
-        cc_mask = (image > float(front_bin)/MAX_NUMBER_OF_BINS) & mask;
-        if(float(cv::countNonZero(cc_mask)) > pixelThreshold) {
-            labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
-            cc_mask.release();
-            component = PLImg::cuda::labeling::largestComponent(labels);
-            labels.release();
+        float binVal = (maxVal - minVal) * float(front_bin)/MAX_NUMBER_OF_BINS + minVal;
+        cc_mask = (image > binVal) & mask;
+        labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
+        cc_mask.release();
+        component = PLImg::cuda::labeling::largestComponent(labels);
+        labels.release();
 
-            std::cout << "Area size = " << component.second << ", Threshold range is: " << pixelThreshold * 0.9 << " -- " << pixelThreshold * 1.1 << std::endl;
+        std::cout << "Area size = " << component.second << ", Threshold range is: " << pixelThreshold * 0.9 << " -- " << pixelThreshold * 1.1 << std::endl;
 
-            if (component.second < pixelThreshold * 0.9) {
-                front_bin_max = front_bin;
-                front_bin = fmin(front_bin - float(front_bin_max - front_bin_min) / 2, front_bin - 1);
-            } else if (component.second > pixelThreshold * 1.1) {
-                front_bin_min = front_bin;
-                front_bin = fmax(front_bin + 1, front_bin + float(front_bin_max - front_bin_min) / 2);
-            } else {
-                return component.first;
-            }
+        if (component.second < pixelThreshold * 0.9) {
+            front_bin_max = front_bin;
+            front_bin = fmin(front_bin - float(front_bin_max - front_bin_min) / 2, front_bin - 1);
+        } else if (component.second > pixelThreshold * 1.1) {
+            front_bin_min = front_bin;
+            front_bin = fmax(front_bin + 1, front_bin + float(front_bin_max - front_bin_min) / 2);
         } else {
-            front_bin = front_bin - 1;
+            return component.first;
         }
         std::cout << "Next front bin = " << front_bin << std::endl;
     }

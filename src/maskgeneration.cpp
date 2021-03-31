@@ -27,12 +27,29 @@
 PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) :
         m_retardation(std::move(retardation)), m_transmittance(std::move(transmittance)), m_tMin(nullptr), m_tMax(nullptr),
         m_tRet(nullptr), m_tTra(nullptr), m_whiteMask(nullptr), m_grayMask(nullptr), m_probabilityMask(nullptr) {
+    if(m_transmittance) {
+        cv::minMaxIdx(*m_transmittance, &m_minTransmittance, &m_maxTransmittance);
+    } else {
+        m_minTransmittance = 0;
+        m_maxTransmittance = 1;
+    }
+    if(m_retardation) {
+        cv::minMaxIdx(*m_retardation, &m_minRetardation, &m_maxRetardation);
+    } else {
+        m_minRetardation = 0;
+        m_maxRetardation = 1;
+    }
 }
 
 void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) {
     this->m_retardation = std::move(retardation);
     this->m_transmittance = std::move(transmittance);
     resetParameters();
+
+    cv::minMaxIdx(*m_transmittance, &m_minTransmittance, &m_maxTransmittance);
+    cv::minMaxIdx(*m_retardation, &m_minRetardation, &m_maxRetardation);
+
+    std::cout << m_minTransmittance << " " << m_maxTransmittance << std::endl << m_minRetardation << " " << m_maxRetardation << std::endl;
 }
 
 void PLImg::MaskGeneration::resetParameters() {
@@ -66,17 +83,23 @@ float PLImg::MaskGeneration::tTra() {
         float temp_tTra = tMin();
 
         // Generate histogram for potential correction of tMin for tTra
-        cv::Mat hist = PLImg::cuda::histogram(*m_transmittance, 0, 1, 256);
-        cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
+        cv::Mat hist = PLImg::cuda::histogram(*m_transmittance, m_minTransmittance, m_maxTransmittance, MAX_NUMBER_OF_BINS);
 
-        int startPosition = temp_tTra * MAX_NUMBER_OF_BINS;
-        int endPosition = tMax() * MAX_NUMBER_OF_BINS;
+        int startPosition = temp_tTra / (float(m_maxTransmittance) - float(m_minTransmittance)) * float(MAX_NUMBER_OF_BINS);
+        int endPosition = tMax() / (float(m_maxTransmittance) - float(m_minTransmittance)) * float(MAX_NUMBER_OF_BINS);
+
+        if(startPosition > endPosition) {
+            int tmp = startPosition;
+            startPosition = endPosition;
+            endPosition = tmp;
+        }
 
         auto peaks = Histogram::peaks(hist, startPosition, endPosition);
+
         if(peaks.size() > 0) {
             endPosition = std::min_element(hist.begin<float>() + startPosition, hist.begin<float>() + peaks.at(0)) - hist.begin<float>();
             this->m_tTra = std::make_unique<float>(
-                    Histogram::maxCurvature(hist, 0.0f, 1.0f, 1, startPosition, endPosition));
+                    Histogram::maxCurvature(hist, m_minTransmittance, m_maxTransmittance, 1, startPosition, endPosition));
         } else {
             this->m_tTra = std::make_unique<float>(temp_tTra);
         }
@@ -86,22 +109,22 @@ float PLImg::MaskGeneration::tTra() {
 
 float PLImg::MaskGeneration::tRet() {
     if(!m_tRet) {
-        cv::Mat fullHist = PLImg::cuda::histogram(*m_retardation, 0, 1, MAX_NUMBER_OF_BINS);
+        cv::Mat fullHist = PLImg::cuda::histogram(*m_retardation, m_minRetardation, m_maxRetardation, MAX_NUMBER_OF_BINS);
 
         float temp_tRet = 0;
         int startPosition, endPosition;
         startPosition = 0;
         endPosition = MIN_NUMBER_OF_BINS / 2;
 
-        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
+        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS *= 2) {
             cv::Mat hist(NUMBER_OF_BINS, 1, CV_32SC1);
-            #pragma omp parallel for
             for(unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
                 unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
                 unsigned myEndPos = (i+1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
                 hist.at<int>(i) = std::accumulate(fullHist.begin<int>() + myStartPos, fullHist.begin<int>() + myEndPos, 0);
             }
             cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
+            std::vector<int> fullHistDebug(hist.begin<int>(), hist.end<int>());
 
             // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
             auto peaks = PLImg::Histogram::peaks(hist, startPosition, endPosition, 1e-2f);
@@ -110,11 +133,12 @@ float PLImg::MaskGeneration::tRet() {
             } else if(peaks.size() == 1) {
                 startPosition = peaks.at(0);
             }
+            temp_tRet = Histogram::maxCurvature(hist, m_minRetardation, m_maxRetardation, 1, startPosition, endPosition);
 
-            temp_tRet = Histogram::maxCurvature(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
-
-            startPosition = fmax(0, (temp_tRet * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
-            endPosition = fmin((temp_tRet * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1, NUMBER_OF_BINS << 1);
+            int resultingBin = temp_tRet / (float(m_maxRetardation) - float(m_minRetardation)) * float(NUMBER_OF_BINS);
+            startPosition = fmax(0, (resultingBin - 2) * 2 - 1);
+            endPosition = fmin((resultingBin + 2) * 2 + 1,
+                               NUMBER_OF_BINS << 1);
         }
 
         this->m_tRet = std::make_unique<float>(temp_tRet);
@@ -124,9 +148,8 @@ float PLImg::MaskGeneration::tRet() {
 
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
-        cv::Mat backgroundMask = *m_transmittance > 0 & *m_transmittance < tMax() & *m_retardation > 0;
-        cv::Mat mask = Image::largestAreaConnectedComponents(*m_retardation, backgroundMask);
-
+        cv::Mat backgroundMask =  *m_retardation > 0 & *m_transmittance > 0 & *m_transmittance < tMax();
+        cv::Mat mask = Image::largestAreaConnectedComponents(*m_retardation, cv::Mat());
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
     }
@@ -135,15 +158,16 @@ float PLImg::MaskGeneration::tMin() {
 
 float PLImg::MaskGeneration::tMax() {
     if(!m_tMax) {
-        cv::Mat fullHist = PLImg::cuda::histogram(*m_transmittance, 0, 1, MAX_NUMBER_OF_BINS);
+        cv::Mat fullHist = PLImg::cuda::histogram(*m_transmittance, m_minTransmittance, m_maxTransmittance + 1.0f / MAX_NUMBER_OF_BINS, MAX_NUMBER_OF_BINS);
+        fullHist.convertTo(fullHist, CV_32FC1);
 
         // Determine start and end on full histogram
         int startPosition, endPosition;
-        endPosition = std::max_element(fullHist.begin<int>() + MAX_NUMBER_OF_BINS / 2, fullHist.end<int>()) - fullHist.begin<int>();
+        endPosition = std::max_element(fullHist.begin<float>() + MAX_NUMBER_OF_BINS / 2, fullHist.end<float>()) - fullHist.begin<float>();
         auto peaks = PLImg::Histogram::peaks(fullHist, MAX_NUMBER_OF_BINS / 2, endPosition);
-        if(peaks.size() > 1) {
-            startPosition = std::min_element(fullHist.begin<int>() + peaks.at(peaks.size() - 1),
-                                             fullHist.begin<int>() + endPosition) - fullHist.begin<int>();
+        if(!peaks.empty()) {
+            startPosition = std::min_element(fullHist.begin<float>() + peaks.at(peaks.size() - 1),
+                                             fullHist.begin<float>() + endPosition) - fullHist.begin<float>();
         } else {
             startPosition = MAX_NUMBER_OF_BINS / 2;
         }
@@ -152,7 +176,7 @@ float PLImg::MaskGeneration::tMax() {
         if(endPosition - startPosition < 2) {
             this->m_tMax = std::make_unique<float>(float(startPosition)/MAX_NUMBER_OF_BINS);
         }
-        //Else do the normal calculation
+            //Else do the normal calculation
         else {
             // Convert from 256 to 16 bins
             startPosition = MIN_NUMBER_OF_BINS * float(startPosition)/MAX_NUMBER_OF_BINS;
@@ -160,20 +184,20 @@ float PLImg::MaskGeneration::tMax() {
 
             float temp_tMax;
             for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
-                cv::Mat hist(NUMBER_OF_BINS, 1, CV_32SC1);
+                cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
                 #pragma omp parallel for
                 for (unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
                     unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
                     unsigned myEndPos = (i + 1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                    hist.at<int>(i) = std::accumulate(fullHist.begin<int>() + myStartPos,
-                                                        fullHist.begin<int>() + myEndPos, 0);
+                    hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos,
+                                                        fullHist.begin<float>() + myEndPos, 0);
                 }
                 cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
 
-                temp_tMax = Histogram::maxCurvature(hist, 0.0f, 1.0f, -1, startPosition, endPosition);
-
-                startPosition = fmax(0, (temp_tMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
-                endPosition = fmax((temp_tMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1,
+                temp_tMax = Histogram::maxCurvature(hist, m_minTransmittance, m_maxTransmittance, -1, startPosition, endPosition);
+                unsigned resultingBin = (temp_tMax - m_minTransmittance) / (m_maxTransmittance - m_minTransmittance) * NUMBER_OF_BINS;
+                startPosition = fmax(0, (resultingBin - 2) * 2 - 1);
+                endPosition = fmax((resultingBin + 2) * 2 + 1,
                                    NUMBER_OF_BINS << 1);
             }
             this->m_tMax = std::make_unique<float>(temp_tMax);
