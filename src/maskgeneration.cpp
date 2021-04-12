@@ -109,36 +109,45 @@ float PLImg::MaskGeneration::tTra() {
 
 float PLImg::MaskGeneration::tRet() {
     if(!m_tRet) {
-        cv::Mat fullHist = PLImg::cuda::histogram(*m_retardation, m_minRetardation, m_maxRetardation, MAX_NUMBER_OF_BINS);
+        cv::Mat intHist = PLImg::cuda::histogram(*m_retardation, m_minRetardation, m_maxRetardation, MAX_NUMBER_OF_BINS);
+        cv::Mat fullHist;
+        intHist.convertTo(fullHist, CV_32FC1);
+        cv::normalize(fullHist, fullHist, 0, 1, cv::NORM_MINMAX, CV_32FC1);
 
         float temp_tRet = 0;
+        int firstBin = 0, reducedMaxNumberOfBins = MAX_NUMBER_OF_BINS;
+
+        auto peaks = PLImg::Histogram::peaks(fullHist, 0, MAX_NUMBER_OF_BINS / 2, 1e-2f);
+        if(!peaks.empty()) {
+            firstBin = peaks.at(peaks.size() - 1);
+            reducedMaxNumberOfBins = MAX_NUMBER_OF_BINS - firstBin;
+        }
+        fullHist(cv::Range(firstBin, MAX_NUMBER_OF_BINS), cv::Range(0, 1)).copyTo(fullHist);
+
         int startPosition, endPosition;
         startPosition = 0;
         endPosition = MIN_NUMBER_OF_BINS / 2;
 
-        for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS *= 2) {
-            cv::Mat hist(NUMBER_OF_BINS, 1, CV_32SC1);
+        for(unsigned REDUCED_NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; REDUCED_NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; REDUCED_NUMBER_OF_BINS *= 2) {
+            int NUMBER_OF_BINS = fmin(REDUCED_NUMBER_OF_BINS, reducedMaxNumberOfBins);
+            cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
             for(unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
-                unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                unsigned myEndPos = (i+1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                hist.at<int>(i) = std::accumulate(fullHist.begin<int>() + myStartPos, fullHist.begin<int>() + myEndPos, 0);
+                unsigned myStartPos = i * reducedMaxNumberOfBins / NUMBER_OF_BINS;
+                unsigned myEndPos = (i+1) * reducedMaxNumberOfBins / NUMBER_OF_BINS;
+                hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos, fullHist.begin<float>() + myEndPos, 0.0f);
             }
-            cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
-            std::vector<int> fullHistDebug(hist.begin<int>(), hist.end<int>());
+            cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32FC1);
 
             // If more than one prominent peak is in the histogram, start at the second peak and not at the beginning
             auto peaks = PLImg::Histogram::peaks(hist, startPosition, endPosition, 1e-2f);
-            if(peaks.size() > 1) {
+            if(!peaks.empty()) {
                 startPosition = peaks.at(peaks.size() - 1);
-            } else if(peaks.size() == 1) {
-                startPosition = peaks.at(0);
             }
             temp_tRet = Histogram::maxCurvature(hist, m_minRetardation, m_maxRetardation, 1, startPosition, endPosition);
 
             int resultingBin = temp_tRet / (float(m_maxRetardation) - float(m_minRetardation)) * float(NUMBER_OF_BINS);
             startPosition = fmax(0, (resultingBin - 2) * 2 - 1);
-            endPosition = fmin((resultingBin + 2) * 2 + 1,
-                               NUMBER_OF_BINS << 1);
+            endPosition = fmin((resultingBin + 2) * 2 + 1,fmin(REDUCED_NUMBER_OF_BINS << 1, reducedMaxNumberOfBins));
         }
 
         this->m_tRet = std::make_unique<float>(temp_tRet);
