@@ -48,7 +48,7 @@ TEST(TestMaskgeneration, TestTRet) {
 
     auto shared_ret = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(shared_ret, nullptr);
-    ASSERT_FLOAT_EQ(mask.tRet(), 0.07421875f);
+    ASSERT_FLOAT_EQ(mask.tRet(), 0.0625f);
 }
 
 TEST(TestMaskgeneration, TestTTra) {
@@ -127,9 +127,10 @@ TEST(TestMaskgeneration, TestTMax) {
         }
     }
     cv::normalize(image, image, 0, 1, cv::NORM_MINMAX);
+    cv::imwrite("/tmp/file.tif", image);
     auto shared_tra = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(nullptr, shared_tra);
-    ASSERT_FLOAT_EQ(mask.tMax(), 0.9375);
+    ASSERT_FLOAT_EQ(mask.tMax(), 0.94531244f);
 }
 
 TEST(TestMaskgeneration, TestSetGet) {

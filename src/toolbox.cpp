@@ -103,53 +103,54 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
     hist.convertTo(peakHist, CV_32FC1);
     std::vector<unsigned> peaks;
 
-    int posAhead;
-    // find all peaks
-    for(int pos = start + 1; pos < stop-1; ++pos) {
-        if(peakHist.at<float>(pos) - peakHist.at<float>(pos-1) > 0) {
-            posAhead = pos + 1;
+    if(start < stop) {
+        int posAhead;
+        // find all peaks
+        for (int pos = start + 1; pos < stop - 1; ++pos) {
+            if (peakHist.at<float>(pos) - peakHist.at<float>(pos - 1) > 0) {
+                posAhead = pos + 1;
 
-            while(posAhead < hist.rows && peakHist.at<float>(pos) == peakHist.at<float>(posAhead)) {
-                ++posAhead;
+                while (posAhead < hist.rows && peakHist.at<float>(pos) == peakHist.at<float>(posAhead)) {
+                    ++posAhead;
+                }
+
+                if (peakHist.at<float>(pos) - peakHist.at<float>(posAhead) > 0) {
+                    peaks.push_back((pos + posAhead - 1) / 2);
+                }
+            }
+        }
+
+        float maxElem = *std::max_element(peakHist.begin<float>() + start, peakHist.begin<float>() + stop);
+
+        // filter peaks by prominence
+        for (int i = peaks.size() - 1; i >= 0; --i) {
+            float left_min = peakHist.at<float>(peaks.at(i));
+            if (left_min == maxElem) {
+                continue;
+            }
+            int left_i = peaks.at(i) - 1;
+            while (left_i > 0 && peakHist.at<float>(left_i) <= peakHist.at<float>(peaks.at(i))) {
+                if (peakHist.at<float>(left_i) < left_min) {
+                    left_min = peakHist.at<float>(left_i);
+                }
+                --left_i;
             }
 
-            if(peakHist.at<float>(pos) - peakHist.at<float>(posAhead) > 0) {
-                peaks.push_back((pos + posAhead - 1) / 2);
+            float right_min = peakHist.at<float>(peaks.at(i));
+            int right_i = peaks.at(i) + 1;
+            while (right_i < hist.rows && peakHist.at<float>(right_i) <= peakHist.at<float>(peaks.at(i))) {
+                if (peakHist.at<float>(right_i) < right_min) {
+                    right_min = peakHist.at<float>(right_i);
+                }
+                ++right_i;
+            }
+
+            float prominence = float(peakHist.at<float>(peaks.at(i)) - fmax(left_min, right_min)) / maxElem;
+            if (prominence < minSignificance) {
+                peaks.erase(peaks.begin() + i);
             }
         }
     }
-
-    float maxElem = *std::max_element(peakHist.begin<float>() + start, peakHist.begin<float>() + stop);
-
-    // filter peaks by prominence
-    for(int i = peaks.size()-1; i >= 0; --i) {
-        float left_min = peakHist.at<float>(peaks.at(i));
-        if(left_min == maxElem) {
-            continue;
-        }
-        int left_i = peaks.at(i) - 1;
-        while(left_i > 0 && peakHist.at<float>(left_i) <= peakHist.at<float>(peaks.at(i))) {
-            if(peakHist.at<float>(left_i) < left_min) {
-                left_min = peakHist.at<float>(left_i);
-            }
-            --left_i;
-        }
-
-        float right_min = peakHist.at<float>(peaks.at(i));
-        int right_i = peaks.at(i) + 1;
-        while(right_i < hist.rows && peakHist.at<float>(right_i) <= peakHist.at<float>(peaks.at(i))) {
-            if(peakHist.at<float>(right_i) < right_min) {
-                right_min = peakHist.at<float>(right_i);
-            }
-            ++right_i;
-        }
-
-        float prominence = float(peakHist.at<float>(peaks.at(i)) - fmax(left_min, right_min)) / maxElem;
-        if(prominence < minSignificance) {
-            peaks.erase(peaks.begin() + i);
-        }
-    }
-
     return peaks;
 }
 
