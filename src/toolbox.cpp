@@ -80,6 +80,24 @@ float PLImg::Histogram::maxCurvature(cv::Mat hist, float histLow, float histHigh
     }
 }
 
+
+cv::Mat PLImg::Histogram::curvature(cv::Mat hist, float histHigh, float histLow) {
+    float stepSize = (histHigh - histLow) / float(hist.rows);
+    cv::Mat curvatureHist;
+    hist.convertTo(curvatureHist, CV_32FC1);
+
+    cv::Mat kappa(hist.rows, 1, CV_32FC1);
+    float d1, d2;
+    for (int i = 1; i < kappa.rows - 1; ++i) {
+        d1 = (curvatureHist.at<float>(i + 1) - curvatureHist.at<float>(i)) / stepSize;
+        d2 = (curvatureHist.at<float>(i + 1) - 2 * curvatureHist.at<float>(i) +
+              curvatureHist.at<float>(i - 1)) / pow(stepSize, 2.0f);
+        kappa.at<float>(i) = d2 / pow(1 + pow(d1, 2.0f), 3.0f / 2.0f);
+    }
+
+    return kappa;
+}
+
 std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop, float minSignificance) {
     cv::Mat peakHist;
     hist.convertTo(peakHist, CV_32FC1);

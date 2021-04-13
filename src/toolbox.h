@@ -75,6 +75,17 @@ namespace PLImg {
          */
         float maxCurvature(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop);
 
+
+        /**
+         * This method calculates the floating point value of the curvature in a given histogram.
+         * To achieve this, the curvature is determined using numerical differentiation with the following formula
+         * \f[ \kappa = \frac{y^{''}}{(1+(y^{'})^2)^{3/2}} \f]
+         * The maximum position of \f$ \kappa \f$ is our maximum curvature and will be returned.
+         * @brief Calculate the maximum curvature floating point value of a histogram
+         * @param hist OpenCV calculated histogram
+         */
+         cv::Mat curvature(cv::Mat hist, float histHigh, float histLow);
+
         /**
          * Histograms can be interpreted as a discrete function with extrema like any normal function. This method
          * allows to calculate the peak positions in between an interval (start, stop) with an additional threshold
