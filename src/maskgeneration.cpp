@@ -46,9 +46,19 @@ void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, 
     this->m_transmittance = std::move(transmittance);
     resetParameters();
 
-    cv::minMaxIdx(*m_transmittance, &m_minTransmittance, &m_maxTransmittance);
-    cv::minMaxIdx(*m_retardation, &m_minRetardation, &m_maxRetardation);
-
+    if(m_transmittance) {
+        cv::minMaxIdx(*m_transmittance, &m_minTransmittance, &m_maxTransmittance);
+    } else {
+        m_minTransmittance = 0;
+        m_maxTransmittance = 1;
+    }
+    if(m_retardation) {
+        cv::minMaxIdx(*m_retardation, &m_minRetardation, &m_maxRetardation);
+    } else {
+        m_minRetardation = 0;
+        m_maxRetardation = 1;
+    }
+    
     std::cout << m_minTransmittance << " " << m_maxTransmittance << std::endl << m_minRetardation << " " << m_maxRetardation << std::endl;
 }
 
