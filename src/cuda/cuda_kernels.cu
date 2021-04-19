@@ -300,15 +300,15 @@ __global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTe
     }
 }
 
-__global__ void histogram(const float* image, int image_width, int image_height, uint* histogram, float min, float max, uint numBins) {
+__global__ void histogram(const float* image, int image_width, int image_height, uint* histogram, float minVal, float maxVal, uint numBins) {
     // Calculate actual position in image based on thread number and block number
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
     const uint y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    const float binWidth = (float(max) - float(min)) / float(numBins);
+    const float binWidth = (float(maxVal) - float(minVal)) / float(numBins);
     if(x < image_width && y < image_height) {
-        uint bin = floor(image[x + y * image_width] / binWidth);
-        if(bin < numBins) {
+        if(image[x + y * image_width] >= minVal && image[x + y * image_width] <= maxVal) {
+            uint bin = min(uint((image[x + y * image_width] - minVal) / binWidth), numBins - 1);
             atomicAdd(&histogram[bin], uint(1));
         }
     }
@@ -331,8 +331,10 @@ __global__ void histogramSharedMem(const float* image, int image_width, int imag
     __syncthreads();
 
     if(x < image_width && y < image_height) {
-        uint bin = min(uint(image[x + y * image_width] / binWidth), numBins - 1);
-        atomicAdd(&localHistogram[bin], uint(1));
+        if(image[x + y * image_width] >= minVal && image[x + y * image_width] <= maxVal) {
+            uint bin = min(uint((image[x + y * image_width] - minVal) / binWidth), numBins - 1);
+            atomicAdd(&localHistogram[bin], uint(1));
+        }
     }
 
     __syncthreads();
