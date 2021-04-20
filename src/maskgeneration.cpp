@@ -203,6 +203,7 @@ float PLImg::MaskGeneration::tMax() {
         fullHist = PLImg::cuda::histogram(*m_transmittance, m_minTransmittance,
                                           histMaximum,
                                           MAX_NUMBER_OF_BINS);
+        fullHist.convertTo(fullHist, CV_32FC1);
         endPosition = MAX_NUMBER_OF_BINS;
 
         auto peaks = PLImg::Histogram::peaks(fullHist, MAX_NUMBER_OF_BINS / 2, endPosition);
