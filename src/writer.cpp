@@ -24,7 +24,6 @@
 
 #include "writer.h"
 #include <iostream>
-#include <utility>
 
 PLImg::HDF5Writer::HDF5Writer() {
     m_filename = "";
