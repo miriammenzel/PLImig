@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
                 // Check for inclination attributes
                 for(const std::string& attrName : inclinationAttributes) {
                     if (dset.attrExists(attrName)) {
-                        attr = dset.openAttribute(attrName");
+                        attr = dset.openAttribute(attrName);
                         attr.read(H5::PredType::NATIVE_FLOAT, &attrValue);
                         attr.close();
                         if(std::isnan(attrValue) || std::isinf(attrValue)) {
