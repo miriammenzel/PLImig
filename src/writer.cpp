@@ -24,6 +24,8 @@
 
 #include "writer.h"
 #include <iostream>
+#include <unistd.h>
+#include <pwd.h>
 
 PLImg::HDF5Writer::HDF5Writer() {
     m_filename = "";
@@ -133,6 +135,13 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
         dset = m_hdf5file.createDataSet(dataset, dtype, dataSpace);
         dset.write(image.data, dtype);
 
+        if(dataset.find("Image") != std::string::npos) {
+            try {
+                m_hdf5file.createGroup("/pyramid");
+            } catch (...) {}
+            m_hdf5file.link(H5G_LINK_SOFT, "/Image", "/pyramid/00");
+        }
+
         dset.close();
         dataSpace.close();
         dtype.close();
@@ -198,7 +207,7 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
     hid_t id;
     H5::Group grp;
     H5::DataSet dset;
-    try {
+        try {
         grp = m_hdf5file.openGroup(output_dataset);
         id = grp.getId();
     } catch(H5::FileIException& exception) {
@@ -212,6 +221,17 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
             outputHandler.deleteAttribute("image_modality");
         }
         outputHandler.setStringAttribute("image_modality", modality);
+
+        std::string username;
+        uid_t uid = geteuid();
+        struct passwd *pw = getpwuid(uid);
+        if (pw) {
+            username = pw->pw_name;
+        }
+        if(outputHandler.doesAttributeExist("created_by")) {
+            outputHandler.deleteAttribute("created_by");
+        }
+        outputHandler.setStringAttribute("created_by", username);
 
         if(outputHandler.doesAttributeExist("creation_time")) {
             outputHandler.deleteAttribute("creation_time");

@@ -228,7 +228,7 @@ sharedMat PLImg::Inclination::inclination() {
                              )
                              + (1.0f - blurredMaskVal) *
                               asin(m_retardation->at<float>(y, x)) /
-                              asinGRMax;
+                              ((asinGRMax * ( 1 - blurredMaskVal)) + asinWRmax * blurredMaskVal);
                     // Prevent negative values for NaN due to sqrt
                     if(tmpVal < 0.0f) {
                         tmpVal = 0.0f;

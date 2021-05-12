@@ -217,10 +217,6 @@ int main(int argc, char** argv) {
 
             // Set our read parameters
             inclination.setModalities(medTransmittance, retardation, generation.probabilityMask(), generation.whiteMask(), generation.grayMask());
-            // If manual parameters were given, apply them here
-
-            inclination.set_im(generation.tMin());
-            inclination.set_rmaxGray(generation.tRet());
 
             // Create file and dataset. Write the inclination afterwards.
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
