@@ -27,8 +27,10 @@
 
 #include <filesystem>
 #include <H5Cpp.h>
+#include <pwd.h>
 #include <opencv2/core.hpp>
 #include <string>
+#include <unistd.h>
 
 #include "plim/AttributeHandler.h"
 #include "reader.h"
