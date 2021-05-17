@@ -109,7 +109,7 @@ namespace PLImg {
          * @param dataset Destination within the HDF5 file.
          * @param image OpenCV image which will be written.
          */
-        void write_dataset(const std::string& dataset, const cv::Mat& image);
+        void write_dataset(const std::string& dataset, const cv::Mat& image, bool create_softlink=false);
         /**
          * This method allows the recursive creation of groups within a HDF5 file.
          * @brief Create group within HDF5 file

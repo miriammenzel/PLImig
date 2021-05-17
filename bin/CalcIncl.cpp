@@ -147,21 +147,8 @@ int main(int argc, char** argv) {
             std::shared_ptr<cv::Mat> medTransmittance;
             // If our given transmittance isn't already median filtered (based on it's file name)
             if (transmittance_path.find("median10") == std::string::npos) {
-                // Write it to a file
-                std::string medTraName(mask_basename);
-                medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittanceMasked");
-                // Set file
-                writer.set_path(output_folder + "/" + medTraName + ".h5");
-                // Set dataset
-                std::string group = dataset.substr(0, dataset.find_last_of('/'));
-                // Create group and dataset
-                writer.create_group(group);
-
                 // Generate med10Transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, grayMask);
-                writer.write_dataset(dataset + "/", *medTransmittance);
-                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittanceMasked", argc, argv);
-                writer.close();
             } else {
                 medTransmittance = transmittance;
             }
@@ -189,7 +176,7 @@ int main(int argc, char** argv) {
             // Create group and dataset
             writer.create_group(group);
 
-            writer.write_dataset(dataset, *inclination.inclination());
+            writer.write_dataset(dataset, *inclination.inclination(), true);
             writer.write_attribute(dataset, "im", inclination.im());
             writer.write_attribute(dataset, "ic", inclination.ic());
             writer.write_attribute(dataset, "rmax_W", inclination.rmaxWhite());
@@ -212,7 +199,7 @@ int main(int argc, char** argv) {
                 // Create group and dataset
                 writer.create_group(group);
 
-                writer.write_dataset(dataset, *inclination.saturation());
+                writer.write_dataset(dataset, *inclination.saturation(), true);
                 writer.write_attribute(dataset, "im", inclination.im());
                 writer.write_attribute(dataset, "ic", inclination.ic());
                 writer.write_attribute(dataset, "rmax_W", inclination.rmaxWhite());

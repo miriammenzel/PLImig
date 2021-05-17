@@ -85,7 +85,7 @@ void PLImg::HDF5Writer::write_type_attribute(const std::string& dataset, const s
     attr.close();
 }
 
-void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat& image) {
+void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat& image, bool create_softlink) {
     H5::DataSet dset;
     H5::DataSpace dataSpace;
     hsize_t dims[2];
@@ -133,11 +133,11 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
         dset = m_hdf5file.createDataSet(dataset, dtype, dataSpace);
         dset.write(image.data, dtype);
 
-        if(dataset.find("Image") != std::string::npos) {
+        if(create_softlink) {
             try {
                 m_hdf5file.createGroup("/pyramid");
             } catch (...) {}
-            m_hdf5file.link(H5G_LINK_SOFT, "/Image", "/pyramid/00");
+            m_hdf5file.link(H5G_LINK_SOFT, dataset, "/pyramid/00");
         }
 
         dset.close();

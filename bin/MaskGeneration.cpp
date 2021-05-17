@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
                 std::string group = dataset.substr(0, dataset.find_last_of('/'));
                 // Create group and dataset
                 writer.create_group(group);
-                writer.write_dataset(dataset + "/", *medTransmittance);
+                writer.write_dataset(dataset + "/", *medTransmittance, true);
                 writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittance", argc, argv);
                 writer.close();
             } else {
@@ -180,13 +180,14 @@ int main(int argc, char** argv) {
             std::cout << "White mask generated and written" << std::endl;
             writer.write_dataset(dataset + "/Gray", *generation.grayMask());
             std::cout << "Gray mask generated and written" << std::endl;
+            writer.write_dataset(dataset + "/Mask", *generation.fullMask(), true);
+            std::cout << "Full mask generated and written" << std::endl;
 
             if (blurred) {
                 writer.write_dataset(dataset + "/Probability", *generation.probabilityMask());
                 std::cout << "Blurred mask generated and written" << std::endl;
             }
             if (detailed) {
-                writer.write_dataset(dataset + "/Mask", *generation.fullMask());
                 writer.write_dataset(dataset + "/NoNerveFibers", *generation.noNerveFiberMask());
                 std::cout << "Detailed masks generated and written" << std::endl;
             }
