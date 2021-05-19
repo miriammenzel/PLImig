@@ -41,6 +41,9 @@ PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std:
         m_minRetardation = 0;
         m_maxRetardation = 1;
     }
+
+    std::cout << "Transmittance range: " << m_minTransmittance << " -- " << m_maxTransmittance << "\n"
+              << "Retardation range: " << m_minRetardation << " -- " << m_maxRetardation << std::endl;
 }
 
 void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) {
@@ -62,8 +65,6 @@ void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, 
         m_minRetardation = 0;
         m_maxRetardation = 1;
     }
-
-    std::cout << m_minTransmittance << " " << m_maxTransmittance << std::endl << m_minRetardation << " " << m_maxRetardation << std::endl;
 }
 
 void PLImg::MaskGeneration::resetParameters() {
@@ -176,7 +177,6 @@ float PLImg::MaskGeneration::tRet() {
             // If our next step would be still in bounds for our histogram.
             startPosition = fmax(0, (resultingBin - 2) * 2 - 1);
             endPosition = fmin((resultingBin + 2) * 2 + 1, NUMBER_OF_BINS << 1);
-            std::cout << startPosition << ", " << resultingBin << ", " << temp_tRet << ", " << endPosition << std::endl;
         }
 
         this->m_tRet = std::make_unique<float>(temp_tRet);

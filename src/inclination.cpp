@@ -163,22 +163,25 @@ float PLImg::Inclination::rmaxGray() {
 float PLImg::Inclination::rmaxWhite() {
     if(!m_rmaxWhite) {
         // rmaxWhite is the mean value in the retardation based on the highest retardation values
-        if(!m_regionGrowingMask) {
+        if (!m_regionGrowingMask) {
             cv::Mat backgroundMask = *m_whiteMask | *m_grayMask;
             m_regionGrowingMask = std::make_unique<cv::Mat>(
                     PLImg::Image::largestAreaConnectedComponents(*m_retardation, backgroundMask));
         }
         size_t numberOfPixels = cv::countNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.95));
-        size_t threshold = 0.1 * numberOfPixels;
+        std::cout << "Number of pixels: " << numberOfPixels << std::endl;
+        auto threshold = size_t(0.1 * float(numberOfPixels));
+        std::cout << "Threshold: " << threshold << std::endl;
 
         // Calculate histogram from our region growing mask
         int channels[] = {0};
-        float histBounds[] = {0.0f, 1.0f+1e-15f};
-        const float* histRange = { histBounds };
+        float histBounds[] = {0.0f, 1.0f + 1e-15f};
+        const float *histRange = {histBounds};
         int histSize = MAX_NUMBER_OF_BINS;
 
         cv::Mat hist;
-        cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask & (*m_blurredMask > 0.95), hist, 1, &histSize, &histRange, true, false);
+        cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask & (*m_blurredMask > 0.95), hist, 1,
+                     &histSize, &histRange, true, false);
 
         size_t sumOfPixels = 0;
         int binIdx = MAX_NUMBER_OF_BINS;
@@ -186,9 +189,11 @@ float PLImg::Inclination::rmaxWhite() {
         while (binIdx > 0 && sumOfPixels < threshold) {
             sumOfPixels += hist.at<float>(binIdx);
             mean += hist.at<float>(binIdx) * float(binIdx) / float(histSize);
+            std::cout << binIdx << " " << hist.at<float>(binIdx) << std::endl;
             --binIdx;
         }
-
+        std::cout << "Mean: " << mean << std::endl;
+        std::cout << "Sum of pixels: " << sumOfPixels << std::endl;
         m_rmaxWhite = std::make_unique<float>(mean / float(sumOfPixels));
     }
     return *m_rmaxWhite;
