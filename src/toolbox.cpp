@@ -104,8 +104,9 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
     cv::Mat peakHist(hist.rows, hist.cols, CV_32FC1);
     hist.convertTo(peakHist, CV_32FC1);
     std::vector<unsigned> peaks = {};
+
     // Start has to be lower than stop
-    if(stop > start) {
+    if(stop < start) {
         return peaks;
     }
     // Stop has to be in bounds
@@ -116,6 +117,7 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
     if(start < 0) {
         start = 0;
     }
+
     int posAhead;
     // find all peaks
     for (int pos = start + 1; pos < stop - 1; ++pos) {

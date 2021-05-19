@@ -164,8 +164,8 @@ float PLImg::MaskGeneration::tRet() {
                 startPosition = peaks.at(peaks.size() - 1);
             }
 
-            auto kappaPeaks = PLImg::Histogram::peaks(kappa, startPosition, endPosition);
             int resultingBin;
+            auto kappaPeaks = PLImg::Histogram::peaks(kappa, startPosition, endPosition);
             if(kappaPeaks.empty()) {
                 resultingBin = std::max_element(kappa.begin<float>() + startPosition, kappa.begin<float>() + endPosition) - kappa.begin<float>();
             } else {
@@ -208,7 +208,7 @@ float PLImg::MaskGeneration::tMax() {
                                           histMaximum,
                                           MAX_NUMBER_OF_BINS);
         fullHist.convertTo(fullHist, CV_32FC1);
-        endPosition = MAX_NUMBER_OF_BINS;
+        endPosition = MAX_NUMBER_OF_BINS - 1;
 
         auto peaks = PLImg::Histogram::peaks(fullHist, MAX_NUMBER_OF_BINS / 2, endPosition);
         if(!peaks.empty()) {
