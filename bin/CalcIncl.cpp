@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
             writer.write_attribute(dataset, "rmax_G", inclination.rmaxGray());
             writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
-            writer.writePLIMAttributes(transmittance_path, retardation_path, "/", "/Image", "Inclination", argc, argv);
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Inclination", argc, argv);
             std::cout << "Inclination generated and written" << std::endl;
             writer.close();
 
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
                 writer.write_attribute(dataset, "rmax_G", inclination.rmaxGray());
                 writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
-                writer.writePLIMAttributes(transmittance_path, retardation_path, "/", "/Image", "Inclination Saturation", argc, argv);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;
                 writer.close();
             }

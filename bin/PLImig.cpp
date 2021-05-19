@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
                 // Create group and dataset
                 writer.create_group(group);
                 writer.write_dataset(dataset + "/", *medTransmittance, true);
-                writer.writePLIMAttributes(transmittance_path, retardation_path, "/", "/Image", "median10NTransmittance", argc, argv);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittance", argc, argv);
                 writer.close();
             } else {
                 medTransmittance = transmittance;
@@ -169,8 +169,8 @@ int main(int argc, char** argv) {
                 generation.set_tMax(tmax);
             }
             writer.set_path(output_folder + "/" + mask_basename + ".h5");
-            writer.writePLIMAttributes(transmittance_path, retardation_path, "/", "/Image", "Mask", argc, argv);
             writer.create_group(dataset);
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Mask", argc, argv);
             writer.write_attribute(dataset, "I_lower", generation.tTra());
             writer.write_attribute(dataset, "r_tres", generation.tRet());
             writer.write_attribute(dataset, "I_rmax", generation.tMin());
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
             writer.write_dataset(dataset + "/Mask", *generation.fullMask(), true);
             std::cout << "Mask generated and written" << std::endl;
             writer.write_dataset(dataset + "/Probability", *generation.probabilityMask());
-            std::cout << "Blurred mask generated and written" << std::endl;
+            std::cout << "Probability mask generated and written" << std::endl;
 
             if (detailed) {
                 writer.write_dataset(dataset + "/NoNerveFibers", *generation.noNerveFiberMask());
@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
             } else {
                 medTransmittance = transmittance;
             }
-            std::cout << "Median10 filtered and masked transmittance generated and written" << std::endl;
+            std::cout << "Median10 filtered and masked transmittance generated" << std::endl;
 
             // Set our read parameters
             inclination.setModalities(medTransmittance, retardation, generation.probabilityMask(), generation.whiteMask(), generation.grayMask());
@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
             writer.write_attribute(dataset, "rmax_G", inclination.rmaxGray());
             writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
-            writer.writePLIMAttributes(transmittance_path, retardation_path, "/", "/Image", "Inclination", argc, argv);
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Inclination", argc, argv);
             std::cout << "Inclination generated and written" << std::endl;
             writer.close();
 
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
                 writer.write_attribute(dataset, "rmax_W", inclination.rmaxWhite());
                 writer.write_attribute(dataset, "rmax_G", inclination.rmaxGray());
                 writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-                writer.writePLIMAttributes(transmittance_path, retardation_path, "/", "/Image", "Inclination Saturation", argc, argv);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;
                 writer.close();
             }

@@ -167,8 +167,8 @@ int main(int argc, char** argv) {
                 generation.set_tMax(tmax);
             }
             writer.set_path(output_folder + "/" + mask_basename + ".h5");
-            writer.writePLIMAttributes(transmittance_path, retardation_path, "/", "/Image", "Mask", argc, argv);
             writer.create_group(dataset);
+            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Mask", argc, argv);
             writer.write_attribute(dataset, "I_lower", generation.tTra());
             writer.write_attribute(dataset, "r_tres", generation.tRet());
             writer.write_attribute(dataset, "I_rmax", generation.tMin());
