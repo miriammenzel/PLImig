@@ -184,7 +184,7 @@ float PLImg::Inclination::rmaxWhite() {
                      &histSize, &histRange, true, false);
 
         size_t sumOfPixels = 0;
-        int binIdx = MAX_NUMBER_OF_BINS;
+        int binIdx = MAX_NUMBER_OF_BINS - 1;
         float mean = 0.0f;
         while (binIdx > 0 && sumOfPixels < threshold) {
             sumOfPixels += hist.at<float>(binIdx);
@@ -192,8 +192,6 @@ float PLImg::Inclination::rmaxWhite() {
             std::cout << binIdx << " " << hist.at<float>(binIdx) << std::endl;
             --binIdx;
         }
-        std::cout << "Mean: " << mean << std::endl;
-        std::cout << "Sum of pixels: " << sumOfPixels << std::endl;
         m_rmaxWhite = std::make_unique<float>(mean / float(sumOfPixels));
     }
     return *m_rmaxWhite;
