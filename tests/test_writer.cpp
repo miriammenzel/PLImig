@@ -48,7 +48,7 @@ TEST(WriterTest, TestWriteAttributes) {
 
     attr = file.openAttribute("t_min");
     datatype = attr.getDataType();
-    attr.read(datatype, &rmin);
+    attr.read(datatype, rmin.data());
     attr.close();
     ASSERT_STRCASEEQ(rmin.c_str(), min.c_str());
 
