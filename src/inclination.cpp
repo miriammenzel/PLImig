@@ -23,6 +23,7 @@
  */
 
 #include "inclination.h"
+#include <cmath>
 #include <iostream>
 
 PLImg::Inclination::Inclination() : m_transmittance(), m_retardation(), m_blurredMask(), m_whiteMask(), m_grayMask() {
@@ -185,7 +186,7 @@ float PLImg::Inclination::rmaxWhite() {
         int binIdx = MAX_NUMBER_OF_BINS - 1;
         float mean = 0.0f;
         while (binIdx > 0 && sumOfPixels < threshold) {
-            sumOfPixels += hist.at<float>(binIdx);
+            sumOfPixels += size_t(hist.at<float>(binIdx));
             mean += hist.at<float>(binIdx) * float(binIdx) / float(histSize);
             --binIdx;
         }
@@ -201,9 +202,9 @@ sharedMat PLImg::Inclination::inclination() {
         float tmpVal;
         float blurredMaskVal;
         // Those parameters are static and can be calculated ahead of time to save some computing time
-        float asinWRmax = asin(rmaxWhite());
-        float asinGRMax = asin(rmaxGray());
-        float logIcIm = log(fmax(1e-15, ic() / im()));
+        float asinWRmax = std::asin(rmaxWhite());
+        float asinGRMax = std::asin(rmaxGray());
+        float logIcIm = logf(fmax(1e-15, ic() / im()));
 
         // Generate inclination for every pixel
         #pragma omp parallel for default(shared) private(tmpVal, blurredMaskVal)
@@ -238,7 +239,7 @@ sharedMat PLImg::Inclination::inclination() {
                     if(tmpVal > 1.0f) {
                         tmpVal = 1.0f;
                     }
-                    m_inclination->at<float>(y, x) = acosf(tmpVal) * 180 / M_PI;
+                    m_inclination->at<float>(y, x) = acosf(tmpVal) * 180.0f / M_PI;
                 // Else set inclination value to 90°
                 } else {
                     m_inclination->at<float>(y, x) = 90.0f;
