@@ -53,8 +53,10 @@ void PLImg::HDF5Writer::write_attribute(const std::string& dataset, const std::s
 }
 
 void PLImg::HDF5Writer::write_attribute(const std::string& dataset, const std::string& parameter_name, std::string value) {
-    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-    this->write_type_attribute(dataset, parameter_name, str_type, &value);
+    H5::StrType str_type(H5::PredType::C_S1, value.size() + 1);
+    // Convert to void pointer for the attribute writing method.
+    auto str = reinterpret_cast<void*>(value.data());
+    this->write_type_attribute(dataset, parameter_name, str_type, str);
 }
 
 void PLImg::HDF5Writer::write_type_attribute(const std::string& dataset, const std::string& parameter_name, const H5::AtomType& type, void* value) {
