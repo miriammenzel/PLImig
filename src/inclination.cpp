@@ -95,7 +95,7 @@ float PLImg::Inclination::ic() {
         const float* histRange = { histBounds };
         int histSize = 1000;
 
-        cv::Mat hist;
+        cv::Mat hist(histSize, 1, CV_32FC1);
         cv::calcHist(&(*m_transmittance), 1, channels, selection, hist, 1, &histSize, &histRange, true, false);
 
         int max_pos = std::max_element(hist.begin<float>(), hist.end<float>()) - hist.begin<float>();
@@ -129,8 +129,8 @@ float PLImg::Inclination::rmaxGray() {
         endPosition = MIN_NUMBER_OF_BINS / 2;
 
         // Generate histogram
-        cv::Mat fullHist;
         int histSize = MAX_NUMBER_OF_BINS;
+        cv::Mat fullHist(histSize, 1, CV_32FC1);
         cv::calcHist(&(*m_retardation), 1, channels, *m_blurredMask < 0.05, fullHist, 1, &histSize, &histRange, true, false);
 
         for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
@@ -178,7 +178,7 @@ float PLImg::Inclination::rmaxWhite() {
         const float *histRange = {histBounds};
         int histSize = MAX_NUMBER_OF_BINS;
 
-        cv::Mat hist;
+        cv::Mat hist(histSize, 1, CV_32FC1);
         cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask & (*m_blurredMask > 0.95), hist, 1,
                      &histSize, &histRange, true, false);
 

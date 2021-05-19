@@ -384,7 +384,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
                                                     ", T+:" << diff_tTra_p << ", T-:" << diff_tTra_m
                                                     << std::endl;
 
-        float diffTra, diffRet;
+        float diffTra = 0.0f;
+        float diffRet = 0.0f;
         #pragma omp parallel for private(diffTra, diffRet) default(shared) schedule(static)
         for(int y = 0; y < m_retardation->rows; ++y) {
             for (int x = 0; x < m_retardation->cols; ++x) {
