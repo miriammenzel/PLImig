@@ -139,7 +139,7 @@ float PLImg::Inclination::rmaxGray() {
             for(unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
                 unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
                 unsigned myEndPos = (i+1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos, fullHist.begin<float>() + myEndPos, 0);
+                hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos, fullHist.begin<float>() + myEndPos, 0.0f);
             }
             cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32F);
 
@@ -151,7 +151,18 @@ float PLImg::Inclination::rmaxGray() {
                 startPosition = peaks.at(0);
             }
 
-            temp_rMax = Histogram::maxCurvature(hist, 0.0f, 1.0f, 1, startPosition, endPosition);
+            auto kappa = Histogram::curvature(hist, 0, 1);
+            cv::normalize(kappa, kappa, 0.0f, 1.0f, cv::NORM_MINMAX, CV_32FC1);
+
+            int resultingBin;
+            auto kappaPeaks = PLImg::Histogram::peaks(kappa, startPosition, endPosition);
+            if(kappaPeaks.empty()) {
+                resultingBin = std::max_element(kappa.begin<float>() + startPosition, kappa.begin<float>() + endPosition) - kappa.begin<float>();
+            } else {
+                resultingBin = kappaPeaks.at(0);
+            }
+
+            temp_rMax = float(resultingBin) * 1.0f / NUMBER_OF_BINS;
 
             startPosition = fmax(0, (temp_rMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
             endPosition = fmin((temp_rMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1, NUMBER_OF_BINS << 1);

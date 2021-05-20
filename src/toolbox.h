@@ -55,27 +55,7 @@ namespace PLImg {
          * @return Integer number describing the width in bins
          */
         int peakWidth(cv::Mat hist, int peakPosition, float direction, float targetHeight = 0.5f);
-
-        /**
-         * This method calculates the floating point value of the maximum curvature in a given histogram between two bounds.
-         * To achieve this, the curvature is determined using numerical differentiation with the following formula
-         * \f[ \kappa = \frac{y^{''}}{(1+(y^{'})^2)^{3/2}} \f]
-         * The maximum position of \f$ \kappa \f$ is our maximum curvature and will be returned.
-         * Note: This method will calculate the peak width of the highest position in the histogram and will only
-         * search in a search interval between peak and 10 times the peak width.
-         * If stop - start < 3 the algorithm will return start converted to a floating point value.
-         * @brief Calculate the maximum curvature floating point value of a histogram
-         * @param hist OpenCV calculated histogram
-         * @param histLow Bin value at bin number 0
-         * @param histHigh Bin value at last bin
-         * @param direction Search for the maximum curvature to the left or to the right
-         * @param start Start position in histogram
-         * @param stop End position in histogram.
-         * @return Floating point value describing where the maximum curvature is located in the histogram.
-         */
-        float maxCurvature(cv::Mat hist, float histLow, float histHigh, float direction, int start, int stop);
-
-
+        
         /**
          * This method calculates the floating point value of the curvature in a given histogram.
          * To achieve this, the curvature is determined using numerical differentiation with the following formula
