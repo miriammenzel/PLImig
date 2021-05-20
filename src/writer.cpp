@@ -281,10 +281,15 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
                 h5_retardation = true;
             }
 
-            if (h5_retardation) {
-                retardation_handler->copyAllAttributesTo(outputHandler, {});
-            } else if (h5_transmittance) {
-                transmittance_handler->copyAllAttributesTo(outputHandler, {});
+            try {
+                if (h5_retardation) {
+                    retardation_handler->copyAllAttributesTo(outputHandler, {});
+                } else if (h5_transmittance) {
+                    transmittance_handler->copyAllAttributesTo(outputHandler, {});
+                }
+            } catch(std::exception& e) {
+                std::cerr << "Error during copying attributes with plim. Skipping copy..." << std::endl;
+                std::cerr << e.what() << std::endl;
             }
 
             if (h5_retardation & !h5_transmittance) {
@@ -297,8 +302,10 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
 
             outputHandler.addCreator();
             outputHandler.addId();
-        } catch(...) {
-            std::cerr << "Error during copying attributes with plim. Skipping..." << std::endl;
+        } catch (AttributeExistsException& e) {
+            std::cerr << e.what() << std::endl;
+        } catch(WrongDatatypeException& e) {
+            std::cerr << e.what() << std::endl;
         }
         transmittance_handler = nullptr;
         retardation_handler = nullptr;

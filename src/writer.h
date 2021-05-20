@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include "plim/AttributeHandler.h"
+#include "plim/PlimExceptions.h"
 #include "reader.h"
 #include "version.h"
 
