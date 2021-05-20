@@ -26,26 +26,15 @@
 #include <cmath>
 #include <iostream>
 
-PLImg::Inclination::Inclination() : m_transmittance(), m_retardation(), m_blurredMask(), m_whiteMask(), m_grayMask() {
-    m_im = nullptr,
-    m_ic = nullptr;
-    m_rmaxWhite = nullptr;
-    m_rmaxGray = nullptr;
-    m_regionGrowingMask = nullptr;
-}
+PLImg::Inclination::Inclination() : m_transmittance(), m_retardation(), m_blurredMask(), m_whiteMask(), m_grayMask(),
+                                    m_im(nullptr), m_ic(nullptr), m_rmaxWhite(nullptr), m_rmaxGray(nullptr),
+                                    m_regionGrowingMask(nullptr) {}
 
 PLImg::Inclination::Inclination(sharedMat transmittance, sharedMat retardation,
                                 sharedMat blurredMask, sharedMat whiteMask, sharedMat grayMask) :
                                 m_transmittance(std::move(transmittance)), m_retardation(std::move(retardation)), m_blurredMask(std::move(blurredMask)),
-                                m_whiteMask(std::move(whiteMask)), m_grayMask(std::move(grayMask)) {
-    m_im = nullptr,
-    m_ic = nullptr;
-    m_rmaxWhite = nullptr;
-    m_rmaxGray = nullptr;
-    m_regionGrowingMask = nullptr;
-    m_inclination = nullptr;
-    m_saturation = nullptr;
-}
+                                m_whiteMask(std::move(whiteMask)), m_grayMask(std::move(grayMask)), m_im(nullptr), m_ic(nullptr), m_rmaxWhite(nullptr),
+                                m_rmaxGray(nullptr), m_regionGrowingMask(nullptr), m_inclination(nullptr), m_saturation(nullptr) {}
 
 void PLImg::Inclination::setModalities(sharedMat transmittance, sharedMat retardation,
                                        sharedMat blurredMask, sharedMat whiteMask, sharedMat grayMask) {
