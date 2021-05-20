@@ -42,11 +42,11 @@ int PLImg::Histogram::peakWidth(cv::Mat hist, int peakPosition, float direction,
 
 cv::Mat PLImg::Histogram::curvature(cv::Mat hist, float histLow, float histHigh) {
     float stepSize = abs(histHigh - histLow) / float(hist.rows);
-    cv::Mat curvatureHist;
+    cv::Mat curvatureHist(hist.rows, hist.cols, CV_32FC1);
     hist.convertTo(curvatureHist, CV_32FC1);
 
     cv::Mat kappa(hist.rows, 1, CV_32FC1);
-    kappa.setTo(0);
+    kappa.setTo(0.0f);
 
     float d1, d2;
     for (int i = 1; i < kappa.rows - 1; ++i) {

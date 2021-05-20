@@ -11,7 +11,7 @@
 // Test function for histogram generation
 void f(std::vector<float>& x) {
     for(float & i : x) {
-        i = 1000.0f * exp(-2*i-5) + 1;
+        i = 10000.0f / (i+1.0f) + 1000.0f * std::pow(2.0f, -i/2.0f + 4.0f);
     }
 }
 
@@ -34,16 +34,16 @@ TEST(TestToolbox, TestHistogramPeakWidth) {
 }
 
 TEST(TestToolbox, TestHistogramPlateauLeft) {
-    auto x = std::vector<float>(128 / 0.01);
+    auto x = std::vector<float>(256 / 0.01);
     for(int i = 0; i < x.size(); ++i) {
-        x.at(i) = i * 0.01;
+        x.at(i) = float(i) * 0.01f;
     }
 
-    auto y = std::vector<float>(128 / 0.01);
+    auto y = std::vector<float>(256 / 0.01);
     std::copy(x.begin(), x.end(), y.begin());
     f(y);
 
-    int sum = int(std::accumulate(y.begin(), y.end(), 0));
+    int sum = int(std::accumulate(y.begin(), y.end(), 0.0f));
     cv::Mat image(sum, 1, CV_32FC1);
 
     // Fill image with random data
@@ -66,24 +66,26 @@ TEST(TestToolbox, TestHistogramPlateauLeft) {
     int histSize = MAX_NUMBER_OF_BINS;
 
     // Generate histogram
-    cv::Mat hist;
+    cv::Mat hist(MAX_NUMBER_OF_BINS, 1, CV_32FC1);
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
+    cv::normalize(hist, hist, 0.0f, 1.0f, cv::NORM_MINMAX, CV_32FC1);
 
-    float result = PLImg::Histogram::maxCurvature(hist, 0, 1, 1, 1, MAX_NUMBER_OF_BINS / 2);
-    ASSERT_FLOAT_EQ(result, 4.0f * (1.0f/256.0f));
+    cv::Mat curvatureVal = PLImg::Histogram::curvature(hist, 0, 1);
+    int result = std::max_element(curvatureVal.begin<float>(), curvatureVal.begin<float>() + 20) - curvatureVal.begin<float>();
+    ASSERT_EQ(result, 15);
 }
 
 TEST(TestToolbox, TestHistogramPlateauRight) {
-    auto x = std::vector<float>(128 / 0.01);
+    auto x = std::vector<float>(256 / 0.01);
     for(int i = 0; i < x.size(); ++i) {
         x.at(i) = i * 0.01;
     }
 
-    auto y = std::vector<float>(128 / 0.01);
+    auto y = std::vector<float>(256 / 0.01);
     std::copy(x.begin(), x.end(), y.begin());
     f(y);
 
-    int sum = int(std::accumulate(y.begin(), y.end(), 0));
+    int sum = int(std::accumulate(y.begin(), y.end(), 0.0f));
     cv::Mat image(sum, 1, CV_32FC1);
 
     // Fill image with random data
@@ -106,12 +108,14 @@ TEST(TestToolbox, TestHistogramPlateauRight) {
     int histSize = MAX_NUMBER_OF_BINS;
 
     // Generate histogram
-    cv::Mat hist;
+    cv::Mat hist(histSize, 1, CV_32FC1);
     cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
+    cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX);
     std::reverse(hist.begin<float>(), hist.end<float>());
 
-    float result = PLImg::Histogram::maxCurvature(hist, 0, 1, -1, MAX_NUMBER_OF_BINS / 2, MAX_NUMBER_OF_BINS);
-    ASSERT_FLOAT_EQ(result, 1.0f - 5.0f * (1.0f/256.0f));
+    cv::Mat curvatureVal = PLImg::Histogram::curvature(hist, 0, 1);
+    int result = std::max_element(curvatureVal.end<float>() - 30, curvatureVal.end<float>()) - curvatureVal.begin<float>();
+    ASSERT_EQ(result, 240);
 }
 
 TEST(TestToolbox, TestImageRegionGrowing) {
