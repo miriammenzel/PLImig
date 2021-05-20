@@ -5,4 +5,4 @@
 
 [submodule "extern/PLIM"]
 	path = extern/PLIM
-	url = ../../inm-1/fa/3d-pli/libraries/PLIM
+	url = ../../../libraries/PLIM
