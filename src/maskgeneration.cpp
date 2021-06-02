@@ -298,7 +298,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(m_retardation->rows/2, m_retardation->cols/2, CV_32FC1);
         std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(m_transmittance->rows/2, m_transmittance->cols/2, CV_32FC1);
         MaskGeneration generation(small_retardation, small_transmittance);
-        int numPixels = m_retardation->rows * m_retardation->cols;
+        unsigned long long numPixels = (unsigned long long) m_retardation->rows *  (unsigned long long) m_retardation->cols;
 
         uint num_threads;
         #pragma omp parallel default(shared)
@@ -309,8 +309,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         for(unsigned i = 0; i < num_threads; ++i) {
             random_engines.at(i) = std::mt19937((clock() * i) % LONG_MAX);
         }
-        std::uniform_int_distribution<int> distribution(0, numPixels);
-        int selected_element;
+        std::uniform_int_distribution<unsigned long long> distribution(0, numPixels);
+        unsigned long long selected_element;
 
         std::vector<float> above_tRet;
         std::vector<float> below_tRet;
@@ -328,9 +328,9 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
                 for (int x = 0; x < small_retardation->cols; ++x) {
                     selected_element = distribution(random_engines.at(omp_get_thread_num()));
                     small_retardation->at<float>(y, x) = m_retardation->at<float>(
-                            selected_element / m_retardation->cols, selected_element % m_retardation->cols);
+                            int(selected_element / m_retardation->cols), int(selected_element % m_retardation->cols));
                     small_transmittance->at<float>(y, x) = m_transmittance->at<float>(
-                            selected_element / m_transmittance->cols, selected_element % m_transmittance->cols);
+                            int(selected_element / m_transmittance->cols), int(selected_element % m_transmittance->cols));
                 }
             }
 

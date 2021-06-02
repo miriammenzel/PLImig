@@ -279,7 +279,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     // Calculate the number of chunks for the Connected Components algorithm
     unsigned numberOfChunks = 1;
     unsigned chunksPerDim;
-    float predictedMemoryUsage = float(image.total()) * sizeof(unsigned char) + 2.0f * image.total() * sizeof(uint) +
+    float predictedMemoryUsage = float(image.total()) * sizeof(unsigned char) + 3.0f * image.total() * sizeof(uint) +
             CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * (sizeof(uint) + sizeof(unsigned char));
     if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
