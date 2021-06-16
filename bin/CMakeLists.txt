@@ -14,7 +14,7 @@ add_executable(PLImigPipeline PLImig.cpp)
 target_link_libraries(PLImigPipeline PLImig)
 
 add_executable(PLImigCheckResults CheckResults.cpp)
-target_link_libraries(PLImigCheckResults PLImig)
+target_link_libraries(PLImigCheckResults ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES})
 
 
 # install instructions for CMake

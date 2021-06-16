@@ -94,6 +94,7 @@ namespace PLImg {
          * @return OpenCV matrix masking the connected components area with the largest pixels
          */
         cv::Mat largestAreaConnectedComponents(const cv::Mat& image, cv::Mat mask = cv::Mat(), float percentPixels = 0.01f);
+        unsigned long long maskCountNonZero(const cv::Mat& mask);
     }
 
     namespace cuda {

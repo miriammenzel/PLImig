@@ -6,8 +6,8 @@
 #include "maskgeneration.h"
 #include <memory>
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 #include <random>
-#include "toolbox.h"
 
 // Test function for histogram generation
 void f(std::vector<float>& x) {

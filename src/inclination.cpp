@@ -169,7 +169,8 @@ float PLImg::Inclination::rmaxWhite() {
             m_regionGrowingMask = std::make_unique<cv::Mat>(
                     PLImg::Image::largestAreaConnectedComponents(*m_retardation, backgroundMask));
         }
-        size_t numberOfPixels = cv::countNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.95));
+
+        size_t numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.95));
         auto threshold = size_t(0.1 * float(numberOfPixels));
 
         // Calculate histogram from our region growing mask

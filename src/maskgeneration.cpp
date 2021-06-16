@@ -225,7 +225,7 @@ float PLImg::MaskGeneration::tMax() {
         }
         //Else do the normal calculation
         else {
-            // Convert from 256 to 16 bins
+            // Convert from 256 to 64 bins
             endPosition = MIN_NUMBER_OF_BINS;
             startPosition = fmin(endPosition - 1, MIN_NUMBER_OF_BINS * float(startPosition)/MAX_NUMBER_OF_BINS);
 

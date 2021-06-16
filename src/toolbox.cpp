@@ -181,6 +181,19 @@ cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::M
     }
 }
 
+unsigned long long PLImg::Image::maskCountNonZero(const cv::Mat &mask) {
+    unsigned long long nonZeroPixels = 0;
+
+    #pragma omp parallel for reduction(+ : nonZeroPixels)
+    for(int x = 0; x < mask.cols; ++x) {
+        for(int y = 0; y < mask.rows; ++y) {
+            if(mask.at<uchar>(x, y) > 0) ++nonZeroPixels;
+        }
+    }
+
+    return nonZeroPixels;
+}
+
 bool PLImg::cuda::runCUDAchecks() {
     static bool didRunCudaChecks = false;
     if(!didRunCudaChecks) {
