@@ -53,15 +53,14 @@ namespace PLImg::cuda::raw {
          * @param image
          * @return
          */
-        std::shared_ptr<cv::Mat> CUDAmedianFilter(const std::shared_ptr<cv::Mat>& image);
+        void CUDAmedianFilter(cv::Mat& image, cv::Mat& result);
         /**
          * @brief CUDAmedianFilterMasked
          * @param image
          * @param mask
          * @return
          */
-        std::shared_ptr<cv::Mat> CUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image,
-                                                        const std::shared_ptr<cv::Mat>& mask);
+        void CUDAmedianFilterMasked(cv::Mat& image, cv::Mat& mask, cv::Mat& result);
     }
 
     cv::Mat CUDAhistogram(const cv::Mat& image, float minLabel, float maxLabel, uint numBins);

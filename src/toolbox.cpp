@@ -127,65 +127,45 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
     return peaks;
 }
 
-cv::Mat PLImg::Image::largestAreaConnectedComponents(const cv::Mat& image, cv::Mat mask, float percentPixels) {
-    float pixelThreshold;
-    if(mask.empty()) {
-        pixelThreshold = float(image.cols) * float(image.rows) * percentPixels / 100;
-        mask = cv::Mat::ones(image.rows, image.cols, CV_8UC1);
-    } else {
-        pixelThreshold = float(cv::countNonZero(mask)) * percentPixels / 100;
+std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Mat>& transmittance, std::shared_ptr<cv::Mat>& retardation, float scalingValue) {
+    cv::Mat small_transmittance(transmittance->rows/2, transmittance->cols/2, CV_32FC1);
+    cv::Mat small_retardation(retardation->rows/2, retardation->cols/2, CV_32FC1);
+
+    unsigned long long numPixels = (unsigned long long) transmittance->rows * (unsigned long long) transmittance->cols;
+
+    // Get the number of threads
+    uint num_threads;
+    #pragma omp parallel default(shared)
+    num_threads = omp_get_num_threads();
+    // Generate different random engines for each thread
+    std::vector<std::mt19937> random_engines(num_threads);
+    #pragma omp parallel for default(shared) schedule(static)
+    for(unsigned i = 0; i < num_threads; ++i) {
+        random_engines.at(i) = std::mt19937((clock() * i) % LONG_MAX);
     }
+    std::uniform_int_distribution<unsigned long long> distribution(0, numPixels);
+    unsigned long long selected_element;
 
-    double minVal, maxVal;
-    cv::minMaxIdx(image, &minVal, &maxVal);
-    cv::Mat hist = PLImg::cuda::histogram(image, minVal, maxVal, MAX_NUMBER_OF_BINS);
-
-    uint front_bin = MAX_NUMBER_OF_BINS - 1;
-    uint pixelSum = 0;
-    while(pixelSum < 1.5 * pixelThreshold && front_bin > 0) {
-        pixelSum += hist.at<int>(front_bin);
-        --front_bin;
-    }
-
-    cv::Mat cc_mask, labels;
-    std::pair<cv::Mat, int> component;
-
-    uint front_bin_max = front_bin;
-    uint front_bin_min = 0;
-
-    while(int(front_bin_max) - int(front_bin_min) > 1 && front_bin < MAX_NUMBER_OF_BINS) {
-        float binVal = (maxVal - minVal) * float(front_bin)/MAX_NUMBER_OF_BINS + minVal;
-        cc_mask = (image > binVal) & mask;
-        labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
-        cc_mask.release();
-        component = PLImg::cuda::labeling::largestComponent(labels);
-        labels.release();
-
-        std::cout << "Area size = " << component.second << ", Threshold range is: " << pixelThreshold * 0.9 << " -- " << pixelThreshold * 1.1 << std::endl;
-
-        if (component.second < pixelThreshold * 0.9) {
-            front_bin_max = front_bin;
-            front_bin = fmin(front_bin - float(front_bin_max - front_bin_min) / 2, front_bin - 1);
-        } else if (component.second > pixelThreshold * 1.1) {
-            front_bin_min = front_bin;
-            front_bin = fmax(front_bin + 1, front_bin + float(front_bin_max - front_bin_min) / 2);
-        } else {
-            return component.first;
+    // Fill transmittance and retardation with random pixels from our base images
+    #pragma omp parallel for
+    for(int y = 0; y < small_retardation.rows; ++y) {
+        for (int x = 0; x < small_retardation.cols; ++x) {
+            selected_element = distribution(random_engines.at(omp_get_thread_num()));
+            small_retardation.at<float>(y, x) = retardation->at<float>(
+                    int(selected_element / retardation->cols), int(selected_element % retardation->cols));
+            small_transmittance.at<float>(y, x) = transmittance->at<float>(
+                    int(selected_element / transmittance->cols), int(selected_element % transmittance->cols));
         }
-        std::cout << "Next front bin = " << front_bin << std::endl;
     }
-    // No search result during the while loop
-    if (component.first.empty()) {
-        return cv::Mat::ones(image.rows, image.cols, CV_8UC1);
-    } else {
-        return component.first;
-    }
+
+    return std::array<cv::Mat, 2> {small_transmittance, small_retardation};
 }
+
 
 unsigned long long PLImg::Image::maskCountNonZero(const cv::Mat &mask) {
     unsigned long long nonZeroPixels = 0;
 
-    #pragma omp parallel for reduction(+ : nonZeroPixels)
+    #pragma omp parallel for reduction(+ : nonZeroPixels) collapse(2)
     for(int x = 0; x < mask.cols; ++x) {
         for(int y = 0; y < mask.rows; ++y) {
             if(mask.at<uchar>(x, y) > 0) ++nonZeroPixels;
@@ -194,6 +174,7 @@ unsigned long long PLImg::Image::maskCountNonZero(const cv::Mat &mask) {
 
     return nonZeroPixels;
 }
+
 
 bool PLImg::cuda::runCUDAchecks() {
     static bool didRunCudaChecks = false;
@@ -234,6 +215,10 @@ ulong PLImg::cuda::getTotalMemory() {
     return total;
 }
 
+float PLImg::cuda::getHistogramMemoryEstimation(const cv::Mat& image, uint numBins) {
+    return float(CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * numBins + image.total()) * sizeof(float);
+}
+
 cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLabel, uint numBins) {
     PLImg::cuda::runCUDAchecks();
 
@@ -245,8 +230,8 @@ cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLa
     // Calculate the number of chunks for the Connected Components algorithm
     unsigned numberOfChunks = 1;
     unsigned chunksPerDim;
-    float predictedMemoryUsage = float(CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * numBins +
-            histImage.total()) * sizeof(float);
+
+    float predictedMemoryUsage = getHistogramMemoryEstimation(image, numBins);
     if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
@@ -276,14 +261,134 @@ cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLa
 
 std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_ptr<cv::Mat>& image) {
     PLImg::cuda::runCUDAchecks();
-    return PLImg::cuda::raw::filters::CUDAmedianFilter(image);
 
+    // Create a result image with the same dimensions as our input image
+    cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
+    // Expand borders of input image inplace to ensure that the median algorithm can run correcly
+    cv::copyMakeBorder(*image, *image, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+
+    // The image might be too large to be saved completely in the video memory.
+    // Therefore chunks will be used if the amount of memory is too small.
+    uint numberOfChunks = 1;
+    // Check the free video memory
+    ulong freeMem;
+    CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
+    // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
+    // with the power of four (1, 4, 16, 256, 1024, ...)
+    if(double(image->total()) * image->elemSize() * 2.1 > double(freeMem)) {
+        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 2.1 / double(freeMem)) / log(4))));
+    }
+    // Each dimensions will get the same number of chunks. Calculate them by using the square root.
+    uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
+
+    uint xMin, xMax, yMin, yMax;
+    // We've increased the image dimensions earlier. Save the original image dimensions for further calculations.
+    int2 realImageDims = {image->cols - 2 * MEDIAN_KERNEL_SIZE, image->rows - 2 * MEDIAN_KERNEL_SIZE};
+    cv::Mat subImage, subResult, croppedImage;
+    // For each chunk
+    for(uint it = 0; it < numberOfChunks; ++it) {
+        std::cout << "\rCurrent chunk: " << it + 1 << "/" << numberOfChunks;
+        std::flush(std::cout);
+        // Calculate image boarders
+        xMin = (it % chunksPerDim) * realImageDims.x / chunksPerDim;
+        xMax = fmin((it % chunksPerDim + 1) * realImageDims.x / chunksPerDim, realImageDims.x);
+        yMin = (it / chunksPerDim) * realImageDims.y / chunksPerDim;
+        yMax = fmin((it / chunksPerDim + 1) * realImageDims.y / chunksPerDim, realImageDims.y);
+
+        // Get chunk of our image and result. Apply padding to the result to ensure that the median filter will run correctly.
+        croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
+                                                yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
+        croppedImage.copyTo(subImage);
+        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subResult);
+        cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE,
+                           MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+
+        PLImg::cuda::raw::filters::CUDAmedianFilter(subImage, subResult);
+
+        // Calculate the range where the median filter was applied and where the chunk will be placed.
+        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, xMax - xMin, yMax - yMin);
+        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+        subResult(srcRect).copyTo(result(dstRect));
+
+    }
+
+    // Fix output after \r
+    std::cout << std::endl;
+    // Revert the padding of the original image
+    croppedImage = cv::Mat(*image, cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, image->cols - 2*MEDIAN_KERNEL_SIZE, image->rows - 2*MEDIAN_KERNEL_SIZE));
+    croppedImage.copyTo(*image);
+
+    // Return resulting median filtered image
+    return std::make_shared<cv::Mat>(result);
 }
 
 std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::shared_ptr<cv::Mat>& image,
-                                                            const std::shared_ptr<cv::Mat>& mask) {
+                                                                  const std::shared_ptr<cv::Mat>& mask) {
     PLImg::cuda::runCUDAchecks();
-    return PLImg::cuda::raw::filters::CUDAmedianFilterMasked(image, mask);
+    // Copy the result back to the CPU
+    cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
+    cv::copyMakeBorder(*image, *image, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+    cv::copyMakeBorder(*mask, *mask, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+
+    // The image might be too large to be saved completely in the video memory.
+    // Therefore chunks will be used if the amount of memory is too small.
+    uint numberOfChunks = 1;
+    ulong freeMem;
+    // Check the free video memory
+    CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
+    // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
+    // with the power of four (1, 4, 16, 256, 1024, ...)
+    if(double(image->total()) * image->elemSize() * 3.1 > double(freeMem)) {
+        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 3.1 / double(freeMem)) / log(4))));
+    }
+    // Each dimensions will get the same number of chunks. Calculate them by using the square root.
+    uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
+
+
+    uint xMin, xMax, yMin, yMax;
+
+    // We've increased the image dimensions earlier. Save the original image dimensions for further calculations.
+    int2 realImageDims = {image->cols - 2 * MEDIAN_KERNEL_SIZE, image->rows - 2 * MEDIAN_KERNEL_SIZE};
+
+    cv::Mat subImage, subMask, subResult, croppedImage;
+    for(uint it = 0; it < numberOfChunks; ++it) {
+        std::cout << "\rCurrent chunk: " << it + 1 << "/" << numberOfChunks;
+        std::flush(std::cout);
+        // Calculate image boarders
+        xMin = (it % chunksPerDim) * realImageDims.x / chunksPerDim;
+        xMax = fmin((it % chunksPerDim + 1) * realImageDims.x / chunksPerDim, realImageDims.x);
+        yMin = (it / chunksPerDim) * realImageDims.y / chunksPerDim;
+        yMax = fmin((it / chunksPerDim + 1) * realImageDims.y / chunksPerDim, realImageDims.y);
+
+        // Get chunk of our image, mask and result. Apply padding to the result to ensure that the median filter will run correctly.
+        croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
+                                                yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
+        croppedImage.copyTo(subImage);
+        croppedImage = cv::Mat(*mask, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
+                                               yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
+        croppedImage.copyTo(subMask);
+        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subResult);
+        cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE,
+                           MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+
+        PLImg::cuda::raw::filters::CUDAmedianFilterMasked(subImage, subMask, subResult);
+
+        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, subResult.cols - 2*MEDIAN_KERNEL_SIZE, subResult.rows - 2*MEDIAN_KERNEL_SIZE);
+        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+
+        subResult(srcRect).copyTo(result(dstRect));
+
+    }
+    // Fix output after \r
+    std::cout << std::endl;
+
+    croppedImage = cv::Mat(*image, cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, image->cols - 2*MEDIAN_KERNEL_SIZE, image->rows - 2*MEDIAN_KERNEL_SIZE));
+    croppedImage.copyTo(*image);
+    croppedImage = cv::Mat(*mask, cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, mask->cols - 2*MEDIAN_KERNEL_SIZE, mask->rows - 2*MEDIAN_KERNEL_SIZE));
+    croppedImage.copyTo(*mask);
+    return std::make_shared<cv::Mat>(result);
 }
 
 cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
@@ -347,6 +452,61 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     // Merge labels if more than one chunk were needed. This fixes any issues where there might be an overlap.
     connectedComponentsMergeChunks(result, numberOfChunks);
     return result;
+}
+
+cv::Mat PLImg::cuda::labeling::largestAreaConnectedComponents(const cv::Mat& image, cv::Mat mask, float percentPixels) {
+    float pixelThreshold;
+    if(mask.empty()) {
+        pixelThreshold = float(image.cols) * float(image.rows) * percentPixels / 100;
+        mask = cv::Mat::ones(image.rows, image.cols, CV_8UC1);
+    } else {
+        pixelThreshold = float(cv::countNonZero(mask)) * percentPixels / 100;
+    }
+
+    double minVal, maxVal;
+    cv::minMaxIdx(image, &minVal, &maxVal);
+    cv::Mat hist = PLImg::cuda::histogram(image, minVal, maxVal, MAX_NUMBER_OF_BINS);
+
+    uint front_bin = MAX_NUMBER_OF_BINS - 1;
+    uint pixelSum = 0;
+    while(pixelSum < 1.5 * pixelThreshold && front_bin > 0) {
+        pixelSum += hist.at<int>(front_bin);
+        --front_bin;
+    }
+
+    cv::Mat cc_mask, labels;
+    std::pair<cv::Mat, int> component;
+
+    uint front_bin_max = front_bin;
+    uint front_bin_min = 0;
+
+    while(int(front_bin_max) - int(front_bin_min) > 1 && front_bin < MAX_NUMBER_OF_BINS) {
+        float binVal = (maxVal - minVal) * float(front_bin)/MAX_NUMBER_OF_BINS + minVal;
+        cc_mask = (image > binVal) & mask;
+        labels = PLImg::cuda::labeling::connectedComponents(cc_mask);
+        cc_mask.release();
+        component = PLImg::cuda::labeling::largestComponent(labels);
+        labels.release();
+
+        std::cout << "Area size = " << component.second << ", Threshold range is: " << pixelThreshold * 0.9 << " -- " << pixelThreshold * 1.1 << std::endl;
+
+        if (component.second < pixelThreshold * 0.9) {
+            front_bin_max = front_bin;
+            front_bin = fmin(front_bin - float(front_bin_max - front_bin_min) / 2, front_bin - 1);
+        } else if (component.second > pixelThreshold * 1.1) {
+            front_bin_min = front_bin;
+            front_bin = fmax(front_bin + 1, front_bin + float(front_bin_max - front_bin_min) / 2);
+        } else {
+            return component.first;
+        }
+        std::cout << "Next front bin = " << front_bin << std::endl;
+    }
+    // No search result during the while loop
+    if (component.first.empty()) {
+        return cv::Mat::ones(image.rows, image.cols, CV_8UC1);
+    } else {
+        return component.first;
+    }
 }
 
 void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int numberOfChunks) {

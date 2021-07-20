@@ -192,7 +192,7 @@ float PLImg::MaskGeneration::tRet() {
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
         cv::Mat backgroundMask =  *m_retardation > 0 & *m_transmittance > 0 & *m_transmittance < tMax();
-        cv::Mat mask = Image::largestAreaConnectedComponents(*m_retardation, cv::Mat());
+        cv::Mat mask = cuda::labeling::largestAreaConnectedComponents(*m_retardation, cv::Mat());
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
     }
@@ -307,29 +307,18 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
 
         #pragma omp parallel 
         {
-            std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(m_retardation->rows/2, m_retardation->cols/2, CV_32FC1);
-            std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(m_transmittance->rows/2, m_transmittance->cols/2, CV_32FC1);
+            std::shared_ptr<cv::Mat> small_retardation;
+            std::shared_ptr<cv::Mat> small_transmittance;
             MaskGeneration generation(small_retardation, small_transmittance);
-            unsigned long long numPixels = (unsigned long long) m_retardation->rows *  (unsigned long long) m_retardation->cols;
 
-            std::mt19937 random_engine = std::mt19937((clock() * omp_get_thread_num()) % LONG_MAX);
-            std::uniform_int_distribution<unsigned long long> distribution(0, numPixels);
-            unsigned long long selected_element;
             float t_ret, t_tra;
 
             for(unsigned i = 0; i < PROBABILITY_MASK_ITERATIONS / omp_get_num_threads(); ++i) {
                 std::cout << "\rProbability Mask Generation: Iteration " << i << " of " << PROBABILITY_MASK_ITERATIONS / omp_get_num_threads() << std::endl;
-                //std::flush(std::cout);         
-                // Fill transmittance and retardation with random pixels from our base images
-                for(int y = 0; y < small_retardation->rows; ++y) {
-                    for (int x = 0; x < small_retardation->cols; ++x) {
-                        selected_element = distribution(random_engine);
-                        small_retardation->at<float>(y, x) = m_retardation->at<float>(
-                                int(selected_element / m_retardation->cols), int(selected_element % m_retardation->cols));
-                        small_transmittance->at<float>(y, x) = m_transmittance->at<float>(
-                                int(selected_element / m_transmittance->cols), int(selected_element % m_transmittance->cols));
-                    }
-                }
+                //std::flush(std::cout);
+                auto small_modalities = Image::randomizedModalities(m_transmittance, m_retardation, 0.5f);
+                small_transmittance = std::make_shared<cv::Mat>(small_modalities[0]);
+                small_retardation = std::make_shared<cv::Mat>(small_modalities[1]);
 
                 generation.setModalities(small_retardation, small_transmittance);
                 generation.set_tMin(this->tMin());

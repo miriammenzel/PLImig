@@ -30,6 +30,7 @@
 #include <omp.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <random>
 #include <set>
 #include <thrust/device_vector.h>
 #include <thrust/unique.h>
@@ -82,18 +83,7 @@ namespace PLImg {
     }
 
     namespace Image {
-        /**
-         * This method allows to search the largest connected component in an image. This connected component will
-         * represent the largest area with the highest image values consisting of at least
-         * \f$ percentPixels / 100 * image.size() \f$ pixels. The threshold is determined through the number of image bins
-         * which need to be used to find a valid mask with enough pixels.
-         * @brief Search for the largest connected components area which fills at least percentPixels of the image size.
-         * @param image OpenCV image which will be used for the connected components algorithm.
-         * @param mask
-         * @param percentPixels Percent of pixels which are needed for the algorithm to succeed.
-         * @return OpenCV matrix masking the connected components area with the largest pixels
-         */
-        cv::Mat largestAreaConnectedComponents(const cv::Mat& image, cv::Mat mask = cv::Mat(), float percentPixels = 0.01f);
+        std::array<cv::Mat, 2> randomizedModalities(std::shared_ptr<cv::Mat>& transmittance, std::shared_ptr<cv::Mat>& retardation, float scalingValue=0.25f);
         unsigned long long maskCountNonZero(const cv::Mat& mask);
     }
 
@@ -114,9 +104,12 @@ namespace PLImg {
          */
         ulong getFreeMemory();
 
+        float getHistogramMemoryEstimation(const cv::Mat& image, uint numBins);
         cv::Mat histogram(const cv::Mat& image, float minLabel, float maxLabel, uint numBins);
 
         namespace filters {
+            float getMedianFilterMemoryEstimation(const std::shared_ptr<cv::Mat>& image);
+            float getMedianFilterMaskedMemoryEstimation(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
             /**
              * This method applies a circular median filter with a radius of 10 to the given image.
              * @brief Apply circular median filter with a radius of 10 to the image
@@ -143,6 +136,23 @@ namespace PLImg {
         }
 
         namespace labeling {
+            unsigned long long getLargestAreaConnectedComponentsMemoryEstimation(const cv::Mat& image);
+            unsigned long long getConnectedComponentsMemoryEstimation(const cv::Mat& image);
+            unsigned long long getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image);
+
+            /**
+             * This method allows to search the largest connected component in an image. This connected component will
+             * represent the largest area with the highest image values consisting of at least
+             * \f$ percentPixels / 100 * image.size() \f$ pixels. The threshold is determined through the number of image bins
+             * which need to be used to find a valid mask with enough pixels.
+             * @brief Search for the largest connected components area which fills at least percentPixels of the image size.
+             * @param image OpenCV image which will be used for the connected components algorithm.
+             * @param mask
+             * @param percentPixels Percent of pixels which are needed for the algorithm to succeed.
+             * @return OpenCV matrix masking the connected components area with the largest pixels
+             */
+            cv::Mat largestAreaConnectedComponents(const cv::Mat& image, cv::Mat mask = cv::Mat(), float percentPixels = 0.01f);
+            
             /**
              * Execute the connected components algorithm on an 8-bit image. This method will use the CUDA NPP library
              * to detect connected regions and will return a mask with the resulting labels. If the input image is too
@@ -168,7 +178,7 @@ namespace PLImg {
              * This functions allows to find the largest region and will return a mask of it in combination with its
              * size as an integer value. This method will use the CUDA NPP library to create a histogram of the labels
              * @brief Get mask and size of the largest component from connected components mask
-             * @param Output image of connectedComponents (const cv::Mat& image)
+             * @param connetedComponentsImage Output image of connectedComponents (const cv::Mat& image)
              * @return Pair of the largest region mask and the number of pixels in the mask.
              */
             std::pair<cv::Mat, int> largestComponent(const cv::Mat& connectedComponentsImage);
