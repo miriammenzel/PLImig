@@ -292,12 +292,16 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
                 std::cerr << e.what() << std::endl;
             }
 
-            if (h5_retardation & !h5_transmittance) {
-                outputHandler.setReferenceModalityTo({*retardation_handler});
-            } else if (h5_transmittance & !h5_retardation) {
-                outputHandler.setReferenceModalityTo({*transmittance_handler});
-            } else if (h5_transmittance && h5_retardation) {
-                outputHandler.setReferenceModalityTo({*transmittance_handler, *retardation_handler});
+            try {
+                if (h5_retardation & !h5_transmittance) {
+                    outputHandler.setReferenceModalityTo({*retardation_handler});
+                } else if (h5_transmittance & !h5_retardation) {
+                    outputHandler.setReferenceModalityTo({*transmittance_handler});
+                } else if (h5_transmittance && h5_retardation) {
+                    outputHandler.setReferenceModalityTo({*transmittance_handler, *retardation_handler});
+                }
+            } catch (MissingAttributeException& e) {
+                std::cerr << e.what() << std::endl;
             }
 
             outputHandler.addCreator();

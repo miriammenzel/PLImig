@@ -49,6 +49,7 @@ cv::Mat PLImg::Histogram::curvature(cv::Mat hist, float histLow, float histHigh)
     kappa.setTo(0.0f);
 
     float d1, d2;
+    #pragma omp parallel for private(d1, d2) default(shared)
     for (int i = 1; i < kappa.rows - 1; ++i) {
         d1 = (curvatureHist.at<float>(i + 1) - curvatureHist.at<float>(i - 1)) / (2.0f * stepSize);
         d2 = (curvatureHist.at<float>(i + 1) - 2.0f * curvatureHist.at<float>(i) +
