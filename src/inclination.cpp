@@ -99,7 +99,7 @@ float PLImg::Inclination::im() {
         if(!m_regionGrowingMask) {
             cv::Mat backgroundMask = *m_whiteMask | *m_grayMask;
             m_regionGrowingMask = std::make_unique<cv::Mat>(
-                    PLImg::Image::largestAreaConnectedComponents(*m_retardation, backgroundMask));
+                    PLImg::cuda::labeling::largestAreaConnectedComponents(*m_retardation, backgroundMask));
         }
         m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask & (*m_blurredMask > 0.95))[0]);
     }
@@ -167,7 +167,7 @@ float PLImg::Inclination::rmaxWhite() {
         if (!m_regionGrowingMask) {
             cv::Mat backgroundMask = *m_whiteMask | *m_grayMask;
             m_regionGrowingMask = std::make_unique<cv::Mat>(
-                    PLImg::Image::largestAreaConnectedComponents(*m_retardation, backgroundMask));
+                    PLImg::cuda::labeling::largestAreaConnectedComponents(*m_retardation, backgroundMask));
         }
 
         size_t numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.95));
