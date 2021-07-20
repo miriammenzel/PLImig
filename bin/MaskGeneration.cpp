@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     CLI::App app;
 
     // Get the number of threads for all following steps
-    uint numThreads;
+    int numThreads;
     #pragma omp parallel
     numThreads = omp_get_num_threads();
     cv::setNumThreads(numThreads);
