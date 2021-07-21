@@ -259,6 +259,13 @@ cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLa
     return hist;
 }
 
+float PLImg::cuda::filters::getMedianFilterMemoryEstimation(const std::shared_ptr<cv::Mat>& image) {
+    return float(image->total()) * float(image->elemSize()) * 2.1;
+}
+float PLImg::cuda::filters::getMedianFilterMaskedMemoryEstimation(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask) {
+    return float(image->total()) * float(image->elemSize()) * 3.1;
+}
+
 std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_ptr<cv::Mat>& image) {
     PLImg::cuda::runCUDAchecks();
 
@@ -275,8 +282,8 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_pt
     CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
     // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
     // with the power of four (1, 4, 16, 256, 1024, ...)
-    if(double(image->total()) * image->elemSize() * 2.1 > double(freeMem)) {
-        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 2.1 / double(freeMem)) / log(4))));
+    if(getMedianFilterMemoryEstimation(image) > double(freeMem)) {
+        numberOfChunks = fmax(1, pow(4.0, ceil(log(getMedianFilterMemoryEstimation(image) / double(freeMem)) / log(4))));
     }
     // Each dimensions will get the same number of chunks. Calculate them by using the square root.
     uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
@@ -339,8 +346,8 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
     CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
     // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
     // with the power of four (1, 4, 16, 256, 1024, ...)
-    if(double(image->total()) * image->elemSize() * 3.1 > double(freeMem)) {
-        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 3.1 / double(freeMem)) / log(4))));
+    if(getMedianFilterMaskedMemoryEstimation(image, mask) > double(freeMem)) {
+        numberOfChunks = fmax(1, pow(4.0, ceil(log(getMedianFilterMaskedMemoryEstimation(image, mask) / double(freeMem)) / log(4))));
     }
     // Each dimensions will get the same number of chunks. Calculate them by using the square root.
     uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
@@ -391,67 +398,20 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
     return std::make_shared<cv::Mat>(result);
 }
 
-cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
-    PLImg::cuda::runCUDAchecks();
-    cv::Mat result = cv::Mat(image.rows, image.cols, CV_32SC1);
+float PLImg::cuda::labeling::getLargestAreaConnectedComponentsMemoryEstimation(const cv::Mat& image) {
+    return getConnectedComponentsMemoryEstimation(image) +
+    getConnectedComponentsLargestComponentMemoryEstimation(image);
+}
 
-    // Calculate the number of chunks for the Connected Components algorithm
-    unsigned numberOfChunks = 1;
-    unsigned chunksPerDim;
-    float predictedMemoryUsage = float(image.total()) * sizeof(unsigned char) + 3.0f * image.total() * sizeof(uint) +
-            CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * (sizeof(uint) + sizeof(unsigned char));
-    if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
-        numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
-    }
-    chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
+float PLImg::cuda::labeling::getConnectedComponentsMemoryEstimation(const cv::Mat& image) {
+    return float(image.total()) * sizeof(unsigned char) + 3.0f * image.total() * sizeof(uint) +
+    CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * (sizeof(uint) + sizeof(unsigned char));
+}
 
-    // Chunked connected components algorithm.
-    // Labels right on the edges will be wrong. This will be fixed in the next step.
-    int xMin, xMax, yMin, yMax;
-
-    cv::Mat subImage, subResult, subMask, croppedImage;
-    uint nextLabelNumber = 0;
-    uint maxLabelNumber = 0;
-
-    for (uint it = 0; it < numberOfChunks; ++it) {
-        std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
-        std::flush(std::cout);
-        // Calculate image boarders
-        xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
-        xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
-        yMin = (it / chunksPerDim) * image.rows / chunksPerDim;
-        yMax = fmin((it / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
-
-        croppedImage = cv::Mat(image, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subImage);
-        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subResult);
-        croppedImage.release();
-
-        cv::copyMakeBorder(subImage, subImage, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
-        cv::copyMakeBorder(subResult, subResult, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
-
-        subResult = PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(subImage, &maxLabelNumber);
-
-        // Increase label number according to the previous chunk. Set background back to 0
-        subMask = subResult == 0;
-        subResult = subResult + cv::Scalar(nextLabelNumber, 0, 0);
-        subResult.setTo(0, subMask);
-        nextLabelNumber = nextLabelNumber + maxLabelNumber;
-
-        cv::Rect srcRect = cv::Rect(1, 1, subResult.cols - 2, subResult.rows - 2);
-        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
-        subResult(srcRect).copyTo(result(dstRect));
-    }
-    std::cout << "\nNumber of labels: " << nextLabelNumber << std::endl;
-
-    // Set values of our result labeling to 0 if those originally were caused by the background.
-    // Sometimes NPP still does use those pixels for the labeling with connected components.
-    // However this behaviour is not deterministic.
-    result.setTo(0, image == 0);
-    // Merge labels if more than one chunk were needed. This fixes any issues where there might be an overlap.
-    connectedComponentsMergeChunks(result, numberOfChunks);
-    return result;
+float PLImg::cuda::labeling::getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image) {
+    double minVal, maxVal;
+    cv::minMaxIdx(image, &minVal, &maxVal);
+    return getHistogramMemoryEstimation(image, uint(maxVal - minVal));
 }
 
 cv::Mat PLImg::cuda::labeling::largestAreaConnectedComponents(const cv::Mat& image, cv::Mat mask, float percentPixels) {
@@ -507,6 +467,68 @@ cv::Mat PLImg::cuda::labeling::largestAreaConnectedComponents(const cv::Mat& ima
     } else {
         return component.first;
     }
+}
+
+cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
+    PLImg::cuda::runCUDAchecks();
+    cv::Mat result = cv::Mat(image.rows, image.cols, CV_32SC1);
+
+    // Calculate the number of chunks for the Connected Components algorithm
+    unsigned numberOfChunks = 1;
+    unsigned chunksPerDim;
+    float predictedMemoryUsage = getConnectedComponentsMemoryEstimation(image);
+    if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
+        numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
+    }
+    chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
+
+    // Chunked connected components algorithm.
+    // Labels right on the edges will be wrong. This will be fixed in the next step.
+    int xMin, xMax, yMin, yMax;
+
+    cv::Mat subImage, subResult, subMask, croppedImage;
+    uint nextLabelNumber = 0;
+    uint maxLabelNumber = 0;
+
+    for (uint it = 0; it < numberOfChunks; ++it) {
+        std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
+        std::flush(std::cout);
+        // Calculate image boarders
+        xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
+        xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
+        yMin = (it / chunksPerDim) * image.rows / chunksPerDim;
+        yMax = fmin((it / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
+
+        croppedImage = cv::Mat(image, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subImage);
+        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+        croppedImage.copyTo(subResult);
+        croppedImage.release();
+
+        cv::copyMakeBorder(subImage, subImage, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
+        cv::copyMakeBorder(subResult, subResult, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
+
+        subResult = PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(subImage, &maxLabelNumber);
+
+        // Increase label number according to the previous chunk. Set background back to 0
+        subMask = subResult == 0;
+        subResult = subResult + cv::Scalar(nextLabelNumber, 0, 0);
+        subResult.setTo(0, subMask);
+        nextLabelNumber = nextLabelNumber + maxLabelNumber;
+
+        cv::Rect srcRect = cv::Rect(1, 1, subResult.cols - 2, subResult.rows - 2);
+        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+        subResult(srcRect).copyTo(result(dstRect));
+    }
+    std::cout << "\nNumber of labels: " << nextLabelNumber << std::endl;
+
+    // Set values of our result labeling to 0 if those originally were caused by the background.
+    // Sometimes NPP still does use those pixels for the labeling with connected components.
+    // However this behaviour is not deterministic.
+    result.setTo(0, image == 0);
+    // Merge labels if more than one chunk were needed. This fixes any issues where there might be an overlap.
+    connectedComponentsMergeChunks(result, numberOfChunks);
+    return result;
 }
 
 void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int numberOfChunks) {

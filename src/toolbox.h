@@ -136,9 +136,9 @@ namespace PLImg {
         }
 
         namespace labeling {
-            unsigned long long getLargestAreaConnectedComponentsMemoryEstimation(const cv::Mat& image);
-            unsigned long long getConnectedComponentsMemoryEstimation(const cv::Mat& image);
-            unsigned long long getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image);
+            float getLargestAreaConnectedComponentsMemoryEstimation(const cv::Mat& image);
+            float getConnectedComponentsMemoryEstimation(const cv::Mat& image);
+            float getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image);
 
             /**
              * This method allows to search the largest connected component in an image. This connected component will
