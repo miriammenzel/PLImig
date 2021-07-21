@@ -147,7 +147,7 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
     unsigned long long selected_element;
 
     // Fill transmittance and retardation with random pixels from our base images
-    #pragma omp parallel for
+    #pragma omp parallel for private(selected_element) shared(distribution, random_engines)
     for(int y = 0; y < small_retardation.rows; ++y) {
         for (int x = 0; x < small_retardation.cols; ++x) {
             selected_element = distribution(random_engines.at(omp_get_thread_num()));
