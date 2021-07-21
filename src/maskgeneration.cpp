@@ -46,9 +46,6 @@ PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std:
         m_minRetardation = 0;
         m_maxRetardation = 1;
     }
-
-    std::cout << "Transmittance range: " << m_minTransmittance << " -- " << m_maxTransmittance << "\n"
-              << "Retardation range: " << m_minRetardation << " -- " << m_maxRetardation << std::endl;
 }
 
 void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) {
@@ -315,11 +312,12 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
 
         std::cout << _OPENMP << std::endl;
         #if _OPENMP < 201611
-                omp_set_nested(true);
+            //omp_set_nested(true);
         #endif
         auto omp_levels = omp_get_max_active_levels();
         omp_set_max_active_levels(3);
-        #pragma omp parallel shared(numberOfThreads, above_tRet, above_tTra, below_tRet, below_tTra)
+        ushort numberOfFinishedIterations = 0;
+        #pragma omp parallel shared(numberOfThreads, above_tRet, above_tTra, below_tRet, below_tTra, numberOfFinishedIterations)
         {
             // Only work with valid threads. The other threads won't do any work.
             if(omp_get_thread_num() < numberOfThreads) {
@@ -330,9 +328,6 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
                 float t_ret, t_tra;
 
                 for (unsigned i = 0; i < PROBABILITY_MASK_ITERATIONS / numberOfThreads; ++i) {
-                    std::cout << "\rProbability Mask Generation: Iteration " << i << " of "
-                              << PROBABILITY_MASK_ITERATIONS / numberOfThreads << std::endl;
-                    //std::flush(std::cout);
                     auto small_modalities = Image::randomizedModalities(m_transmittance, m_retardation, 0.5f);
                     small_transmittance = std::make_shared<cv::Mat>(small_modalities[0]);
                     small_retardation = std::make_shared<cv::Mat>(small_modalities[1]);
@@ -358,6 +353,14 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
                         #pragma omp critical
                         below_tTra.push_back(t_tra);
                     }
+
+                    #pragma omp critical
+                    {
+                        ++numberOfFinishedIterations;
+                        std::cout << "\rProbability Mask Generation: Iteration " << numberOfFinishedIterations << " of "
+                                  << PROBABILITY_MASK_ITERATIONS;
+                        std::flush(std::cout);
+                    };
                 }
                 small_transmittance = nullptr;
                 small_retardation = nullptr;
@@ -366,7 +369,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         }
         omp_set_max_active_levels(omp_levels);
         #if _OPENMP < 201611
-                omp_set_nested(false);
+            //omp_set_nested(false);
         #endif
 
         std::cout << std::endl;
