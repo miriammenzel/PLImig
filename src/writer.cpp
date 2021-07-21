@@ -141,11 +141,11 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
             } catch (...) {}
             m_hdf5file.link(H5G_LINK_SOFT, dataset, "/pyramid/00");
         }
-
         dset.close();
         dataSpace.close();
         dtype.close();
     }
+    m_hdf5file.flush(H5F_SCOPE_GLOBAL);
 }
 
 void PLImg::HDF5Writer::create_group(const std::string& group) {
