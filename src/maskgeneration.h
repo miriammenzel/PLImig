@@ -28,7 +28,7 @@
 #include <iostream>
 #include <memory>
 #include <omp.h>
-#include <opencv2/core.hpp>
+#include <opencv2/opencv.hpp>
 
 #include "toolbox.h"
 

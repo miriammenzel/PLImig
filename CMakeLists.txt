@@ -18,7 +18,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 if(NOT DEFINED ${CMAKE_CUDA_ARCHITECTURES})
     set(CMAKE_CUDA_ARCHITECTURES 60 61 70 75 80)
@@ -34,7 +34,7 @@ find_package(Filesystem REQUIRED)
 find_package(NIFTI REQUIRED)
 
 
-option(PLIM_SUBMODULE "Build plim through submodule. If this option is disabled CMake will try to find a local installation of plim" ON)
+option(PLIM_SUBMODULE "Build plim through submodule. If this option is disabled CMake will try to find a local installation of plim" OFF)
 if(PLIM_SUBMODULE)
     add_subdirectory(extern/PLIM)
     set(PLIM_LIBRARIES plim)

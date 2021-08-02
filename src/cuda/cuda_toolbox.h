@@ -34,8 +34,7 @@
 #include <memory>
 #include <thrust/device_vector.h>
 #include <thrust/unique.h>
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
 /**
  * @file

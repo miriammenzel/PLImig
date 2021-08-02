@@ -312,7 +312,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
 
         std::cout << _OPENMP << std::endl;
         #if _OPENMP < 201611
-            //omp_set_nested(true);
+            omp_set_nested(true);
         #endif
         auto omp_levels = omp_get_max_active_levels();
         omp_set_max_active_levels(3);
@@ -369,7 +369,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         }
         omp_set_max_active_levels(omp_levels);
         #if _OPENMP < 201611
-            //omp_set_nested(false);
+            omp_set_nested(false);
         #endif
 
         std::cout << std::endl;

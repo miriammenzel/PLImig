@@ -28,8 +28,7 @@
 #include "cuda/define.h"
 #include <numeric>
 #include <omp.h>
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
 #include <random>
 #include <set>
 #include <thrust/device_vector.h>

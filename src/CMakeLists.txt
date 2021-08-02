@@ -26,5 +26,5 @@ set(HEADER
 
 # Generate executable file
 add_library(PLImig SHARED ${SOURCE})
-target_link_libraries(PLImig ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
+target_link_libraries(PLImig ${OpenCV_LIBS} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
         CUDA::cudart OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem ${PLIM_LIBRARIES})

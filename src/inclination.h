@@ -27,8 +27,7 @@
 
 #include <cmath>
 #include <memory>
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
 #include "toolbox.h"
 
 typedef std::shared_ptr<cv::Mat> sharedMat;
