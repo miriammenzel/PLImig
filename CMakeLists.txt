@@ -34,7 +34,7 @@ find_package(Filesystem REQUIRED)
 find_package(NIFTI REQUIRED)
 
 
-option(PLIM_SUBMODULE "Build plim through submodule. If this option is disabled CMake will try to find a local installation of plim" OFF)
+option(PLIM_SUBMODULE "Build plim through submodule. If this option is disabled CMake will try to find a local installation of plim" ON)
 if(PLIM_SUBMODULE)
     add_subdirectory(extern/PLIM)
     set(PLIM_LIBRARIES plim)
