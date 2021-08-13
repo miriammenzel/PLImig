@@ -7,7 +7,7 @@ project(PLImig LANGUAGES C CXX CUDA VERSION 1.2.0)
 
 # Set a default build type if none was specified
 set(default_build_type "Debug")
-add_definitions(-DTIME_MEASUREMENT)
+# add_definitions(-DTIME_MEASUREMENT)
 
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

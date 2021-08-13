@@ -32,7 +32,15 @@
 #include <string>
 #include <iostream>
 
+#ifdef TIME_MEASUREMENT
+    #pragma message("Time measurement enabled.")
+    #include <chrono>
+#endif
+
 int main(int argc, char** argv) {
+    #ifdef TIME_MEASUREMENT
+        auto start = std::chrono::high_resolution_clock::now();
+    #endif
     CLI::App app;
 
     // Get the number of threads for all following steps
@@ -196,5 +204,11 @@ int main(int argc, char** argv) {
         }
     }
 
+    #ifdef TIME_MEASUREMENT
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+
+        std::cout << "Runtime was " << duration.count() << std::endl;
+    #endif
     return EXIT_SUCCESS;
 }
