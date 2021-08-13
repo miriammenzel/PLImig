@@ -223,7 +223,8 @@ float PLImg::MaskGeneration::tMax() {
 
         //If the transmittance was masked, we should see a large maxCurvature with 0 values after the highest peak
         if(endPosition - startPosition < 2) {
-            this->m_tMax = std::make_unique<float>(float(startPosition)/MAX_NUMBER_OF_BINS);
+            float stepSize = float(histMaximum - m_minTransmittance) / float(MAX_NUMBER_OF_BINS);
+            this->m_tMax = std::make_unique<float>(m_minTransmittance + startPosition * stepSize);
         }
         //Else do the normal calculation
         else {
@@ -233,13 +234,9 @@ float PLImg::MaskGeneration::tMax() {
 
             float temp_tMax;
             for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
-                cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
-                for (unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
-                    unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                    unsigned myEndPos = (i + 1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                    hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos,
-                                                        fullHist.begin<float>() + myEndPos, 0.0f);
-                }
+                cv::Mat hist = PLImg::cuda::histogram(*m_transmittance, m_minTransmittance,
+                                                      histMaximum,
+                                                      NUMBER_OF_BINS);
                 cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32FC1);
 
                 float stepSize = float(histMaximum - m_minTransmittance) / float(NUMBER_OF_BINS);
@@ -327,7 +324,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
 
                 float t_ret, t_tra;
 
-                for (unsigned i = 0; i < PROBABILITY_MASK_ITERATIONS / numberOfThreads; ++i) {
+                for (int i = 0; i < ceil(float(PROBABILITY_MASK_ITERATIONS) / numberOfThreads); ++i) {
                     auto small_modalities = Image::randomizedModalities(m_transmittance, m_retardation, 0.5f);
                     small_transmittance = std::make_shared<cv::Mat>(small_modalities[0]);
                     small_retardation = std::make_shared<cv::Mat>(small_modalities[1]);

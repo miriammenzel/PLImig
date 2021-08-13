@@ -198,7 +198,6 @@ float PLImg::Inclination::rmaxWhite() {
 
 sharedMat PLImg::Inclination::inclination() {
     if(!m_inclination) {
-        std::cout << rmaxWhite() << " " << rmaxGray() << " " << im() << " " << ic() << std::endl;
         m_inclination = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
         float tmpVal;
         float blurredMaskVal;

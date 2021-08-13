@@ -168,7 +168,7 @@ unsigned long long PLImg::Image::maskCountNonZero(const cv::Mat &mask) {
     #pragma omp parallel for reduction(+ : nonZeroPixels) collapse(2)
     for(int x = 0; x < mask.cols; ++x) {
         for(int y = 0; y < mask.rows; ++y) {
-            if(mask.at<uchar>(x, y) > 0) ++nonZeroPixels;
+            if(mask.at<uchar>(y, x) > 0) ++nonZeroPixels;
         }
     }
 
