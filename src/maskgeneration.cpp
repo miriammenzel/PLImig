@@ -318,6 +318,8 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         {
             // Only work with valid threads. The other threads won't do any work.
             if(omp_get_thread_num() < numberOfThreads) {
+                std::cout << "Spawning max " << fmin(1, omp_get_thread_limit() / numberOfThreads) << " threads" << std::endl;
+                omp_set_num_threads(fmin(1, omp_get_thread_limit() / numberOfThreads));
                 std::shared_ptr<cv::Mat> small_retardation;
                 std::shared_ptr<cv::Mat> small_transmittance;
                 MaskGeneration generation(small_retardation, small_transmittance);
