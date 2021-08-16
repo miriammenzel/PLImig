@@ -216,7 +216,11 @@ ulong PLImg::cuda::getTotalMemory() {
 }
 
 float PLImg::cuda::getHistogramMemoryEstimation(const cv::Mat& image, uint numBins) {
-    return float(CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * numBins + image.total()) * sizeof(float);
+    if(numBins * sizeof(uint) < 49152) {
+        return float(ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * numBins) * sizeof(uint) + image.total() * sizeof(float);
+    } else {
+        return float(numBins * sizeof(uint) + image.total() * sizeof(float));
+    }
 }
 
 cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLabel, uint numBins) {

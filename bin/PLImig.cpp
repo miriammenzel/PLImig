@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
     auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
     parameters->add_option("--ilower", ttra, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--rtres", tret, "Plateau in retardation histogram")
+    parameters->add_option("--rthres", tret, "Plateau in retardation histogram")
               ->default_val(-1);
     parameters->add_option("--irmax", tmin, "Average transmittance value of brightest retardation values")
               ->default_val(-1);

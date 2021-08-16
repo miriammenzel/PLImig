@@ -305,9 +305,9 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         int numberOfThreads;
         #pragma omp parallel
         numberOfThreads = omp_get_num_threads();
-        numberOfThreads = fmin(numberOfThreads, uint(float(PLImg::cuda::getFreeMemory()) / predictedMemoryUsage));
+        numberOfThreads = fmax(1, fmin(numberOfThreads, uint(float(PLImg::cuda::getFreeMemory()) / predictedMemoryUsage)));
 
-        std::cout << _OPENMP << std::endl;
+        std::cout << "OpenMP version used during compilation (doesn't have to match the executing OpenMP version): " << _OPENMP << std::endl;
         #if _OPENMP < 201611
             omp_set_nested(true);
         #endif
@@ -316,20 +316,26 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         ushort numberOfFinishedIterations = 0;
         #pragma omp parallel shared(numberOfThreads, above_tRet, above_tTra, below_tRet, below_tTra, numberOfFinishedIterations)
         {
+            #pragma omp single
+            {
+                std::cout << "Computing " << numberOfThreads << " iterations in parallel with max. " << omp_get_max_threads() / numberOfThreads << " threads per iteration." << std::endl;
+            }
+            omp_set_num_threads(omp_get_max_threads() / numberOfThreads);
+
             // Only work with valid threads. The other threads won't do any work.
             if(omp_get_thread_num() < numberOfThreads) {
-                #pragma omp single
-                {
-                    std::cout << "Spawning max " << fmin(1, omp_get_thread_limit() / numberOfThreads) << " threads" << std::endl;
-                }
-                omp_set_num_threads(fmin(1, omp_get_thread_limit() / numberOfThreads));
                 std::shared_ptr<cv::Mat> small_retardation;
                 std::shared_ptr<cv::Mat> small_transmittance;
                 MaskGeneration generation(small_retardation, small_transmittance);
 
                 float t_ret, t_tra;
+                uint ownNumberOfIterations = PROBABILITY_MASK_ITERATIONS / numberOfThreads;
+                uint overhead = PROBABILITY_MASK_ITERATIONS % numberOfThreads;
+                if (overhead > 0 && omp_get_thread_num() < overhead) {
+                    ++ownNumberOfIterations;
+                }
 
-                for (int i = 0; i < ceil(float(PROBABILITY_MASK_ITERATIONS) / numberOfThreads); ++i) {
+                for (int i = 0; i < ownNumberOfIterations; ++i) {
                     auto small_modalities = Image::randomizedModalities(m_transmittance, m_retardation, 0.5f);
                     small_transmittance = std::make_shared<cv::Mat>(small_modalities[0]);
                     small_retardation = std::make_shared<cv::Mat>(small_modalities[1]);
