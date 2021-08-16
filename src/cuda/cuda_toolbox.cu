@@ -151,7 +151,9 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
     uint* deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
     // Save the new maximum label as a return value for the user
     uint distance = thrust::distance(deviceUniqueMask, deviceMaxUniqueLabel);
-    *maxLabelNumber = distance;
+    if(maxLabelNumber) {
+        *maxLabelNumber = distance;
+    }
     // Reduce numbers in label image to low numbers for following algorithms
     connectedComponentsReduceComponents<<<numBlocks, threadsPerBlock>>>(deviceMask, kernelImage.cols,
                                                                         deviceUniqueMask,
