@@ -408,8 +408,9 @@ float PLImg::cuda::labeling::getLargestAreaConnectedComponentsMemoryEstimation(c
 }
 
 float PLImg::cuda::labeling::getConnectedComponentsMemoryEstimation(const cv::Mat& image) {
-    return float(image.total()) * sizeof(unsigned char) + 3.0f * image.total() * sizeof(uint) +
-    CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * (sizeof(uint) + sizeof(unsigned char));
+    return float(image.total()) * sizeof(unsigned char) + 4.0f * image.total() * sizeof(uint) +
+    ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * 
+    (sizeof(uint) + sizeof(unsigned char));
 }
 
 float PLImg::cuda::labeling::getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image) {
