@@ -24,11 +24,6 @@
 
 #include "maskgeneration.h"
 
-#ifdef TIME_MEASUREMENT
-    #pragma message("Time measurement enabled.")
-    #include <chrono>
-#endif
-
 PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) :
         m_retardation(std::move(retardation)), m_transmittance(std::move(transmittance)), m_tMin(nullptr), m_tMax(nullptr),
         m_tRet(nullptr), m_tTra(nullptr), m_whiteMask(nullptr), m_grayMask(nullptr), m_probabilityMask(nullptr) {
@@ -180,7 +175,6 @@ float PLImg::MaskGeneration::tRet() {
             startPosition = fmax(0, (resultingBin - 2) * 2 - 1);
             endPosition = fmin((resultingBin + 2) * 2 + 1, NUMBER_OF_BINS << 1);
         }
-
         this->m_tRet = std::make_unique<float>(temp_tRet);
     }
     return *this->m_tRet;
@@ -278,8 +272,26 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::whiteMask() {
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::fullMask() {
-    cv::Mat mask = *whiteMask() | *grayMask();
-    return std::make_shared<cv::Mat>(mask);
+    if(!m_fullMask) {
+        if (!m_whiteMask) whiteMask();
+        if (!m_grayMask) grayMask();
+
+        cv::Mat mask(m_whiteMask->rows, m_whiteMask->cols, CV_8UC1);
+
+        #pragma omp parallel for
+        for (int i = 0; i < mask.total(); ++i) {
+            // Set value based on white or gray
+            if (m_whiteMask->at<unsigned char>(i)) {
+                mask.at<unsigned char>(i) = WHITE_VALUE;
+            } else if (m_grayMask->at<unsigned char>(i)) {
+                mask.at<unsigned char>(i) = GRAY_VALUE;
+            } else {
+                mask.at<unsigned char>(i) = 0;
+            }
+        }
+
+        return std::make_shared<cv::Mat>(mask);
+    }
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {

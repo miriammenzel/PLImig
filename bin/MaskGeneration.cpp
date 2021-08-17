@@ -148,12 +148,8 @@ int main(int argc, char** argv) {
                 medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittance");
                 // Set file
                 writer.set_path(output_folder + "/" + medTraName + ".h5");
-                // Set dataset
-                std::string group = dataset.substr(0, dataset.find_last_of('/'));
-                // Create group and dataset
-                writer.create_group(group);
-                writer.write_dataset(dataset + "/", *medTransmittance, true);
-                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittance", argc, argv);
+                writer.write_dataset("/Image", *medTransmittance, true);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "median10NTransmittance", argc, argv);
                 writer.close();
             } else {
                 medTransmittance = transmittance;
@@ -174,29 +170,23 @@ int main(int argc, char** argv) {
             if(tmax >= 0) {
                 generation.set_tMax(tmax);
             }
-            writer.set_path(output_folder + "/" + mask_basename + ".h5");
-            writer.create_group(dataset);
-            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Mask", argc, argv);
-            writer.write_attribute(dataset, "I_lower", generation.tTra());
-            writer.write_attribute(dataset, "r_tres", generation.tRet());
-            writer.write_attribute(dataset, "I_rmax", generation.tMin());
-            writer.write_attribute(dataset, "I_upper", generation.tMax());
-            writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
-            std::cout << "Attributes generated and written" << std::endl;
-            writer.write_dataset(dataset + "/White", *generation.whiteMask());
-            std::cout << "White mask generated and written" << std::endl;
-            writer.write_dataset(dataset + "/Gray", *generation.grayMask());
-            std::cout << "Gray mask generated and written" << std::endl;
-            writer.write_dataset(dataset + "/Mask", *generation.fullMask(), true);
+            writer.set_path(output_folder + "/" + mask_basename + ".h5");
+            writer.write_dataset("/Image", *generation.fullMask(), true);
+            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
+            writer.write_attribute("/Image", "I_lower", generation.tTra());
+            writer.write_attribute("/Image", "r_thres", generation.tRet());
+            writer.write_attribute("/Image", "I_rmax", generation.tMin());
+            writer.write_attribute("/Image", "I_upper", generation.tMax());
+            writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
             std::cout << "Full mask generated and written" << std::endl;
 
             if (blurred) {
-                writer.write_dataset(dataset + "/Probability", *generation.probabilityMask());
-                std::cout << "Blurred mask generated and written" << std::endl;
+                writer.write_dataset("/Probability", *generation.probabilityMask());
+                std::cout << "Probability mask generated and written" << std::endl;
             }
             if (detailed) {
-                writer.write_dataset(dataset + "/NoNerveFibers", *generation.noNerveFiberMask());
+                writer.write_dataset("/NoNerveFibers", *generation.noNerveFiberMask());
                 std::cout << "Detailed masks generated and written" << std::endl;
             }
             writer.close();

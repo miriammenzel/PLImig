@@ -60,8 +60,7 @@ namespace PLImg {
          * @param whiteMask White mask
          * @param grayMask Gray mask
          */
-        Inclination(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask,
-                    sharedMat whiteMask, sharedMat grayMask);
+        Inclination(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask, sharedMat mask);
         /**
          * Set parameter maps manually. All parameters will be reset so that the inclination will be calculated newly.
          * @param transmittance NTransmittance parameter map
@@ -70,8 +69,7 @@ namespace PLImg {
          * @param whiteMask White mask
          * @param grayMask Gray mask
          */
-        void setModalities(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask, sharedMat whiteMask,
-                           sharedMat grayMask);
+        void setModalities(sharedMat transmittance, sharedMat retardation, sharedMat blurredMask, sharedMat mask);
 
         /**
          * Get the im value
@@ -171,7 +169,7 @@ namespace PLImg {
         ///
         sharedMat m_transmittance, m_retardation, m_inclination, m_saturation;
         ///
-        sharedMat m_blurredMask, m_whiteMask, m_grayMask;
+        sharedMat m_blurredMask, m_mask;
 
     };
 }

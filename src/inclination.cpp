@@ -26,23 +26,22 @@
 #include <cmath>
 #include <iostream>
 
-PLImg::Inclination::Inclination() : m_transmittance(), m_retardation(), m_blurredMask(), m_whiteMask(), m_grayMask(),
+PLImg::Inclination::Inclination() : m_transmittance(), m_retardation(), m_blurredMask(), m_mask(),
                                     m_im(nullptr), m_ic(nullptr), m_rmaxWhite(nullptr), m_rmaxGray(nullptr),
                                     m_regionGrowingMask(nullptr) {}
 
 PLImg::Inclination::Inclination(sharedMat transmittance, sharedMat retardation,
-                                sharedMat blurredMask, sharedMat whiteMask, sharedMat grayMask) :
+                                sharedMat blurredMask, sharedMat mask) :
                                 m_transmittance(std::move(transmittance)), m_retardation(std::move(retardation)), m_blurredMask(std::move(blurredMask)),
-                                m_whiteMask(std::move(whiteMask)), m_grayMask(std::move(grayMask)), m_im(nullptr), m_ic(nullptr), m_rmaxWhite(nullptr),
+                                m_mask(std::move(mask)), m_im(nullptr), m_ic(nullptr), m_rmaxWhite(nullptr),
                                 m_rmaxGray(nullptr), m_regionGrowingMask(nullptr), m_inclination(nullptr), m_saturation(nullptr) {}
 
 void PLImg::Inclination::setModalities(sharedMat transmittance, sharedMat retardation,
-                                       sharedMat blurredMask, sharedMat whiteMask, sharedMat grayMask) {
+                                       sharedMat blurredMask, sharedMat mask) {
     m_transmittance = std::move(transmittance);
     m_retardation = std::move(retardation);
     m_blurredMask = std::move(blurredMask);
-    m_whiteMask = std::move(whiteMask);
-    m_grayMask = std::move(grayMask);
+    m_mask = std::move(mask);
 
     m_im = nullptr,
     m_ic = nullptr;
@@ -77,7 +76,7 @@ float PLImg::Inclination::ic() {
     if(!m_ic) {
         // ic will be calculated by taking the gray portion of the
         // transmittance and calculating the maximum value in the histogram
-        cv::Mat selection = *m_grayMask & *m_blurredMask < 0.05;
+        cv::Mat selection = (*m_mask == GRAY_VALUE) & *m_blurredMask < 0.05;
 
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f};
@@ -97,7 +96,7 @@ float PLImg::Inclination::im() {
     if(!m_im) {
         // im is the mean value in the transmittance based on the highest retardation values
         if(!m_regionGrowingMask) {
-            cv::Mat backgroundMask = *m_whiteMask | *m_grayMask;
+            cv::Mat backgroundMask = *m_mask > 0;
             m_regionGrowingMask = std::make_unique<cv::Mat>(
                     PLImg::cuda::labeling::largestAreaConnectedComponents(*m_retardation, backgroundMask));
         }
@@ -165,7 +164,7 @@ float PLImg::Inclination::rmaxWhite() {
     if(!m_rmaxWhite) {
         // rmaxWhite is the mean value in the retardation based on the highest retardation values
         if (!m_regionGrowingMask) {
-            cv::Mat backgroundMask = *m_whiteMask | *m_grayMask;
+            cv::Mat backgroundMask = *m_mask > 0;
             m_regionGrowingMask = std::make_unique<cv::Mat>(
                     PLImg::cuda::labeling::largestAreaConnectedComponents(*m_retardation, backgroundMask));
         }
@@ -211,7 +210,7 @@ sharedMat PLImg::Inclination::inclination() {
         for(int y = 0; y < m_inclination->rows; ++y) {
             for(int x = 0; x < m_inclination->cols; ++x) {
                 // If pixel is in tissue
-                if(m_whiteMask->at<bool>(y, x) || m_grayMask->at<bool>(y, x)) {
+                if(m_mask->at<unsigned short>(y, x) > 0) {
                     blurredMaskVal = m_blurredMask->at<float>(y, x);
                     if(blurredMaskVal > 0.95) {
                         blurredMaskVal = 1;

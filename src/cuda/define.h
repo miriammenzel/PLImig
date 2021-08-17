@@ -23,5 +23,7 @@
     } \
 } while (false)
 
+#define WHITE_VALUE 200
+#define GRAY_VALUE 100
 
 #endif //PLIMIG_DEFINE_H
