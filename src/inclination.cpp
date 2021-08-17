@@ -210,7 +210,7 @@ sharedMat PLImg::Inclination::inclination() {
         for(int y = 0; y < m_inclination->rows; ++y) {
             for(int x = 0; x < m_inclination->cols; ++x) {
                 // If pixel is in tissue
-                if(m_mask->at<unsigned short>(y, x) > 0) {
+                if(m_mask->at<unsigned char>(y, x) > 0) {
                     blurredMaskVal = m_blurredMask->at<float>(y, x);
                     if(blurredMaskVal > 0.95) {
                         blurredMaskVal = 1;
