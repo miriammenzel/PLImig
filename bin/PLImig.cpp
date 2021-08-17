@@ -176,10 +176,10 @@ int main(int argc, char** argv) {
 
             writer.write_dataset("Image", *generation.fullMask(), true);
             writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
-            writer.write_attribute("/Image", "I_lower", generation.tTra());
+            writer.write_attribute("/Image", "i_lower", generation.tTra());
             writer.write_attribute("/Image", "r_thres", generation.tRet());
-            writer.write_attribute("/Image", "I_rmax", generation.tMin());
-            writer.write_attribute("/Image", "I_upper", generation.tMax());
+            writer.write_attribute("/Image", "i_rmax", generation.tMin());
+            writer.write_attribute("/Image", "i_upper", generation.tMax());
             writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
             std::cout << "Mask generated and written" << std::endl;
 
@@ -209,8 +209,8 @@ int main(int argc, char** argv) {
             writer.write_dataset("/Image", *inclination.inclination(), true);
             writer.write_attribute("/Image", "im", inclination.im());
             writer.write_attribute("/Image", "ic", inclination.ic());
-            writer.write_attribute("/Image", "rmax_W", inclination.rmaxWhite());
-            writer.write_attribute("/Image", "rmax_G", inclination.rmaxGray());
+            writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+            writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
             writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
             writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination", argc, argv);
@@ -227,8 +227,8 @@ int main(int argc, char** argv) {
                 writer.write_dataset("/Image", *inclination.saturation(), true);
                 writer.write_attribute("/Image", "im", inclination.im());
                 writer.write_attribute("/Image", "ic", inclination.ic());
-                writer.write_attribute("/Image", "rmax_W", inclination.rmaxWhite());
-                writer.write_attribute("/Image", "rmax_G", inclination.rmaxGray());
+                writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+                writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
                 writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
                 writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;

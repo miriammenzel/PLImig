@@ -174,10 +174,10 @@ int main(int argc, char** argv) {
             writer.set_path(output_folder + "/" + mask_basename + ".h5");
             writer.write_dataset("/Image", *generation.fullMask(), true);
             writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
-            writer.write_attribute("/Image", "I_lower", generation.tTra());
+            writer.write_attribute("/Image", "i_lower", generation.tTra());
             writer.write_attribute("/Image", "r_thres", generation.tRet());
-            writer.write_attribute("/Image", "I_rmax", generation.tMin());
-            writer.write_attribute("/Image", "I_upper", generation.tMax());
+            writer.write_attribute("/Image", "i_rmax", generation.tMin());
+            writer.write_attribute("/Image", "i_upper", generation.tMax());
             writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
             std::cout << "Full mask generated and written" << std::endl;
 

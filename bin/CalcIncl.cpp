@@ -69,8 +69,8 @@ int main(int argc, char** argv) {
     optional->add_flag("--detailed", detailed);
     optional->add_option("--im", im)->default_val(-1);
     optional->add_option("--ic", ic)->default_val(-1);
-    optional->add_option("--rmaxWhite", rmaxWhite)->default_val(-1);
-    optional->add_option("--rmaxGray", rmaxGray)->default_val(-1);
+    optional->add_option("--rmax_white", rmaxWhite)->default_val(-1);
+    optional->add_option("--rmax_gray", rmaxGray)->default_val(-1);
 
     CLI11_PARSE(app, argc, argv);
 
@@ -174,8 +174,8 @@ int main(int argc, char** argv) {
             writer.write_dataset("/Image", *inclination.inclination(), true);
             writer.write_attribute("/Image", "im", inclination.im());
             writer.write_attribute("/Image", "ic", inclination.ic());
-            writer.write_attribute("/Image", "rmax_W", inclination.rmaxWhite());
-            writer.write_attribute("/Image", "rmax_G", inclination.rmaxGray());
+            writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+            writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
             writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
             writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination", argc, argv);
@@ -193,8 +193,8 @@ int main(int argc, char** argv) {
                 writer.write_dataset("/Image", *inclination.saturation(), true);
                 writer.write_attribute("/Image", "im", inclination.im());
                 writer.write_attribute("/Image", "ic", inclination.ic());
-                writer.write_attribute("/Image", "rmax_W", inclination.rmaxWhite());
-                writer.write_attribute("/Image", "rmax_G", inclination.rmaxGray());
+                writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+                writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
                 writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
                 writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination Saturation", argc, argv);
