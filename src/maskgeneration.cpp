@@ -290,8 +290,9 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::fullMask() {
             }
         }
 
-        return std::make_shared<cv::Mat>(mask);
+        m_fullMask = std::make_shared<cv::Mat>(mask);
     }
+    return m_fullMask;
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
