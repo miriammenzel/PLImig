@@ -26,5 +26,10 @@ set(HEADER
 
 # Generate executable file
 add_library(PLImig SHARED ${SOURCE})
-target_link_libraries(PLImig ${OpenCV_LIBRARIES} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
+target_link_libraries(PLImig ${OpenCV_LIBS} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
         CUDA::cudart OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem ${PLIM_LIBRARIES})
+
+# install instructions for CMake
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    install(TARGETS PLImig LIBRARY DESTINATION lib PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ )
+endif()

@@ -3,3 +3,17 @@ build
 cmake-build-release
 .idea
 src/version.cpp
+PLImig.geany
+.gitignore
+PLImig.workspace
+tags
+.codelite/ctags
+.codelite/PLImig.db
+.codelite/PLImig.session
+.vscode/settings.json
+docs/.cproject
+docs/.project
+CMakeLists.txt.user
+*/*/.ipynb_checkpoints/*.ipynb
+*.ipynb
+*.pyc

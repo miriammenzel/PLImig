@@ -7,7 +7,7 @@ FIND_PACKAGE( ZLIB REQUIRED )
 # ==========================================
 FIND_PATH( NIFTI_INCLUDE_DIR
 	nifti1.h
-	/usr/local/include/nifti /usr/include/nifti
+        /usr/local/include/nifti /usr/include/nifti $ENV{ENVPATH}/include/nifti
 )
 
 FIND_LIBRARY( NIFTI_BASE_LIBRARY

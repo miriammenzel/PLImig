@@ -32,11 +32,19 @@
 #include <string>
 #include <iostream>
 
+#ifdef TIME_MEASUREMENT
+    #pragma message("Time measurement enabled.")
+    #include <chrono>
+#endif
+
 int main(int argc, char** argv) {
+    #ifdef TIME_MEASUREMENT
+        auto start = std::chrono::high_resolution_clock::now();
+    #endif
     CLI::App app;
 
     // Get the number of threads for all following steps
-    uint numThreads;
+    int numThreads;
     #pragma omp parallel
     numThreads = omp_get_num_threads();
     cv::setNumThreads(numThreads);
@@ -67,7 +75,7 @@ int main(int argc, char** argv) {
     auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
     parameters->add_option("--ilower", ttra, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--rtres", tret, "Plateau in retardation histogram")
+    parameters->add_option("--rthres", tret, "Plateau in retardation histogram")
               ->default_val(-1);
     parameters->add_option("--irmax", tmin, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
@@ -143,12 +151,8 @@ int main(int argc, char** argv) {
                 medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittance");
                 // Set file
                 writer.set_path(output_folder + "/" + medTraName + ".h5");
-                // Set dataset
-                std::string group = dataset.substr(0, dataset.find_last_of('/'));
-                // Create group and dataset
-                writer.create_group(group);
-                writer.write_dataset(dataset + "/", *medTransmittance, true);
-                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "median10NTransmittance", argc, argv);
+                writer.write_dataset("/Image", *medTransmittance, true);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "median10NTransmittance", argc, argv);
                 writer.close();
             } else {
                 medTransmittance = transmittance;
@@ -169,33 +173,28 @@ int main(int argc, char** argv) {
                 generation.set_tMax(tmax);
             }
             writer.set_path(output_folder + "/" + mask_basename + ".h5");
-            writer.create_group(dataset);
-            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Mask", argc, argv);
-            writer.write_attribute(dataset, "I_lower", generation.tTra());
-            writer.write_attribute(dataset, "r_tres", generation.tRet());
-            writer.write_attribute(dataset, "I_rmax", generation.tMin());
-            writer.write_attribute(dataset, "I_upper", generation.tMax());
-            writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
-            std::cout << "Attributes generated and written" << std::endl;
-            writer.write_dataset(dataset + "/White", *generation.whiteMask());
-            std::cout << "White mask generated and written" << std::endl;
-            writer.write_dataset(dataset + "/Gray", *generation.grayMask());
-            std::cout << "Gray mask generated and written" << std::endl;
-            writer.write_dataset(dataset + "/Mask", *generation.fullMask(), true);
+            writer.write_dataset("Image", *generation.fullMask(), true);
+            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
+            writer.write_attribute("/Image", "i_lower", generation.tTra());
+            writer.write_attribute("/Image", "r_thres", generation.tRet());
+            writer.write_attribute("/Image", "i_rmax", generation.tMin());
+            writer.write_attribute("/Image", "i_upper", generation.tMax());
+            writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
             std::cout << "Mask generated and written" << std::endl;
-            writer.write_dataset(dataset + "/Probability", *generation.probabilityMask());
+
+            writer.write_dataset("/Probability", *generation.probabilityMask());
             std::cout << "Probability mask generated and written" << std::endl;
 
             if (detailed) {
-                writer.write_dataset(dataset + "/NoNerveFibers", *generation.noNerveFiberMask());
+                writer.write_dataset("/NoNerveFibers", *generation.noNerveFiberMask());
                 std::cout << "Detailed masks generated and written" << std::endl;
             }
             writer.close();
 
             if (transmittance_path.find("median10") == std::string::npos) {
                 // Generate med10Transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.grayMask());
+                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.fullMask());
                 transmittance = nullptr;
             } else {
                 medTransmittance = transmittance;
@@ -203,22 +202,18 @@ int main(int argc, char** argv) {
             std::cout << "Median10 filtered and masked transmittance generated" << std::endl;
 
             // Set our read parameters
-            inclination.setModalities(medTransmittance, retardation, generation.probabilityMask(), generation.whiteMask(), generation.grayMask());
+            inclination.setModalities(medTransmittance, retardation, generation.probabilityMask(), generation.fullMask());
 
             // Create file and dataset. Write the inclination afterwards.
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
-            std::string group = dataset.substr(0, dataset.find_last_of('/'));
-            // Create group and dataset
-            writer.create_group(group);
+            writer.write_dataset("/Image", *inclination.inclination(), true);
+            writer.write_attribute("/Image", "im", inclination.im());
+            writer.write_attribute("/Image", "ic", inclination.ic());
+            writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+            writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
+            writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
-            writer.write_dataset(dataset, *inclination.inclination(), true);
-            writer.write_attribute(dataset, "im", inclination.im());
-            writer.write_attribute(dataset, "ic", inclination.ic());
-            writer.write_attribute(dataset, "rmax_W", inclination.rmaxWhite());
-            writer.write_attribute(dataset, "rmax_G", inclination.rmaxGray());
-            writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-
-            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Inclination", argc, argv);
+            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination", argc, argv);
             std::cout << "Inclination generated and written" << std::endl;
             writer.close();
 
@@ -229,18 +224,13 @@ int main(int argc, char** argv) {
                 }
                 // Create file and dataset. Write the inclination afterwards.
                 writer.set_path(output_folder+ "/" + saturation_basename + ".h5");
-
-                std::string group = dataset.substr(0, dataset.find_last_of('/'));
-                // Create group and dataset
-                writer.create_group(group);
-
-                writer.write_dataset(dataset, *inclination.saturation(), true);
-                writer.write_attribute(dataset, "im", inclination.im());
-                writer.write_attribute(dataset, "ic", inclination.ic());
-                writer.write_attribute(dataset, "rmax_W", inclination.rmaxWhite());
-                writer.write_attribute(dataset, "rmax_G", inclination.rmaxGray());
-                writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Inclination Saturation", argc, argv);
+                writer.write_dataset("/Image", *inclination.saturation(), true);
+                writer.write_attribute("/Image", "im", inclination.im());
+                writer.write_attribute("/Image", "ic", inclination.ic());
+                writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+                writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
+                writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
+                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;
                 writer.close();
             }
@@ -249,5 +239,11 @@ int main(int argc, char** argv) {
         }
     }
 
+    #ifdef TIME_MEASUREMENT
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+
+        std::cout << "Runtime was " << duration.count() << std::endl;
+    #endif
     return EXIT_SUCCESS;
 }

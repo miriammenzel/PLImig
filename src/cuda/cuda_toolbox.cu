@@ -151,7 +151,9 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
     uint* deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
     // Save the new maximum label as a return value for the user
     uint distance = thrust::distance(deviceUniqueMask, deviceMaxUniqueLabel);
-    *maxLabelNumber = distance;
+    if(maxLabelNumber) {
+        *maxLabelNumber = distance;
+    }
     // Reduce numbers in label image to low numbers for following algorithms
     connectedComponentsReduceComponents<<<numBlocks, threadsPerBlock>>>(deviceMask, kernelImage.cols,
                                                                         deviceUniqueMask,
@@ -167,200 +169,88 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
     return result;
 }
 
-std::shared_ptr<cv::Mat> PLImg::cuda::raw::filters::CUDAmedianFilter(const std::shared_ptr<cv::Mat>& image) {
-    // Create a result image with the same dimensions as our input image
-    cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
-    // Expand borders of input image inplace to ensure that the median algorithm can run correcly
-    cv::copyMakeBorder(*image, *image, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
-
-    // The image might be too large to be saved completely in the video memory.
-    // Therefore chunks will be used if the amount of memory is too small.
-    uint numberOfChunks = 1;
-    // Check the free video memory
-    ulong freeMem;
-    CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
-    // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
-    // with the power of four (1, 4, 16, 256, 1024, ...)
-    if(double(image->total()) * image->elemSize() * 2.1 > double(freeMem)) {
-        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 2.1 / double(freeMem)) / log(4))));
-    }
-    // Each dimensions will get the same number of chunks. Calculate them by using the square root.
-    uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
-
+void PLImg::cuda::raw::filters::CUDAmedianFilter(cv::Mat& image, cv::Mat& result) {
     float* deviceImage, *deviceResult;
-    uint xMin, xMax, yMin, yMax;
-    ulong nSrcStep, nResStep;
+    int nSrcStep, nResStep;
+    int2 subImageDims;
     // Apply median filter
     // Calculate offsets for image and result. Starting at the edge would result in errors because we would
     // go out of bounds.
     dim3 threadsPerBlock, numBlocks;
+    // Allocate GPU memory for the original image and its result
+    CHECK_CUDA(cudaMalloc((void **) &deviceImage, image.total() * image.elemSize()));
+    // Length of columns
+    nSrcStep = image.cols;
 
-    // We've increased the image dimensions earlier. Save the original image dimensions for further calculations.
-    int2 realImageDims = {image->cols - 2 * MEDIAN_KERNEL_SIZE, image->rows - 2 * MEDIAN_KERNEL_SIZE};
-    int2 subImageDims;
+    CHECK_CUDA(cudaMalloc((void **) &deviceResult, image.total() * image.elemSize()));
+    // Length of columns
+    nResStep = result.cols;
 
-    cv::Mat subImage, subResult, croppedImage;
-    // For each chunk
-    for(uint it = 0; it < numberOfChunks; ++it) {
-        std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
-        std::flush(std::cout);
-        // Calculate image boarders
-        xMin = (it % chunksPerDim) * realImageDims.x / chunksPerDim;
-        xMax = fmin((it % chunksPerDim + 1) * realImageDims.x / chunksPerDim, realImageDims.x);
-        yMin = (it / chunksPerDim) * realImageDims.y / chunksPerDim;
-        yMax = fmin((it / chunksPerDim + 1) * realImageDims.y / chunksPerDim, realImageDims.y);
+    // Copy image from CPU to GPU
+    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * image.elemSize(), cudaMemcpyHostToDevice));
 
-        // Get chunk of our image and result. Apply padding to the result to ensure that the median filter will run correctly.
-        croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE, yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
-        croppedImage.copyTo(subImage);
-        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subResult);
-        cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+    // Apply median filter
+    subImageDims = {result.cols, result.rows};
+    threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
+    numBlocks = dim3(ceil(float(subImageDims.x) / threadsPerBlock.x), ceil(float(subImageDims.y) / threadsPerBlock.y));
+    // Run median filter
+    medianFilterKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep,
+                                                       deviceResult, nResStep,
+                                                       subImageDims);
 
-        // Allocate GPU memory for the original image and its result
-        CHECK_CUDA(cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize()));
-        // Length of columns
-        nSrcStep = subImage.cols;
+    // Copy result from GPU back to CPU
+    CHECK_CUDA(cudaMemcpy(result.data, deviceResult, image.total() * image.elemSize(), cudaMemcpyDeviceToHost));
 
-        CHECK_CUDA(cudaMalloc((void **) &deviceResult, subImage.total() * subImage.elemSize()));
-        // Length of columns
-        nResStep = subResult.cols;
-
-        // Copy image from CPU to GPU
-        CHECK_CUDA(cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice));
-
-        // Apply median filter
-        subImageDims = {subImage.cols, subImage.rows};
-        threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
-        numBlocks = dim3(ceil(float(subImageDims.x) / threadsPerBlock.x), ceil(float(subImageDims.y) / threadsPerBlock.y));
-        // Run median filter
-        medianFilterKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep,
-                                                           deviceResult, nResStep,
-                                                           subImageDims);
-
-        // Copy result from GPU back to CPU
-        CHECK_CUDA(cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost));
-
-        // Free reserved memory
-        CHECK_CUDA(cudaFree(deviceImage));
-        CHECK_CUDA(cudaFree(deviceResult));
-        CHECK_CUDA(cudaDeviceSynchronize());
-
-        // Calculate the range where the median filter was applied and where the chunk will be placed.
-        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, xMax - xMin, yMax - yMin);
-        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
-        subResult(srcRect).copyTo(result(dstRect));
-    }
-    // Fix output after \r
-    std::cout << std::endl;
-    // Revert the padding of the original image
-    croppedImage = cv::Mat(*image, cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, image->cols - 2*MEDIAN_KERNEL_SIZE, image->rows - 2*MEDIAN_KERNEL_SIZE));
-    croppedImage.copyTo(*image);
-
-    // Return resulting median filtered image
-    return std::make_shared<cv::Mat>(result);
+    // Free reserved memory
+    CHECK_CUDA(cudaFree(deviceImage));
+    CHECK_CUDA(cudaFree(deviceResult));
+    CHECK_CUDA(cudaDeviceSynchronize());
 }
 
-std::shared_ptr<cv::Mat> PLImg::cuda::raw::filters::CUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask) {
-    // Copy the result back to the CPU
-    cv::Mat result = cv::Mat(image->rows, image->cols, image->type());
-    cv::copyMakeBorder(*image, *image, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
-    cv::copyMakeBorder(*mask, *mask, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
-
-    // The image might be too large to be saved completely in the video memory.
-    // Therefore chunks will be used if the amount of memory is too small.
-    uint numberOfChunks = 1;
-    ulong freeMem;
-    // Check the free video memory
-    CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
-    // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
-    // with the power of four (1, 4, 16, 256, 1024, ...)
-    if(double(image->total()) * image->elemSize() * 3.1 > double(freeMem)) {
-        numberOfChunks = fmax(1, pow(4.0, ceil(log(image->total() * image->elemSize() * 3.1 / double(freeMem)) / log(4))));
-    }
-    // Each dimensions will get the same number of chunks. Calculate them by using the square root.
-    uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
-
+void PLImg::cuda::raw::filters::CUDAmedianFilterMasked(cv::Mat& image, cv::Mat& mask, cv::Mat& result) {
     float* deviceImage, *deviceResult;
     uchar* deviceMask;
-    uint xMin, xMax, yMin, yMax;
     ulong nSrcStep, nMaskStep, nResStep;
     // Apply median filter
     // Calculate offsets for image and result. Starting at the edge would result in errors because we would
     // go out of bounds.
     dim3 threadsPerBlock, numBlocks;
-
-    // We've increased the image dimensions earlier. Save the original image dimensions for further calculations.
-    int2 realImageDims = {image->cols - 2 * MEDIAN_KERNEL_SIZE, image->rows - 2 * MEDIAN_KERNEL_SIZE};
     int2 subImageDims;
 
-    cv::Mat subImage, subMask, subResult, croppedImage;
-    for(uint it = 0; it < numberOfChunks; ++it) {
-        std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
-        std::flush(std::cout);
-        // Calculate image boarders
-        xMin = (it % chunksPerDim) * realImageDims.x / chunksPerDim;
-        xMax = fmin((it % chunksPerDim + 1) * realImageDims.x / chunksPerDim, realImageDims.x);
-        yMin = (it / chunksPerDim) * realImageDims.y / chunksPerDim;
-        yMax = fmin((it / chunksPerDim + 1) * realImageDims.y / chunksPerDim, realImageDims.y);
+    // Allocate GPU memory for the original image, mask and its result
+    CHECK_CUDA(cudaMalloc((void **) &deviceImage, image.total() * image.elemSize()));
+    // Length of columns
+    nSrcStep = image.cols;
 
-        // Get chunk of our image, mask and result. Apply padding to the result to ensure that the median filter will run correctly.
-        croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE, yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
-        croppedImage.copyTo(subImage);
-        croppedImage = cv::Mat(*mask, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE, yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
-        croppedImage.copyTo(subMask);
-        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subResult);
-        cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+    CHECK_CUDA(cudaMalloc((void **) &deviceMask, mask.total() * mask.elemSize()));
+    // Length of columns
+    nMaskStep = mask.cols;
 
-        // Allocate GPU memory for the original image, mask and its result
-        CHECK_CUDA(cudaMalloc((void **) &deviceImage, subImage.total() * subImage.elemSize()));
-        // Length of columns
-        nSrcStep = subImage.cols;
+    CHECK_CUDA(cudaMalloc((void **) &deviceResult, image.total() * image.elemSize()));
+    // Length of columns
+    nResStep = result.cols;
 
-        CHECK_CUDA(cudaMalloc((void **) &deviceMask, subMask.total() * subMask.elemSize()));
-        // Length of columns
-        nMaskStep = subMask.cols;
+    // Copy image from CPU to GPU
+    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * image.elemSize(), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(deviceMask, mask.data, mask.total() * mask.elemSize(), cudaMemcpyHostToDevice));
 
-        CHECK_CUDA(cudaMalloc((void **) &deviceResult, subImage.total() * subImage.elemSize()));
-        // Length of columns
-        nResStep = subResult.cols;
+    // Apply median filter
+    subImageDims = {image.cols, image.rows};
+    threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
+    numBlocks = dim3(ceil(float(subImageDims.x) / threadsPerBlock.x), ceil(float(subImageDims.y) / threadsPerBlock.y));
+    // Run median filter
+    medianFilterMaskedKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep,
+                                                             deviceResult, nResStep,
+                                                             deviceMask, nMaskStep,
+                                                             subImageDims);
 
-        // Copy image from CPU to GPU
-        CHECK_CUDA(cudaMemcpy(deviceImage, subImage.data, subImage.total() * subImage.elemSize(), cudaMemcpyHostToDevice));
-        CHECK_CUDA(cudaMemcpy(deviceMask, subMask.data, subMask.total() * subMask.elemSize(), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(result.data, deviceResult, image.total() * image.elemSize(), cudaMemcpyDeviceToHost));
 
-        // Apply median filter
-        subImageDims = {subImage.cols, subImage.rows};
-        threadsPerBlock = dim3(CUDA_KERNEL_NUM_THREADS, CUDA_KERNEL_NUM_THREADS);
-        numBlocks = dim3(ceil(float(subImageDims.x) / threadsPerBlock.x), ceil(float(subImageDims.y) / threadsPerBlock.y));
-        // Run median filter
-        medianFilterMaskedKernel<<<numBlocks, threadsPerBlock>>>(deviceImage, nSrcStep,
-                                                                 deviceResult, nResStep,
-                                                                 deviceMask, nMaskStep,
-                                                                 subImageDims);
-
-        CHECK_CUDA(cudaMemcpy(subResult.data, deviceResult, subImage.total() * subImage.elemSize(), cudaMemcpyDeviceToHost));
-
-        // Free reserved memory
-        CHECK_CUDA(cudaFree(deviceImage));
-        CHECK_CUDA(cudaFree(deviceResult));
-        CHECK_CUDA(cudaFree(deviceMask));
-        CHECK_CUDA(cudaDeviceSynchronize());
-
-        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, subResult.cols - 2*MEDIAN_KERNEL_SIZE, subResult.rows - 2*MEDIAN_KERNEL_SIZE);
-        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
-
-        subResult(srcRect).copyTo(result(dstRect));
-    }
-    // Fix output after \r
-    std::cout << std::endl;
-
-    croppedImage = cv::Mat(*image, cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, image->cols - 2*MEDIAN_KERNEL_SIZE, image->rows - 2*MEDIAN_KERNEL_SIZE));
-    croppedImage.copyTo(*image);
-    croppedImage = cv::Mat(*mask, cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, mask->cols - 2*MEDIAN_KERNEL_SIZE, mask->rows - 2*MEDIAN_KERNEL_SIZE));
-    croppedImage.copyTo(*mask);
-    return std::make_shared<cv::Mat>(result);
+    // Free reserved memory
+    CHECK_CUDA(cudaFree(deviceImage));
+    CHECK_CUDA(cudaFree(deviceResult));
+    CHECK_CUDA(cudaFree(deviceMask));
+    CHECK_CUDA(cudaDeviceSynchronize());
 }
 
 cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, float minLabel, float maxLabel, uint numBins) {

@@ -34,8 +34,7 @@
 #include <memory>
 #include <thrust/device_vector.h>
 #include <thrust/unique.h>
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
 /**
  * @file
@@ -53,15 +52,14 @@ namespace PLImg::cuda::raw {
          * @param image
          * @return
          */
-        std::shared_ptr<cv::Mat> CUDAmedianFilter(const std::shared_ptr<cv::Mat>& image);
+        void CUDAmedianFilter(cv::Mat& image, cv::Mat& result);
         /**
          * @brief CUDAmedianFilterMasked
          * @param image
          * @param mask
          * @return
          */
-        std::shared_ptr<cv::Mat> CUDAmedianFilterMasked(const std::shared_ptr<cv::Mat>& image,
-                                                        const std::shared_ptr<cv::Mat>& mask);
+        void CUDAmedianFilterMasked(cv::Mat& image, cv::Mat& mask, cv::Mat& result);
     }
 
     cv::Mat CUDAhistogram(const cv::Mat& image, float minLabel, float maxLabel, uint numBins);

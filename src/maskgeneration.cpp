@@ -41,9 +41,6 @@ PLImg::MaskGeneration::MaskGeneration(std::shared_ptr<cv::Mat> retardation, std:
         m_minRetardation = 0;
         m_maxRetardation = 1;
     }
-
-    std::cout << "Transmittance range: " << m_minTransmittance << " -- " << m_maxTransmittance << "\n"
-              << "Retardation range: " << m_minRetardation << " -- " << m_maxRetardation << std::endl;
 }
 
 void PLImg::MaskGeneration::setModalities(std::shared_ptr<cv::Mat> retardation, std::shared_ptr<cv::Mat> transmittance) {
@@ -178,7 +175,6 @@ float PLImg::MaskGeneration::tRet() {
             startPosition = fmax(0, (resultingBin - 2) * 2 - 1);
             endPosition = fmin((resultingBin + 2) * 2 + 1, NUMBER_OF_BINS << 1);
         }
-
         this->m_tRet = std::make_unique<float>(temp_tRet);
     }
     return *this->m_tRet;
@@ -187,7 +183,7 @@ float PLImg::MaskGeneration::tRet() {
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
         cv::Mat backgroundMask =  *m_retardation > 0 & *m_transmittance > 0 & *m_transmittance < tMax();
-        cv::Mat mask = Image::largestAreaConnectedComponents(*m_retardation, cv::Mat());
+        cv::Mat mask = cuda::labeling::largestAreaConnectedComponents(*m_retardation, cv::Mat());
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
     }
@@ -221,7 +217,8 @@ float PLImg::MaskGeneration::tMax() {
 
         //If the transmittance was masked, we should see a large maxCurvature with 0 values after the highest peak
         if(endPosition - startPosition < 2) {
-            this->m_tMax = std::make_unique<float>(float(startPosition)/MAX_NUMBER_OF_BINS);
+            float stepSize = float(histMaximum - m_minTransmittance) / float(MAX_NUMBER_OF_BINS);
+            this->m_tMax = std::make_unique<float>(m_minTransmittance + startPosition * stepSize);
         }
         //Else do the normal calculation
         else {
@@ -231,13 +228,9 @@ float PLImg::MaskGeneration::tMax() {
 
             float temp_tMax;
             for(unsigned NUMBER_OF_BINS = MIN_NUMBER_OF_BINS; NUMBER_OF_BINS <= MAX_NUMBER_OF_BINS; NUMBER_OF_BINS = NUMBER_OF_BINS << 1) {
-                cv::Mat hist(NUMBER_OF_BINS, 1, CV_32FC1);
-                for (unsigned i = 0; i < NUMBER_OF_BINS; ++i) {
-                    unsigned myStartPos = i * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                    unsigned myEndPos = (i + 1) * MAX_NUMBER_OF_BINS / NUMBER_OF_BINS;
-                    hist.at<float>(i) = std::accumulate(fullHist.begin<float>() + myStartPos,
-                                                        fullHist.begin<float>() + myEndPos, 0.0f);
-                }
+                cv::Mat hist = PLImg::cuda::histogram(*m_transmittance, m_minTransmittance,
+                                                      histMaximum,
+                                                      NUMBER_OF_BINS);
                 cv::normalize(hist, hist, 0, 1, cv::NORM_MINMAX, CV_32FC1);
 
                 float stepSize = float(histMaximum - m_minTransmittance) / float(NUMBER_OF_BINS);
@@ -279,8 +272,27 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::whiteMask() {
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::fullMask() {
-    cv::Mat mask = *whiteMask() | *grayMask();
-    return std::make_shared<cv::Mat>(mask);
+    if(!m_fullMask) {
+        if (!m_whiteMask) whiteMask();
+        if (!m_grayMask) grayMask();
+
+        cv::Mat mask(m_whiteMask->rows, m_whiteMask->cols, CV_8UC1);
+
+        #pragma omp parallel for
+        for (int i = 0; i < mask.total(); ++i) {
+            // Set value based on white or gray
+            if (m_whiteMask->at<unsigned char>(i)) {
+                mask.at<unsigned char>(i) = WHITE_VALUE;
+            } else if (m_grayMask->at<unsigned char>(i)) {
+                mask.at<unsigned char>(i) = GRAY_VALUE;
+            } else {
+                mask.at<unsigned char>(i) = 0;
+            }
+        }
+
+        m_fullMask = std::make_shared<cv::Mat>(mask);
+    }
+    return m_fullMask;
 }
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
@@ -294,69 +306,94 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::noNerveFiberMask() {
 
 std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
     if(!m_probabilityMask) {
-        m_probabilityMask = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
-        std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(m_retardation->rows/2, m_retardation->cols/2, CV_32FC1);
-        std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(m_transmittance->rows/2, m_transmittance->cols/2, CV_32FC1);
-        MaskGeneration generation(small_retardation, small_transmittance);
-        unsigned long long numPixels = (unsigned long long) m_retardation->rows *  (unsigned long long) m_retardation->cols;
-
-        uint num_threads;
-        #pragma omp parallel default(shared)
-        num_threads = omp_get_num_threads();
-
-        std::vector<std::mt19937> random_engines(num_threads);
-        #pragma omp parallel for default(shared) schedule(static)
-        for(unsigned i = 0; i < num_threads; ++i) {
-            random_engines.at(i) = std::mt19937((clock() * i) % LONG_MAX);
-        }
-        std::uniform_int_distribution<unsigned long long> distribution(0, numPixels);
-        unsigned long long selected_element;
-
         std::vector<float> above_tRet;
         std::vector<float> below_tRet;
         std::vector<float> above_tTra;
         std::vector<float> below_tTra;
+        m_probabilityMask = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
 
-        float t_ret, t_tra;
+        // We're trying to calculate the maximum possible number of threads than can be used simultaneously to calculate multiple iterations at once.
+        float predictedMemoryUsage = PLImg::cuda::getHistogramMemoryEstimation(Image::randomizedModalities(m_transmittance, m_retardation, 0.5f)[0], MAX_NUMBER_OF_BINS);
+        // Calculate the number of threads that will be used based on the free memory and the maximum number of threads
+        int numberOfThreads;
+        #pragma omp parallel
+        numberOfThreads = omp_get_num_threads();
+        numberOfThreads = fmax(1, fmin(numberOfThreads, uint(float(PLImg::cuda::getFreeMemory()) / predictedMemoryUsage)));
 
-        for(unsigned i = 0; i < PROBABILITY_MASK_ITERATIONS; ++i) {
-            std::cout << "\rProbability Mask Generation: Iteration " << i << " of " << PROBABILITY_MASK_ITERATIONS;
-            std::flush(std::cout);
-            // Fill transmittance and retardation with random pixels from our base images
-            #pragma omp parallel for firstprivate(distribution, selected_element) schedule(static) default(shared)
-            for(int y = 0; y < small_retardation->rows; ++y) {
-                for (int x = 0; x < small_retardation->cols; ++x) {
-                    selected_element = distribution(random_engines.at(omp_get_thread_num()));
-                    small_retardation->at<float>(y, x) = m_retardation->at<float>(
-                            int(selected_element / m_retardation->cols), int(selected_element % m_retardation->cols));
-                    small_transmittance->at<float>(y, x) = m_transmittance->at<float>(
-                            int(selected_element / m_transmittance->cols), int(selected_element % m_transmittance->cols));
+        std::cout << "OpenMP version used during compilation (doesn't have to match the executing OpenMP version): " << _OPENMP << std::endl;
+        #if _OPENMP < 201611
+            omp_set_nested(true);
+        #endif
+        auto omp_levels = omp_get_max_active_levels();
+        omp_set_max_active_levels(3);
+        ushort numberOfFinishedIterations = 0;
+        #pragma omp parallel shared(numberOfThreads, above_tRet, above_tTra, below_tRet, below_tTra, numberOfFinishedIterations)
+        {
+            #pragma omp single
+            {
+                std::cout << "Computing " << numberOfThreads << " iterations in parallel with max. " << omp_get_max_threads() / numberOfThreads << " threads per iteration." << std::endl;
+            }
+            omp_set_num_threads(omp_get_max_threads() / numberOfThreads);
+
+            // Only work with valid threads. The other threads won't do any work.
+            if(omp_get_thread_num() < numberOfThreads) {
+                std::shared_ptr<cv::Mat> small_retardation;
+                std::shared_ptr<cv::Mat> small_transmittance;
+                MaskGeneration generation(small_retardation, small_transmittance);
+
+                float t_ret, t_tra;
+                uint ownNumberOfIterations = PROBABILITY_MASK_ITERATIONS / numberOfThreads;
+                uint overhead = PROBABILITY_MASK_ITERATIONS % numberOfThreads;
+                if (overhead > 0 && omp_get_thread_num() < overhead) {
+                    ++ownNumberOfIterations;
                 }
-            }
 
-            generation.setModalities(small_retardation, small_transmittance);
-            generation.set_tMin(this->tMin());
-            generation.set_tMax(this->tMax());
+                for (int i = 0; i < ownNumberOfIterations; ++i) {
+                    auto small_modalities = Image::randomizedModalities(m_transmittance, m_retardation, 0.5f);
+                    small_transmittance = std::make_shared<cv::Mat>(small_modalities[0]);
+                    small_retardation = std::make_shared<cv::Mat>(small_modalities[1]);
 
-            t_ret = generation.tRet();
-            if(t_ret >= this->tRet()) {
-                above_tRet.push_back(t_ret);
-            } else if(t_ret <= this->tRet()) {
-                below_tRet.push_back(t_ret);
-            }
+                    generation.setModalities(small_retardation, small_transmittance);
+                    generation.set_tMin(this->tMin());
+                    generation.set_tMax(this->tMax());
 
-            t_tra = generation.tTra();
-            if(t_tra >= this->tTra()) {
-                above_tTra.push_back(t_tra);
-            } else if(t_tra <= this->tTra() && t_tra > 0) {
-                below_tTra.push_back(t_tra);
+                    t_ret = generation.tRet();
+                    if (t_ret >= this->tRet()) {
+                        #pragma omp critical
+                        above_tRet.push_back(t_ret);
+                    } else if (t_ret <= this->tRet()) {
+                        #pragma omp critical
+                        below_tRet.push_back(t_ret);
+                    }
+
+                    t_tra = generation.tTra();
+                    if (t_tra >= this->tTra()) {
+                        #pragma omp critical
+                        above_tTra.push_back(t_tra);
+                    } else if (t_tra <= this->tTra() && t_tra > 0) {
+                        #pragma omp critical
+                        below_tTra.push_back(t_tra);
+                    }
+
+                    #pragma omp critical
+                    {
+                        ++numberOfFinishedIterations;
+                        std::cout << "\rProbability Mask Generation: Iteration " << numberOfFinishedIterations << " of "
+                                  << PROBABILITY_MASK_ITERATIONS;
+                        std::flush(std::cout);
+                    };
+                }
+                small_transmittance = nullptr;
+                small_retardation = nullptr;
+                generation.setModalities(nullptr, nullptr);
             }
         }
-        std::cout << std::endl;
+        omp_set_max_active_levels(omp_levels);
+        #if _OPENMP < 201611
+            omp_set_nested(false);
+        #endif
 
-        small_transmittance = nullptr;
-        small_retardation = nullptr;
-        generation.setModalities(nullptr, nullptr);
+        std::cout << std::endl;
 
         float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
         if (above_tRet.empty()) {
@@ -379,7 +416,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         } else {
             diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();
         }
-        
+
         std::cout << "Probability parameters: R+:"  << diff_tRet_p << ", R-:" << diff_tRet_m <<
                                                     ", T+:" << diff_tTra_p << ", T-:" << diff_tTra_m
                                                     << std::endl;
@@ -402,7 +439,7 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
                     diffRet = (diffRet - tRet()) / diff_tRet_p;
                 }
                 m_probabilityMask->at<float>(y, x) = (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
-                                                           sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
+                                                            sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
             }
         }
     }

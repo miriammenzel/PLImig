@@ -1,18 +1,10 @@
 find_package(GTest)
 
-# Search for required packages and load them
-find_package(OpenCV REQUIRED)
-find_package(HDF5 REQUIRED COMPONENTS C CXX)
-find_package(CUDAToolkit REQUIRED)
-
-include_directories(${CUDAToolkit_INCLUDE_DIRS})
-include_directories(src/)
-
 # Set output directory to tests
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
 
 add_executable(test_reader test_reader.cpp ${PROJECT_SOURCE_DIR}/src/reader.cpp)
-target_link_libraries(test_reader GTest::GTest ${OpenCV_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES})
+target_link_libraries(test_reader GTest::GTest ${OpenCV_LIBS} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES})
 gtest_discover_tests(test_reader TEST_PREFIX new:)
 
 add_executable(test_writer test_writer.cpp ${PROJECT_SOURCE_DIR}/src/writer.cpp ${PROJECT_SOURCE_DIR}/src/reader.cpp ${PROJECT_SOURCE_DIR}/src/version.cpp)
@@ -22,14 +14,14 @@ gtest_discover_tests(test_writer TEST_PREFIX new:)
 add_executable(test_toolbox test_toolbox.cpp ${PROJECT_SOURCE_DIR}/src/toolbox.cpp
                                              ${PROJECT_SOURCE_DIR}/src/cuda/cuda_toolbox.cu
                                              ${PROJECT_SOURCE_DIR}/src/cuda/cuda_kernels.cu)
-target_link_libraries(test_toolbox GTest::GTest ${OpenCV_LIBRARIES} CUDA::cudart OpenMP::OpenMP_CXX OpenMP::OpenMP_C)
+target_link_libraries(test_toolbox GTest::GTest ${OpenCV_LIBS} CUDA::cudart OpenMP::OpenMP_CXX OpenMP::OpenMP_C)
 gtest_discover_tests(test_toolbox TEST_PREFIX new:)
 
 add_executable(test_maskgeneration test_maskgeneration.cpp ${PROJECT_SOURCE_DIR}/src/toolbox.cpp
                                                            ${PROJECT_SOURCE_DIR}/src/maskgeneration.cpp
                                                            ${PROJECT_SOURCE_DIR}/src/cuda/cuda_toolbox.cu
                                                            ${PROJECT_SOURCE_DIR}/src/cuda/cuda_kernels.cu)
-target_link_libraries(test_maskgeneration GTest::GTest ${OpenCV_LIBRARIES} CUDA::cudart OpenMP::OpenMP_CXX OpenMP::OpenMP_C)
+target_link_libraries(test_maskgeneration GTest::GTest ${OpenCV_LIBS} CUDA::cudart OpenMP::OpenMP_CXX OpenMP::OpenMP_C)
 gtest_discover_tests(test_maskgeneration TEST_PREFIX new:)
 
 if(CMAKE_COMPILER_IS_GNUCXX)

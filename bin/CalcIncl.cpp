@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     CLI::App app;
 
     // Get the number of threads for all following steps
-    uint numThreads;
+    int numThreads;
     #pragma omp parallel
     numThreads = omp_get_num_threads();
     cv::setNumThreads(numThreads);
@@ -69,8 +69,8 @@ int main(int argc, char** argv) {
     optional->add_flag("--detailed", detailed);
     optional->add_option("--im", im)->default_val(-1);
     optional->add_option("--ic", ic)->default_val(-1);
-    optional->add_option("--rmaxWhite", rmaxWhite)->default_val(-1);
-    optional->add_option("--rmaxGray", rmaxGray)->default_val(-1);
+    optional->add_option("--rmax_white", rmaxWhite)->default_val(-1);
+    optional->add_option("--rmax_gray", rmaxGray)->default_val(-1);
 
     CLI11_PARSE(app, argc, argv);
 
@@ -139,16 +139,15 @@ int main(int argc, char** argv) {
             // Read all files.
             std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(PLImg::Reader::imread(transmittance_path, dataset));
             std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(PLImg::Reader::imread(retardation_path, dataset));
-            std::shared_ptr<cv::Mat> whiteMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/White"));
-            std::shared_ptr<cv::Mat> grayMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/Gray"));
-            std::shared_ptr<cv::Mat> blurredMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset+"/Probability"));
+            std::shared_ptr<cv::Mat> mask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, dataset));
+            std::shared_ptr<cv::Mat> blurredMask = std::make_shared<cv::Mat>(PLImg::Reader::imread(mask_path, "/Probability"));
             std::cout << "Files read" << std::endl;
 
             std::shared_ptr<cv::Mat> medTransmittance;
             // If our given transmittance isn't already median filtered (based on it's file name)
             if (transmittance_path.find("median10") == std::string::npos) {
                 // Generate med10Transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, grayMask);
+                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, mask);
             } else {
                 medTransmittance = transmittance;
             }
@@ -156,7 +155,7 @@ int main(int argc, char** argv) {
             std::cout << "Med10Transmittance generated" << std::endl;
 
             // Set our read parameters
-            inclination.setModalities(medTransmittance, retardation, blurredMask, whiteMask, grayMask);
+            inclination.setModalities(medTransmittance, retardation, blurredMask, mask);
             // If manual parameters were given, apply them here
             if(im >= 0) {
                 inclination.set_im(im);
@@ -172,18 +171,14 @@ int main(int argc, char** argv) {
             }
             // Create file and dataset. Write the inclination afterwards.
             writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
-            std::string group = dataset.substr(0, dataset.find_last_of('/'));
-            // Create group and dataset
-            writer.create_group(group);
+            writer.write_dataset("/Image", *inclination.inclination(), true);
+            writer.write_attribute("/Image", "im", inclination.im());
+            writer.write_attribute("/Image", "ic", inclination.ic());
+            writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+            writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
+            writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
-            writer.write_dataset(dataset, *inclination.inclination(), true);
-            writer.write_attribute(dataset, "im", inclination.im());
-            writer.write_attribute(dataset, "ic", inclination.ic());
-            writer.write_attribute(dataset, "rmax_W", inclination.rmaxWhite());
-            writer.write_attribute(dataset, "rmax_G", inclination.rmaxGray());
-            writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-
-            writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Inclination", argc, argv);
+            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination", argc, argv);
             std::cout << "Inclination generated and written" << std::endl;
             writer.close();
 
@@ -195,18 +190,14 @@ int main(int argc, char** argv) {
                 // Create file and dataset. Write the inclination afterwards.
                 writer.set_path(output_folder+ "/" + saturation_basename + ".h5");
 
-                std::string group = dataset.substr(0, dataset.find_last_of('/'));
-                // Create group and dataset
-                writer.create_group(group);
+                writer.write_dataset("/Image", *inclination.saturation(), true);
+                writer.write_attribute("/Image", "im", inclination.im());
+                writer.write_attribute("/Image", "ic", inclination.ic());
+                writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+                writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
+                writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
-                writer.write_dataset(dataset, *inclination.saturation(), true);
-                writer.write_attribute(dataset, "im", inclination.im());
-                writer.write_attribute(dataset, "ic", inclination.ic());
-                writer.write_attribute(dataset, "rmax_W", inclination.rmaxWhite());
-                writer.write_attribute(dataset, "rmax_G", inclination.rmaxGray());
-                writer.write_attribute(dataset, "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-
-                writer.writePLIMAttributes(transmittance_path, retardation_path, dataset + "/", "/Image", "Inclination Saturation", argc, argv);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;
                 writer.close();
             }

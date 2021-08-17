@@ -6,7 +6,9 @@ cmake_minimum_required(VERSION 3.14)
 project(PLImig LANGUAGES C CXX CUDA VERSION 1.2.0)
 
 # Set a default build type if none was specified
-set(default_build_type "Debug")
+set(default_build_type "Release")
+# add_definitions(-DTIME_MEASUREMENT)
+
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
@@ -16,7 +18,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 if(NOT DEFINED ${CMAKE_CUDA_ARCHITECTURES})
     set(CMAKE_CUDA_ARCHITECTURES 60 61 70 75 80)

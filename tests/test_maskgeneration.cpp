@@ -5,8 +5,7 @@
 #include "gtest/gtest.h"
 #include "maskgeneration.h"
 #include <memory>
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
 #include <random>
 
 // Test function for histogram generation
@@ -258,17 +257,20 @@ TEST(TestMaskgeneration, TestFullMask) {
 
     generation.set_tTra(0.5f);
     generation.set_tRet(0.1f);
-    generation.set_tMin(-1.0f);
+    generation.set_tMin(0.0f);
     generation.set_tMax(0.9f);
 
     auto whiteMask = generation.whiteMask();
     auto grayMask = generation.grayMask();
     auto fullMask = generation.fullMask();
 
-    for(int i = 0; i < fullMask->rows; ++i) {
-        for (int j = 0; j < fullMask->cols; ++j) {
-            ASSERT_TRUE(fullMask->at<bool>(i, j) == whiteMask->at<bool>(i, j) |
-                                fullMask->at<bool>(i, j) == grayMask->at<bool>(i, j));
+    for(int i = 0; i < fullMask->total(); ++i) {
+        if(whiteMask->at<bool>(i)) {
+            ASSERT_EQ(fullMask->at<unsigned char>(i), 200);
+        } else if(grayMask->at<bool>(i)) {
+            ASSERT_EQ(fullMask->at<unsigned char>(i), 100);
+        } else {
+            ASSERT_EQ(fullMask->at<unsigned char>(i), 0);
         }
     }
 }

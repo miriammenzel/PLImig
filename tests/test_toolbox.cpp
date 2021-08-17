@@ -4,7 +4,6 @@
 #include "gtest/gtest.h"
 #include <cmath>
 #include <memory>
-#include <opencv2/core.hpp>
 #include <random>
 #include "toolbox.h"
 
@@ -35,7 +34,7 @@ TEST(TestToolbox, TestHistogramPeakWidth) {
 
 TEST(TestToolbox, TestHistogramPlateauLeft) {
     auto x = std::vector<float>(256 / 0.01);
-    for(int i = 0; i < x.size(); ++i) {
+    for(unsigned long i = 0; i < x.size(); ++i) {
         x.at(i) = float(i) * 0.01f;
     }
 
@@ -77,7 +76,7 @@ TEST(TestToolbox, TestHistogramPlateauLeft) {
 
 TEST(TestToolbox, TestHistogramPlateauRight) {
     auto x = std::vector<float>(256 / 0.01);
-    for(int i = 0; i < x.size(); ++i) {
+    for(unsigned long i = 0; i < x.size(); ++i) {
         x.at(i) = i * 0.01;
     }
 
@@ -134,7 +133,7 @@ TEST(TestToolbox, TestImageRegionGrowing) {
         }
     }
 
-    cv::Mat mask = PLImg::Image::largestAreaConnectedComponents(test_retardation, cv::Mat());
+    cv::Mat mask = PLImg::cuda::labeling::largestAreaConnectedComponents(test_retardation, cv::Mat());
     for(uint i = 11; i < 20; ++i) {
         for(uint j = 11; j < 15; ++j) {
             ASSERT_TRUE(mask.at<bool>(i, j));
@@ -150,8 +149,8 @@ TEST(TestToolbox, TestMedianFilter) {
     auto testImagePtr = std::make_shared<cv::Mat>(testImage);
     auto medianFilterPtr = PLImg::cuda::filters::medianFilter(testImagePtr);
 
-    for(unsigned i = 0; i < expectedResult.rows; ++i) {
-        for(unsigned j = 0; j < expectedResult.cols; ++j) {
+    for(int i = 0; i < expectedResult.rows; ++i) {
+        for(int j = 0; j < expectedResult.cols; ++j) {
             ASSERT_FLOAT_EQ(medianFilterPtr->at<float>(i, j), expectedResult.at<float>(i, j));
         }
     }
@@ -186,8 +185,8 @@ TEST(TestToolbox, TestConnectedComponents) {
     cv::Mat result = PLImg::cuda::raw::labeling::CUDAConnectedComponents(exampleMask, &maxNumber);
     cv::imwrite("output.tiff", result);
 
-    for(uint x = 0; x < resultMask.cols; ++x) {
-        for(uint y = 0; y < resultMask.rows; ++y) {
+    for(int x = 0; x < resultMask.cols; ++x) {
+        for(int y = 0; y < resultMask.rows; ++y) {
             ASSERT_EQ(result.at<int>(y, x), resultMask.at<int>(y, x)) << x << "," << y;
         }
     }
@@ -217,8 +216,8 @@ TEST(TestToolbox, TestConnectedComponentsUF) {
     resultMask.convertTo(resultMask, CV_32SC1);
     cv::Mat result = PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(exampleMask, &maxNumber);
 
-    for(uint x = 0; x < resultMask.cols; ++x) {
-        for(uint y = 0; y < resultMask.rows; ++y) {
+    for(int x = 0; x < resultMask.cols; ++x) {
+        for(int y = 0; y < resultMask.rows; ++y) {
             ASSERT_EQ(result.at<int>(y, x), resultMask.at<int>(y, x)) << x << "," << y;
         }
     }

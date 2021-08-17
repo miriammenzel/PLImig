@@ -4,6 +4,7 @@ find_path(PLIM_INCLUDE_DIRS
         /opt/work/include/plim
         /usr/local/include/plim
         /usr/include/plim
+        $ENV{ENVPATH}/include/plim
 )
 
 find_library(PLIM_LIBRARIES
