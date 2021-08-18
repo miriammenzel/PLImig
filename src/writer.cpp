@@ -60,24 +60,23 @@ void PLImg::HDF5Writer::write_attribute(const std::string& dataset, const std::s
 }
 
 void PLImg::HDF5Writer::write_type_attribute(const std::string& dataset, const std::string& parameter_name, const H5::AtomType& type, void* value) {
-    hsize_t dims[1] = {1};
     H5::Attribute attr;
-    H5::DataSpace space(1, dims);
-    std::string path_appendix;
     try {
         H5::Group grp = m_hdf5file.openGroup(dataset);
         if (!grp.attrExists(parameter_name)) {
-            attr = grp.createAttribute(parameter_name, type, space);
+            attr = grp.createAttribute(parameter_name, type, H5S_SCALAR);
         } else {
-            attr = grp.openAttribute(parameter_name);
+            grp.removeAttr(parameter_name);
+            attr = grp.createAttribute(parameter_name, type, H5S_SCALAR);
         }
     } catch(H5::FileIException& exception) {
         try {
             H5::DataSet dset = m_hdf5file.openDataSet(dataset);
             if (!dset.attrExists(parameter_name)) {
-                attr = dset.createAttribute(parameter_name, type, space);
+                attr = dset.createAttribute(parameter_name, type, H5S_SCALAR);
             } else {
-                attr = dset.openAttribute(parameter_name);
+                dset.removeAttr(parameter_name);
+                attr = dset.createAttribute(parameter_name, type, H5S_SCALAR);
             }
         } catch(H5::FileIException& exception) {
             return;
@@ -85,6 +84,7 @@ void PLImg::HDF5Writer::write_type_attribute(const std::string& dataset, const s
     }
     attr.write(type, value);
     attr.close();
+    m_hdf5file.flush(H5F_SCOPE_GLOBAL);
 }
 
 void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat& image, bool create_softlink) {
@@ -303,14 +303,22 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
             } catch (MissingAttributeException& e) {
                 std::cerr << e.what() << std::endl;
             }
-
-            outputHandler.addCreator();
-            outputHandler.addId();
         } catch (AttributeExistsException& e) {
             std::cerr << e.what() << std::endl;
         } catch(WrongDatatypeException& e) {
             std::cerr << e.what() << std::endl;
         }
+
+        try {
+            outputHandler.addId();
+        } catch(WrongDatatypeException& e) {
+            std::cerr << "Error while writing ID" << std::endl;
+            std::cerr << e.what() << std::endl;
+        } catch(MissingAttributeException& e) {
+            std::cerr << "Could not write ID because attribute was missing." << std::endl;
+            std::cerr << e.what() << std::endl;
+        }
+
         transmittance_handler = nullptr;
         retardation_handler = nullptr;
 
@@ -319,7 +327,8 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
 
         if(ret_dset.getId() > 0) ret_dset.close();
         if(retardation.getId() > 0) retardation.close();
-    } catch (...) {
+    } catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
         throw std::runtime_error("Output dataset was not valid!");
     }
 

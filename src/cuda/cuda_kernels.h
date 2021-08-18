@@ -32,7 +32,7 @@
 #include <cmath>
 
 /// Fixed median kernel size
-#define MEDIAN_KERNEL_SIZE 10
+#define MEDIAN_KERNEL_SIZE 5
 /// Number of CUDA Kernel threads used for kernel execution
 #define CUDA_KERNEL_NUM_THREADS 32
 

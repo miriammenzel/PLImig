@@ -99,8 +99,13 @@ int main(int argc, char** argv) {
 
         // Get name of retardation and check if transmittance has median filer applied.
         retardation_basename = std::string(transmittance_basename);
-        if (retardation_basename.find("median10") != std::string::npos) {
-            retardation_basename = retardation_basename.replace(retardation_basename.find("median10"), 8, "");
+        auto pos = retardation_basename.find("median");
+        if (pos != std::string::npos) {
+            int length = 6;
+            while(std::isdigit(retardation_basename.at(pos + length))) {
+                ++length;
+            }
+            retardation_basename = retardation_basename.replace(pos, length, "");
         }
         if (retardation_basename.find("NTransmittance") != std::string::npos) {
             retardation_basename = retardation_basename.replace(retardation_basename.find("NTransmittance"), 14, "Retardation");
@@ -145,14 +150,14 @@ int main(int argc, char** argv) {
 
             std::shared_ptr<cv::Mat> medTransmittance;
             // If our given transmittance isn't already median filtered (based on it's file name)
-            if (transmittance_path.find("median10") == std::string::npos) {
+            if (transmittance_path.find("median") == std::string::npos) {
                 // Generate med10Transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, mask);
+                std::cout << "Filtered transmittance generated" << std::endl;
             } else {
                 medTransmittance = transmittance;
             }
             transmittance = nullptr;
-            std::cout << "Med10Transmittance generated" << std::endl;
 
             // Set our read parameters
             inclination.setModalities(medTransmittance, retardation, blurredMask, mask);
@@ -176,7 +181,7 @@ int main(int argc, char** argv) {
             writer.write_attribute("/Image", "ic", inclination.ic());
             writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
             writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
-            writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
+            // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
             writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination", argc, argv);
             std::cout << "Inclination generated and written" << std::endl;
@@ -195,7 +200,7 @@ int main(int argc, char** argv) {
                 writer.write_attribute("/Image", "ic", inclination.ic());
                 writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
                 writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
-                writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
+                // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
 
                 writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination Saturation", argc, argv);
                 std::cout << "Saturation image generated and written" << std::endl;

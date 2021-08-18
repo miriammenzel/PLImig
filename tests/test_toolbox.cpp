@@ -144,10 +144,11 @@ TEST(TestToolbox, TestImageRegionGrowing) {
 
 TEST(TestToolbox, TestMedianFilter) {
     auto testImage = cv::imread("../../tests/files/median_filter/median_input.tiff", cv::IMREAD_ANYDEPTH);
-    auto expectedResult = cv::imread("../../tests/files/median_filter/median_expected_result.tiff", cv::IMREAD_ANYDEPTH);
+    auto expectedResult = cv::imread("../../tests/files/median_filter/median_"+std::to_string(MEDIAN_KERNEL_SIZE)+"_expected_result.tiff", cv::IMREAD_ANYDEPTH);
 
     auto testImagePtr = std::make_shared<cv::Mat>(testImage);
     auto medianFilterPtr = PLImg::cuda::filters::medianFilter(testImagePtr);
+
 
     for(int i = 0; i < expectedResult.rows; ++i) {
         for(int j = 0; j < expectedResult.cols; ++j) {
