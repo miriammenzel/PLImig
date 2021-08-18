@@ -139,23 +139,25 @@ int main(int argc, char** argv) {
                     PLImg::Reader::imread(retardation_path, dataset));
             std::cout << "Files read" << std::endl;
 
-            std::shared_ptr<cv::Mat> medTransmittance = transmittance;
-            if (transmittance_path.find("median10") == std::string::npos) {
-                // Generate med10Transmittance
+            std::shared_ptr<cv::Mat> medTransmittance;
+            if (transmittance_path.find("median") == std::string::npos) {
+                // Generate median transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
-                // Write it to a file
-                std::string medTraName(mask_basename);
-                medTraName.replace(mask_basename.find("Mask"), 4, "median10NTransmittance");
-                // Set file
-                writer.set_path(output_folder + "/" + medTraName + ".h5");
+                // Set output file name
+                std::string medianName = "median"+std::to_string(MEDIAN_KERNEL_SIZE)+"NTransmittance";
+                std::string medianTransmittanceBasename(mask_basename);
+                medianTransmittanceBasename.replace(mask_basename.find("Mask"), 4, medianName);
+                // Set and write file
+                writer.set_path(output_folder + "/" + medianTransmittanceBasename + ".h5");
                 writer.write_dataset("/Image", *medTransmittance, true);
-                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "median10NTransmittance", argc, argv);
+                writer.write_attribute("/Image", "median_kernel_size", int(MEDIAN_KERNEL_SIZE));
+                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", medianName, argc, argv);
                 writer.close();
+                std::cout << "Median-Transmittance generated" << std::endl;
             } else {
                 medTransmittance = transmittance;
             }
             transmittance = nullptr;
-            std::cout << "Med10Transmittance generated" << std::endl;
 
             generation.setModalities(retardation, medTransmittance);
             if(ttra >= 0) {
@@ -178,7 +180,7 @@ int main(int argc, char** argv) {
             writer.write_attribute("/Image", "r_thres", generation.tRet());
             writer.write_attribute("/Image", "i_rmax", generation.tMin());
             writer.write_attribute("/Image", "i_upper", generation.tMax());
-            writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
+            // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
             std::cout << "Full mask generated and written" << std::endl;
 
             if (blurred) {
