@@ -110,8 +110,13 @@ int main(int argc, char** argv) {
 
         // Get name of retardation and check if transmittance has median filer applied.
         retardation_basename = std::string(transmittance_basename);
-        if (retardation_basename.find("median10") != std::string::npos) {
-            retardation_basename = retardation_basename.replace(retardation_basename.find("median10"), 8, "");
+        auto pos = retardation_basename.find("median");
+        if (pos != std::string::npos) {
+            int length = 6;
+            while(std::isdigit(retardation_basename.at(pos + length))) {
+                ++length;
+            }
+            retardation_basename = retardation_basename.replace(pos, length, "");
         }
         if (retardation_basename.find("NTransmittance") != std::string::npos) {
             retardation_basename = retardation_basename.replace(retardation_basename.find("NTransmittance"), 14, "Retardation");
@@ -151,7 +156,7 @@ int main(int argc, char** argv) {
                 writer.set_path(output_folder + "/" + medianTransmittanceBasename + ".h5");
                 writer.write_dataset("/Image", *medTransmittance, true);
                 writer.write_attribute("/Image", "median_kernel_size", int(MEDIAN_KERNEL_SIZE));
-                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", medianName, argc, argv);
+                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "NTransmittance", argc, argv);
                 writer.close();
                 std::cout << "Median-Transmittance generated" << std::endl;
             } else {
