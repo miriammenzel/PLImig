@@ -89,7 +89,9 @@ int main(int argc, char** argv) {
     PLImg::MaskGeneration generation;
 
     std::string transmittance_basename, mask_basename;
-    std::string transmittance_path, retardation_path, mask_path;
+    std::string transmittance_path, retardation_path;
+    // Output paths
+    std::string median_transmittance_path, mask_path;
 
     for(unsigned i = 0; i < transmittance_files.size(); ++i) {
         transmittance_path = transmittance_files.at(i);
@@ -139,13 +141,14 @@ int main(int argc, char** argv) {
             medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
             // Set output file name
             std::string medianName = "median"+std::to_string(MEDIAN_KERNEL_SIZE)+"NTransmittance";
-            std::string medianTransmittanceBasename(mask_basename);
-            medianTransmittanceBasename.replace(mask_basename.find("Mask"), 4, medianName);
+            std::string median_transmittance_basename(mask_basename);
+            median_transmittance_basename.replace(mask_basename.find("Mask"), 4, medianName);
+            median_transmittance_path = output_folder + "/" + median_transmittance_basename + ".h5";
             // Set and write file
-            writer.set_path(output_folder + "/" + medianTransmittanceBasename + ".h5");
+            writer.set_path(median_transmittance_path);
             writer.write_dataset("/Image", *medTransmittance, true);
             writer.write_attribute("/Image", "median_kernel_size", int(MEDIAN_KERNEL_SIZE));
-            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "NTransmittance", argc, argv);
+            writer.writePLIMAttributes({transmittance_path}, "/Image", "/Image", "NTransmittance", argc, argv);
             writer.close();
             std::cout << "Median-Transmittance generated" << std::endl;
         } else {
@@ -169,7 +172,7 @@ int main(int argc, char** argv) {
 
         writer.set_path(output_folder + "/" + mask_basename + ".h5");
         writer.write_dataset("/Image", *generation.fullMask(), true);
-        writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
+        writer.writePLIMAttributes({median_transmittance_path, retardation_path}, "/Image", "/Image", "Mask", argc, argv);
         writer.write_attribute("/Image", "i_lower", generation.tTra());
         writer.write_attribute("/Image", "r_thres", generation.tRet());
         writer.write_attribute("/Image", "i_rmax", generation.tMin());

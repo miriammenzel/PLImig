@@ -131,7 +131,7 @@ namespace PLImg {
          * @param argc Number of arguments when calling the program
          * @param argv Arguments when calling the program
          */
-        void writePLIMAttributes(const std::string& transmittance_path, const std::string& retardation_path,
+        void writePLIMAttributes(const std::vector<std::string>& reference_maps,
                                  const std::string& output_dataset, const std::string& input_dataset,
                                  const std::string& modality, int argc, char** argv);
     private:
@@ -143,6 +143,8 @@ namespace PLImg {
         static void createDirectoriesIfMissing(const std::string& filename);
 
         void write_type_attribute(const std::string& dataset, const std::string& parameter_name, const H5::AtomType& datatype, void* value);
+
+        static void writePLIMReference(plim::AttributeHandler& handler, std::initializer_list<plim::AttributeHandler> reference_handler);
 
         ///
         std::string m_filename;

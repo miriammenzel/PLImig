@@ -200,14 +200,14 @@ void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) 
     }
 }
 
-void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_path, const std::string& retardation_path,
+void PLImg::HDF5Writer::writePLIMAttributes(const std::vector<std::string>& reference_maps,
                                             const std::string& output_dataset, const std::string& input_dataset,
                                             const std::string& modality, const int argc, char** argv) {
     H5::Exception::dontPrint();
     hid_t id;
     H5::Group grp;
     H5::DataSet dset;
-        try {
+    try {
         grp = m_hdf5file.openGroup(output_dataset);
         id = grp.getId();
     } catch(H5::FileIException& exception) {
@@ -257,56 +257,40 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
         }
         outputHandler.setStringAttribute("software_parameters", software_parameters);
 
+        std::vector<H5::H5File> reference_files;
+        std::vector<H5::DataSet> reference_datasets;
+        std::vector<plim::AttributeHandler> reference_modalities;
+        for(auto& reference : reference_maps) {
+            std::cout << reference << std::endl;
+            if(reference.find(".h5") != std::string::npos) {
+                try {
+                    reference_files.emplace_back();
+                    reference_files.back().openFile(reference, H5F_ACC_RDONLY);
+                    reference_datasets.push_back(reference_files.back().openDataSet(input_dataset));
+                    plim::AttributeHandler handler(reference_datasets.back().getId());
+                    reference_modalities.push_back(handler);
 
-        H5::H5File transmittance;
-        H5::DataSet tr_dset;
-        H5::H5File retardation;
-        H5::DataSet ret_dset;
-        std::unique_ptr<plim::AttributeHandler> transmittance_handler = nullptr;
-        std::unique_ptr<plim::AttributeHandler> retardation_handler = nullptr;
-        bool h5_transmittance = false;
-        bool h5_retardation = false;
-
-        try {
-            if (transmittance_path.find(".h5") != std::string::npos) {
-                transmittance.openFile(transmittance_path, H5F_ACC_RDONLY);
-                tr_dset = transmittance.openDataSet(input_dataset);
-                transmittance_handler = std::make_unique<plim::AttributeHandler>(tr_dset.getId());
-                h5_transmittance = true;
-            }
-            if (retardation_path.find(".h5") != std::string::npos) {
-                retardation.openFile(retardation_path, H5F_ACC_RDONLY);
-                ret_dset = retardation.openDataSet(input_dataset);
-                retardation_handler = std::make_unique<plim::AttributeHandler>(ret_dset.getId());
-                h5_retardation = true;
-            }
-
-            try {
-                if (h5_retardation) {
-                    retardation_handler->copyAllAttributesTo(outputHandler, {});
-                } else if (h5_transmittance) {
-                    transmittance_handler->copyAllAttributesTo(outputHandler, {});
+                    handler.copyAllAttributesTo(outputHandler, {});
+                } catch (MissingAttributeException& e) {
+                    std::cerr << e.what() << std::endl;
+                } catch (AttributeExistsException& e) {
+                    std::cerr << e.what() << std::endl;
+                } catch(WrongDatatypeException& e) {
+                    std::cerr << e.what() << std::endl;
                 }
-            } catch(std::exception& e) {
-                std::cerr << "Error during copying attributes with plim. Skipping copy..." << std::endl;
-                std::cerr << e.what() << std::endl;
             }
+        }
 
-            try {
-                if (h5_retardation & !h5_transmittance) {
-                    outputHandler.setReferenceModalityTo({*retardation_handler});
-                } else if (h5_transmittance & !h5_retardation) {
-                    outputHandler.setReferenceModalityTo({*transmittance_handler});
-                } else if (h5_transmittance && h5_retardation) {
-                    outputHandler.setReferenceModalityTo({*transmittance_handler, *retardation_handler});
-                }
-            } catch (MissingAttributeException& e) {
-                std::cerr << e.what() << std::endl;
-            }
-        } catch (AttributeExistsException& e) {
-            std::cerr << e.what() << std::endl;
-        } catch(WrongDatatypeException& e) {
-            std::cerr << e.what() << std::endl;
+        std::cout << reference_files.size() << std::endl;
+        std::cout << reference_datasets.size() << std::endl;
+        std::cout << reference_modalities.size() << std::endl;
+
+        if(reference_modalities.size() == 1) {
+            writePLIMReference(outputHandler, {reference_modalities.at(0)});
+        } else if(reference_modalities.size() == 2) {
+            writePLIMReference(outputHandler, {reference_modalities.at(0), reference_modalities.at(1)});
+        } else if(reference_modalities.size() == 3) {
+            writePLIMReference(outputHandler, {reference_modalities.at(0), reference_modalities.at(1), reference_modalities.at(2)});
         }
 
         try {
@@ -319,14 +303,13 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
             std::cerr << e.what() << std::endl;
         }
 
-        transmittance_handler = nullptr;
-        retardation_handler = nullptr;
+        for(auto& reference : reference_datasets) {
+            reference.close();
+        }
+        for(auto& reference : reference_files) {
+            reference.close();
+        }
 
-        if(tr_dset.getId() > 0) tr_dset.close();
-        if(transmittance.getId() > 0) transmittance.close();
-
-        if(ret_dset.getId() > 0) ret_dset.close();
-        if(retardation.getId() > 0) retardation.close();
     } catch (std::exception& e) {
         std::cerr << e.what() << std::endl;
         throw std::runtime_error("Output dataset was not valid!");
@@ -336,4 +319,20 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::string& transmittance_pat
     dset.close();
 }
 
+void PLImg::HDF5Writer::writePLIMReference(plim::AttributeHandler &handler,
+                                           std::initializer_list<plim::AttributeHandler> reference_handler) {
+    try{
+        handler.setReferenceModalityTo(reference_handler);
+    } catch (MissingAttributeException& e) {
+        std::cerr << "Could not set reference modalities. Skipping..." << std::endl;
+        std::cerr << e.what() << std::endl;
+    } catch (WrongDatatypeException& e) {
+        std::cerr << "Could not set reference modalities. Skipping..." << std::endl;
+        std::cerr << e.what() << std::endl;
+    } catch (DimensionException& e) {
+        std::cerr << "Could not set reference modalities. Skipping..." << std::endl;
+        std::cerr << e.what() << std::endl;
+    }
+
+}
 
