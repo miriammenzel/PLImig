@@ -281,10 +281,6 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::vector<std::string>& refe
             }
         }
 
-        std::cout << reference_files.size() << std::endl;
-        std::cout << reference_datasets.size() << std::endl;
-        std::cout << reference_modalities.size() << std::endl;
-
         if(reference_modalities.size() == 1) {
             writePLIMReference(outputHandler, {reference_modalities.at(0)});
         } else if(reference_modalities.size() == 2) {
