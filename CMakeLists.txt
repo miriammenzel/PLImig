@@ -3,7 +3,7 @@ if (POLICY CMP0048)
 endif (POLICY CMP0048)
 
 cmake_minimum_required(VERSION 3.14)
-project(PLImig LANGUAGES C CXX CUDA VERSION 1.2.0)
+project(PLImig LANGUAGES C CXX CUDA VERSION 1.3.0)
 
 # Set a default build type if none was specified
 set(default_build_type "Release")
