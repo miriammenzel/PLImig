@@ -123,14 +123,22 @@ int main(int argc, char** argv) {
         if (retardation_basename.find("Transmittance") != std::string::npos) {
             retardation_basename = retardation_basename.replace(retardation_basename.find("Transmittance"), 13, "Retardation");
         }
+
         retardation_found = false;
-        for(auto & retardation_file : retardation_files) {
-            if(retardation_file.find(retardation_basename) != std::string::npos) {
-                retardation_found = true;
-                retardation_path = retardation_file;
-                break;
+        if(retardation_files.size() == 1) {
+            retardation_found = true;
+            retardation_path = retardation_files.at(0);
+        } else {
+            for (auto &retardation_file : retardation_files) {
+                std::cout << retardation_file << std::endl;
+                if (retardation_file.find(retardation_basename) != std::string::npos) {
+                    retardation_found = true;
+                    retardation_path = retardation_file;
+                    break;
+                }
             }
         }
+
         if(retardation_found) {
             mask_basename = std::string(retardation_basename);
             if (mask_basename.find("Retardation") != std::string::npos) {
@@ -243,6 +251,8 @@ int main(int argc, char** argv) {
             }
 
             std::cout << std::endl;
+        } else {
+            std::cerr << "Retardation with file name: " << retardation_basename << " not found! Please check your input. Skipping file..." << std::endl;
         }
     }
 

@@ -113,12 +113,19 @@ int main(int argc, char** argv) {
         if (retardation_basename.find("Transmittance") != std::string::npos) {
             retardation_basename = retardation_basename.replace(retardation_basename.find("Transmittance"), 13, "Retardation");
         }
+
         retardation_found = false;
-        for(auto & retardation_file : retardation_files) {
-            if(retardation_file.find(retardation_basename) != std::string::npos) {
-                retardation_found = true;
-                retardation_path = retardation_file;
-                break;
+        if(retardation_files.size() == 1) {
+            retardation_found = true;
+            retardation_path = retardation_files.at(0);
+        } else {
+            for (auto &retardation_file : retardation_files) {
+                std::cout << retardation_file << std::endl;
+                if (retardation_file.find(retardation_basename) != std::string::npos) {
+                    retardation_found = true;
+                    retardation_path = retardation_file;
+                    break;
+                }
             }
         }
 
@@ -127,11 +134,16 @@ int main(int argc, char** argv) {
             mask_basename = mask_basename.replace(mask_basename.find("Retardation"), 11, "Mask");
         }
         mask_found = false;
-        for(auto & mask_file : mask_files) {
-            if(mask_file.find(mask_basename) != std::string::npos) {
-                mask_found = true;
-                mask_path = mask_file;
-                break;
+        if(mask_files.size() == 1) {
+            mask_found = true;
+            mask_path = mask_files.at(0);
+        } else {
+            for (auto &mask_file : mask_files) {
+                if (mask_file.find(mask_basename) != std::string::npos) {
+                    mask_found = true;
+                    mask_path = mask_file;
+                    break;
+                }
             }
         }
 
