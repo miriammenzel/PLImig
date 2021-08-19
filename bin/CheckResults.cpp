@@ -55,8 +55,8 @@ int main(int argc, char** argv) {
     // Disable HDF5 exceptions as they are pretty annoying in the terminal
     H5::Exception::dontPrint();
 
-    std::array<std::string, 4> maskAttributes = {"r_thres", "I_lower", "I_rmax", "I_upper"};
-    std::array<std::string, 4> inclinationAttributes = {"im", "ic", "rmax_G", "rmax_W"};
+    std::array<std::string, 4> maskAttributes = {"r_thres", "i_lower", "i_rmax", "i_upper"};
+    std::array<std::string, 4> inclinationAttributes = {"im", "ic", "rmax_gray", "rmax_white"};
     for(const auto& file : files) {
         H5::H5File input;
         input.openFile(file, H5F_ACC_RDONLY);
