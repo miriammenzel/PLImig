@@ -88,12 +88,14 @@ int main(int argc, char** argv) {
     PLImg::HDF5Writer writer;
     PLImg::MaskGeneration generation;
 
-    std::string transmittance_basename, retardation_basename, mask_basename;
-    std::string retardation_path, mask_path;
-    bool retardation_found;
+    std::string transmittance_basename, mask_basename;
+    std::string transmittance_path, retardation_path, mask_path;
 
-    for(const auto& transmittance_path : transmittance_files) {
+    for(unsigned i = 0; i < transmittance_files.size(); ++i) {
+        transmittance_path = transmittance_files.at(i);
+        retardation_path = retardation_files.at(i);
         std::cout << transmittance_path << std::endl;
+        std::cout << retardation_path << std::endl;
 
         unsigned long long int endPosition = transmittance_path.find_last_of('/');
         if(endPosition != std::string::npos) {
@@ -109,106 +111,82 @@ int main(int argc, char** argv) {
         }
 
         // Get name of retardation and check if transmittance has median filer applied.
-        retardation_basename = std::string(transmittance_basename);
-        auto pos = retardation_basename.find("median");
+        mask_basename = std::string(transmittance_basename);
+        auto pos = mask_basename.find("median");
         if (pos != std::string::npos) {
             int length = 6;
-            while(std::isdigit(retardation_basename.at(pos + length))) {
+            while(std::isdigit(mask_basename.at(pos + length))) {
                 ++length;
             }
-            retardation_basename = retardation_basename.replace(pos, length, "");
+            mask_basename = mask_basename.replace(pos, length, "");
         }
-        if (retardation_basename.find("NTransmittance") != std::string::npos) {
-            retardation_basename = retardation_basename.replace(retardation_basename.find("NTransmittance"), 14, "Retardation");
+        if (mask_basename.find("NTransmittance") != std::string::npos) {
+            mask_basename = mask_basename.replace(mask_basename.find("NTransmittance"), 14, "Mask");
         }
-        if (retardation_basename.find("Transmittance") != std::string::npos) {
-            retardation_basename = retardation_basename.replace(retardation_basename.find("Transmittance"), 13, "Retardation");
-        }
-
-        retardation_found = false;
-        if(retardation_files.size() == 1) {
-            retardation_found = true;
-            retardation_path = retardation_files.at(0);
-        } else {
-            for (auto &retardation_file : retardation_files) {
-                std::cout << retardation_file << std::endl;
-                if (retardation_file.find(retardation_basename) != std::string::npos) {
-                    retardation_found = true;
-                    retardation_path = retardation_file;
-                    break;
-                }
-            }
+        if (mask_basename.find("Transmittance") != std::string::npos) {
+            mask_basename = mask_basename.replace(mask_basename.find("Transmittance"), 13, "Mask");
         }
 
-        if(retardation_found) {
-            mask_basename = std::string(retardation_basename);
-            if (mask_basename.find("Retardation") != std::string::npos) {
-                mask_basename = mask_basename.replace(mask_basename.find("Retardation"), 11, "Mask");
-            }
+        std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(
+                PLImg::Reader::imread(transmittance_path, dataset));
+        std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(
+                PLImg::Reader::imread(retardation_path, dataset));
+        std::cout << "Files read" << std::endl;
 
-            std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(
-                    PLImg::Reader::imread(transmittance_path, dataset));
-            std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(
-                    PLImg::Reader::imread(retardation_path, dataset));
-            std::cout << "Files read" << std::endl;
-
-            std::shared_ptr<cv::Mat> medTransmittance;
-            if (transmittance_path.find("median") == std::string::npos) {
-                // Generate median transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
-                // Set output file name
-                std::string medianName = "median"+std::to_string(MEDIAN_KERNEL_SIZE)+"NTransmittance";
-                std::string medianTransmittanceBasename(mask_basename);
-                medianTransmittanceBasename.replace(mask_basename.find("Mask"), 4, medianName);
-                // Set and write file
-                writer.set_path(output_folder + "/" + medianTransmittanceBasename + ".h5");
-                writer.write_dataset("/Image", *medTransmittance, true);
-                writer.write_attribute("/Image", "median_kernel_size", int(MEDIAN_KERNEL_SIZE));
-                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "NTransmittance", argc, argv);
-                writer.close();
-                std::cout << "Median-Transmittance generated" << std::endl;
-            } else {
-                medTransmittance = transmittance;
-            }
-            transmittance = nullptr;
-
-            generation.setModalities(retardation, medTransmittance);
-            if(ttra >= 0) {
-                generation.set_tTra(ttra);
-            }
-            if(tret >= 0) {
-                generation.set_tRet(tret);
-            }
-            if(tmin >= 0) {
-                generation.set_tMin(tmin);
-            }
-            if(tmax >= 0) {
-                generation.set_tMax(tmax);
-            }
-
-            writer.set_path(output_folder + "/" + mask_basename + ".h5");
-            writer.write_dataset("/Image", *generation.fullMask(), true);
-            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
-            writer.write_attribute("/Image", "i_lower", generation.tTra());
-            writer.write_attribute("/Image", "r_thres", generation.tRet());
-            writer.write_attribute("/Image", "i_rmax", generation.tMin());
-            writer.write_attribute("/Image", "i_upper", generation.tMax());
-            // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-            std::cout << "Full mask generated and written" << std::endl;
-
-            if (blurred) {
-                writer.write_dataset("/Probability", *generation.probabilityMask());
-                std::cout << "Probability mask generated and written" << std::endl;
-            }
-            if (detailed) {
-                writer.write_dataset("/NoNerveFibers", *generation.noNerveFiberMask());
-                std::cout << "Detailed masks generated and written" << std::endl;
-            }
+        std::shared_ptr<cv::Mat> medTransmittance;
+        if (transmittance_path.find("median") == std::string::npos) {
+            // Generate median transmittance
+            medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
+            // Set output file name
+            std::string medianName = "median"+std::to_string(MEDIAN_KERNEL_SIZE)+"NTransmittance";
+            std::string medianTransmittanceBasename(mask_basename);
+            medianTransmittanceBasename.replace(mask_basename.find("Mask"), 4, medianName);
+            // Set and write file
+            writer.set_path(output_folder + "/" + medianTransmittanceBasename + ".h5");
+            writer.write_dataset("/Image", *medTransmittance, true);
+            writer.write_attribute("/Image", "median_kernel_size", int(MEDIAN_KERNEL_SIZE));
+            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "NTransmittance", argc, argv);
             writer.close();
-            std::cout << std::endl;
+            std::cout << "Median-Transmittance generated" << std::endl;
         } else {
-            std::cerr << "Retardation with file name: " << retardation_basename << " not found! Please check your input. Skipping file..." << std::endl;
+            medTransmittance = transmittance;
         }
+        transmittance = nullptr;
+
+        generation.setModalities(retardation, medTransmittance);
+        if(ttra >= 0) {
+            generation.set_tTra(ttra);
+        }
+        if(tret >= 0) {
+            generation.set_tRet(tret);
+        }
+        if(tmin >= 0) {
+            generation.set_tMin(tmin);
+        }
+        if(tmax >= 0) {
+            generation.set_tMax(tmax);
+        }
+
+        writer.set_path(output_folder + "/" + mask_basename + ".h5");
+        writer.write_dataset("/Image", *generation.fullMask(), true);
+        writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
+        writer.write_attribute("/Image", "i_lower", generation.tTra());
+        writer.write_attribute("/Image", "r_thres", generation.tRet());
+        writer.write_attribute("/Image", "i_rmax", generation.tMin());
+        writer.write_attribute("/Image", "i_upper", generation.tMax());
+        // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
+        std::cout << "Full mask generated and written" << std::endl;
+
+        if (blurred) {
+            writer.write_dataset("/Probability", *generation.probabilityMask());
+            std::cout << "Probability mask generated and written" << std::endl;
+        }
+        if (detailed) {
+            writer.write_dataset("/NoNerveFibers", *generation.noNerveFiberMask());
+            std::cout << "Detailed masks generated and written" << std::endl;
+        }
+        writer.close();
+        std::cout << std::endl;
     }
 
     #ifdef TIME_MEASUREMENT

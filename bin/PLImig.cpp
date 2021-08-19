@@ -87,12 +87,14 @@ int main(int argc, char** argv) {
     PLImg::MaskGeneration generation;
     PLImg::Inclination inclination;
 
-    std::string transmittance_basename, retardation_basename, mask_basename, inclination_basename;
-    std::string retardation_path, mask_path;
-    bool retardation_found;
+    std::string transmittance_basename, mask_basename, inclination_basename;
+    std::string retardation_path, mask_path, transmittance_path;
 
-    for(const auto& transmittance_path : transmittance_files) {
+    for(unsigned i = 0; i < transmittance_files.size(); ++i) {
+        transmittance_path = transmittance_files.at(i);
+        retardation_path = retardation_files.at(i);
         std::cout << transmittance_path << std::endl;
+        std::cout << retardation_path << std::endl;
 
         unsigned long long int endPosition = transmittance_path.find_last_of('/');
         if(endPosition != std::string::npos) {
@@ -100,7 +102,7 @@ int main(int argc, char** argv) {
         } else {
             transmittance_basename = transmittance_path;
         }
-        for(std::string extension : std::array<std::string, 5> {".h5", ".tiff", ".tif", ".nii.gz", ".nii"}) {
+        for(const std::string& extension : std::array<std::string, 5> {".h5", ".tiff", ".tif", ".nii.gz", ".nii"}) {
             endPosition = transmittance_basename.rfind(extension);
             if(endPosition != std::string::npos) {
                 transmittance_basename = transmittance_basename.substr(0, endPosition);
@@ -108,152 +110,128 @@ int main(int argc, char** argv) {
         }
 
         // Get name of retardation and check if transmittance has median filer applied.
-        retardation_basename = std::string(transmittance_basename);
-        auto pos = retardation_basename.find("median");
+        mask_basename = std::string(transmittance_basename);
+        auto pos = mask_basename.find("median");
         if (pos != std::string::npos) {
             int length = 6;
-            while(std::isdigit(retardation_basename.at(pos + length))) {
+            while(std::isdigit(mask_basename.at(pos + length))) {
                 ++length;
             }
-            retardation_basename = retardation_basename.replace(pos, length, "");
+            mask_basename = mask_basename.replace(pos, length, "");
         }
-        if (retardation_basename.find("NTransmittance") != std::string::npos) {
-            retardation_basename = retardation_basename.replace(retardation_basename.find("NTransmittance"), 14, "Retardation");
+        if (mask_basename.find("NTransmittance") != std::string::npos) {
+            mask_basename = mask_basename.replace(mask_basename.find("NTransmittance"), 14, "Mask");
         }
-        if (retardation_basename.find("Transmittance") != std::string::npos) {
-            retardation_basename = retardation_basename.replace(retardation_basename.find("Transmittance"), 13, "Retardation");
+        if (mask_basename.find("Transmittance") != std::string::npos) {
+            mask_basename = mask_basename.replace(mask_basename.find("Transmittance"), 13, "Mask");
         }
-
-        retardation_found = false;
-        if(retardation_files.size() == 1) {
-            retardation_found = true;
-            retardation_path = retardation_files.at(0);
-        } else {
-            for (auto &retardation_file : retardation_files) {
-                std::cout << retardation_file << std::endl;
-                if (retardation_file.find(retardation_basename) != std::string::npos) {
-                    retardation_found = true;
-                    retardation_path = retardation_file;
-                    break;
-                }
-            }
+        inclination_basename = std::string(mask_basename);
+        if (mask_basename.find("Mask") != std::string::npos) {
+            inclination_basename = inclination_basename.replace(inclination_basename.find("Mask"), 4, "Inclination");
         }
 
-        if(retardation_found) {
-            mask_basename = std::string(retardation_basename);
-            if (mask_basename.find("Retardation") != std::string::npos) {
-                mask_basename = mask_basename.replace(mask_basename.find("Retardation"), 11, "Mask");
-            }
-            inclination_basename = std::string(mask_basename);
-            if (mask_basename.find("Mask") != std::string::npos) {
-                inclination_basename = inclination_basename.replace(inclination_basename.find("Mask"), 4, "Inclination");
-            }
+        std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(
+                PLImg::Reader::imread(transmittance_path, dataset));
+        std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(
+                PLImg::Reader::imread(retardation_path, dataset));
+        std::cout << "Files read" << std::endl;
 
-            std::shared_ptr<cv::Mat> transmittance = std::make_shared<cv::Mat>(
-                    PLImg::Reader::imread(transmittance_path, dataset));
-            std::shared_ptr<cv::Mat> retardation = std::make_shared<cv::Mat>(
-                    PLImg::Reader::imread(retardation_path, dataset));
-            std::cout << "Files read" << std::endl;
-
-            std::shared_ptr<cv::Mat> medTransmittance;
-            if (transmittance_path.find("median") == std::string::npos) {
-                // Generate median transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
-                // Set output file name
-                std::string medianName = "median"+std::to_string(MEDIAN_KERNEL_SIZE)+"NTransmittance";
-                std::string medianTransmittanceBasename(mask_basename);
-                medianTransmittanceBasename.replace(mask_basename.find("Mask"), 4, medianName);
-                // Set and write file
-                writer.set_path(output_folder + "/" + medianTransmittanceBasename + ".h5");
-                writer.write_dataset("/Image", *medTransmittance, true);
-                writer.write_attribute("/Image", "median_kernel_size", int(MEDIAN_KERNEL_SIZE));
-                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "NTransmittance", argc, argv);
-                writer.close();
-                std::cout << "Median-Transmittance generated" << std::endl;
-            } else {
-                medTransmittance = transmittance;
-            }
-
-            generation.setModalities(retardation, medTransmittance);
-            if(ttra >= 0) {
-                generation.set_tTra(ttra);
-            }
-            if(tret >= 0) {
-                generation.set_tRet(tret);
-            }
-            if(tmin >= 0) {
-                generation.set_tMin(tmin);
-            }
-            if(tmax >= 0) {
-                generation.set_tMax(tmax);
-            }
-            writer.set_path(output_folder + "/" + mask_basename + ".h5");
-
-            writer.write_dataset("Image", *generation.fullMask(), true);
-            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
-            writer.write_attribute("/Image", "i_lower", generation.tTra());
-            writer.write_attribute("/Image", "r_thres", generation.tRet());
-            writer.write_attribute("/Image", "i_rmax", generation.tMin());
-            writer.write_attribute("/Image", "i_upper", generation.tMax());
-            // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-            std::cout << "Mask generated and written" << std::endl;
-
-            writer.write_dataset("/Probability", *generation.probabilityMask());
-            std::cout << "Probability mask generated and written" << std::endl;
-
-            if (detailed) {
-                writer.write_dataset("/NoNerveFibers", *generation.noNerveFiberMask());
-                std::cout << "Detailed masks generated and written" << std::endl;
-            }
+        std::shared_ptr<cv::Mat> medTransmittance;
+        if (transmittance_path.find("median") == std::string::npos) {
+            // Generate median transmittance
+            medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
+            // Set output file name
+            std::string medianName = "median"+std::to_string(MEDIAN_KERNEL_SIZE)+"NTransmittance";
+            std::string medianTransmittanceBasename(mask_basename);
+            medianTransmittanceBasename.replace(mask_basename.find("Mask"), 4, medianName);
+            // Set and write file
+            writer.set_path(output_folder + "/" + medianTransmittanceBasename + ".h5");
+            writer.write_dataset("/Image", *medTransmittance, true);
+            writer.write_attribute("/Image", "median_kernel_size", int(MEDIAN_KERNEL_SIZE));
+            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "NTransmittance", argc, argv);
             writer.close();
+            std::cout << "Median-Transmittance generated" << std::endl;
+        } else {
+            medTransmittance = transmittance;
+        }
 
-            if (transmittance_path.find("median10") == std::string::npos) {
-                // Generate med10Transmittance
-                medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.fullMask());
-                transmittance = nullptr;
-            } else {
-                medTransmittance = transmittance;
+        generation.setModalities(retardation, medTransmittance);
+        if(ttra >= 0) {
+            generation.set_tTra(ttra);
+        }
+        if(tret >= 0) {
+            generation.set_tRet(tret);
+        }
+        if(tmin >= 0) {
+            generation.set_tMin(tmin);
+        }
+        if(tmax >= 0) {
+            generation.set_tMax(tmax);
+        }
+        writer.set_path(output_folder + "/" + mask_basename + ".h5");
+
+        writer.write_dataset("Image", *generation.fullMask(), true);
+        writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Mask", argc, argv);
+        writer.write_attribute("/Image", "i_lower", generation.tTra());
+        writer.write_attribute("/Image", "r_thres", generation.tRet());
+        writer.write_attribute("/Image", "i_rmax", generation.tMin());
+        writer.write_attribute("/Image", "i_upper", generation.tMax());
+        // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
+        std::cout << "Mask generated and written" << std::endl;
+
+        writer.write_dataset("/Probability", *generation.probabilityMask());
+        std::cout << "Probability mask generated and written" << std::endl;
+
+        if (detailed) {
+            writer.write_dataset("/NoNerveFibers", *generation.noNerveFiberMask());
+            std::cout << "Detailed masks generated and written" << std::endl;
+        }
+        writer.close();
+
+        if (transmittance_path.find("median") == std::string::npos) {
+            // Generate med10Transmittance
+            medTransmittance = PLImg::cuda::filters::medianFilterMasked(transmittance, generation.fullMask());
+            transmittance = nullptr;
+        } else {
+            medTransmittance = transmittance;
+        }
+        std::cout << "Median filtered and masked transmittance generated" << std::endl;
+
+        // Set our read parameters
+        inclination.setModalities(medTransmittance, retardation, generation.probabilityMask(), generation.fullMask());
+
+        // Create file and dataset. Write the inclination afterwards.
+        writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
+        writer.write_dataset("/Image", *inclination.inclination(), true);
+        writer.write_attribute("/Image", "im", inclination.im());
+        writer.write_attribute("/Image", "ic", inclination.ic());
+        writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
+        writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
+        // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
+
+        writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination", argc, argv);
+        std::cout << "Inclination generated and written" << std::endl;
+        writer.close();
+
+        if(detailed) {
+            auto saturation_basename = std::string(mask_basename);
+            if (mask_basename.find("Mask") != std::string::npos) {
+                saturation_basename = saturation_basename.replace(saturation_basename.find("Mask"), 4, "Saturation");
             }
-            std::cout << "Median10 filtered and masked transmittance generated" << std::endl;
-
-            // Set our read parameters
-            inclination.setModalities(medTransmittance, retardation, generation.probabilityMask(), generation.fullMask());
-
             // Create file and dataset. Write the inclination afterwards.
-            writer.set_path(output_folder+ "/" + inclination_basename + ".h5");
-            writer.write_dataset("/Image", *inclination.inclination(), true);
+            writer.set_path(output_folder+ "/" + saturation_basename + ".h5");
+            writer.write_dataset("/Image", *inclination.saturation(), true);
             writer.write_attribute("/Image", "im", inclination.im());
             writer.write_attribute("/Image", "ic", inclination.ic());
             writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
             writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
             // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-
-            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination", argc, argv);
-            std::cout << "Inclination generated and written" << std::endl;
+            writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination Saturation", argc, argv);
+            std::cout << "Saturation image generated and written" << std::endl;
             writer.close();
-
-            if(detailed) {
-                auto saturation_basename = std::string(mask_basename);
-                if (mask_basename.find("Mask") != std::string::npos) {
-                    saturation_basename = saturation_basename.replace(saturation_basename.find("Mask"), 4, "Saturation");
-                }
-                // Create file and dataset. Write the inclination afterwards.
-                writer.set_path(output_folder+ "/" + saturation_basename + ".h5");
-                writer.write_dataset("/Image", *inclination.saturation(), true);
-                writer.write_attribute("/Image", "im", inclination.im());
-                writer.write_attribute("/Image", "ic", inclination.ic());
-                writer.write_attribute("/Image", "rmax_white", inclination.rmaxWhite());
-                writer.write_attribute("/Image", "rmax_gray", inclination.rmaxGray());
-                // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
-                writer.writePLIMAttributes(transmittance_path, retardation_path, "/Image", "/Image", "Inclination Saturation", argc, argv);
-                std::cout << "Saturation image generated and written" << std::endl;
-                writer.close();
-            }
-
-            std::cout << std::endl;
-        } else {
-            std::cerr << "Retardation with file name: " << retardation_basename << " not found! Please check your input. Skipping file..." << std::endl;
         }
+
+        std::cout << std::endl;
     }
 
     #ifdef TIME_MEASUREMENT
