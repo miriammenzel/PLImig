@@ -239,26 +239,38 @@ cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLa
     if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
-    chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
 
-    // Chunked connected components algorithm.
-    // Labels right on the edges will be wrong. This will be fixed in the next step.
-    int xMin, xMax, yMin, yMax;
+    bool gpu_exception;
+    do {
+        gpu_exception = false;
+        try {
+            chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
 
-    cv::Mat subImage, croppedImage;
-    for (uint it = 0; it < numberOfChunks; ++it) {
-        // Calculate image boarders
-        xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
-        xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
-        yMin = (it / chunksPerDim) * image.rows / chunksPerDim;
-        yMax = fmin((it / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
+            // Chunked connected components algorithm.
+            // Labels right on the edges will be wrong. This will be fixed in the next step.
+            int xMin, xMax, yMin, yMax;
 
-        croppedImage = cv::Mat(histImage, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subImage);
-        croppedImage.release();
-        cv::Mat subHist = PLImg::cuda::raw::CUDAhistogram(subImage, minLabel, maxLabel, numBins);
-        cv::add(hist, subHist, hist);
-    }
+            cv::Mat subImage, croppedImage;
+            for (uint it = 0; it < numberOfChunks; ++it) {
+                // Calculate image boarders
+                xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
+                xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
+                yMin = (it / chunksPerDim) * image.rows / chunksPerDim;
+                yMax = fmin((it / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
+
+                croppedImage = cv::Mat(histImage, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+                croppedImage.copyTo(subImage);
+                croppedImage.release();
+
+                cv::Mat subHist = PLImg::cuda::raw::CUDAhistogram(subImage, minLabel, maxLabel, numBins);
+                cv::add(hist, subHist, hist);
+            }
+        } catch (PLImg::GPUOutOfMemoryException& e) {
+            std::cerr << "Ran out of memory because prediction was not accurate enough. Increasing number of chunks" << std::endl;
+            numberOfChunks = numberOfChunks * 4;
+            gpu_exception = true;
+        }
+    } while(gpu_exception);
 
     return hist;
 }
@@ -281,13 +293,10 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_pt
     // The image might be too large to be saved completely in the video memory.
     // Therefore chunks will be used if the amount of memory is too small.
     uint numberOfChunks = 1;
-    // Check the free video memory
-    ulong freeMem;
-    CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
     // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
     // with the power of four (1, 4, 16, 256, 1024, ...)
-    if(getMedianFilterMemoryEstimation(image) > double(freeMem)) {
-        numberOfChunks = fmax(1, pow(4.0, ceil(log(getMedianFilterMemoryEstimation(image) / double(freeMem)) / log(4))));
+    if(getMedianFilterMemoryEstimation(image) > double(PLImg::cuda::getFreeMemory())) {
+        numberOfChunks = fmax(1, pow(4.0, ceil(log(getMedianFilterMemoryEstimation(image) / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
     // Each dimensions will get the same number of chunks. Calculate them by using the square root.
     uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
@@ -296,33 +305,42 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_pt
     // We've increased the image dimensions earlier. Save the original image dimensions for further calculations.
     int2 realImageDims = {image->cols - 2 * MEDIAN_KERNEL_SIZE, image->rows - 2 * MEDIAN_KERNEL_SIZE};
     cv::Mat subImage, subResult, croppedImage;
-    // For each chunk
-    for(uint it = 0; it < numberOfChunks; ++it) {
-        std::cout << "\rCurrent chunk: " << it + 1 << "/" << numberOfChunks;
-        std::flush(std::cout);
-        // Calculate image boarders
-        xMin = (it % chunksPerDim) * realImageDims.x / chunksPerDim;
-        xMax = fmin((it % chunksPerDim + 1) * realImageDims.x / chunksPerDim, realImageDims.x);
-        yMin = (it / chunksPerDim) * realImageDims.y / chunksPerDim;
-        yMax = fmin((it / chunksPerDim + 1) * realImageDims.y / chunksPerDim, realImageDims.y);
 
-        // Get chunk of our image and result. Apply padding to the result to ensure that the median filter will run correctly.
-        croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
-                                                yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
-        croppedImage.copyTo(subImage);
-        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subResult);
-        cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE,
-                           MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+    bool gpu_exception;
+    do {
+        gpu_exception = false;
+        try {
+            chunksPerDim = fmax(1, sqrtf(numberOfChunks));
+            // For each chunk
+            for(uint it = 0; it < numberOfChunks; ++it) {
+                std::cout << "\rCurrent chunk: " << it + 1 << "/" << numberOfChunks;
+                std::flush(std::cout);
+                // Calculate image boarders
+                xMin = (it % chunksPerDim) * realImageDims.x / chunksPerDim;
+                xMax = fmin((it % chunksPerDim + 1) * realImageDims.x / chunksPerDim, realImageDims.x);
+                yMin = (it / chunksPerDim) * realImageDims.y / chunksPerDim;
+                yMax = fmin((it / chunksPerDim + 1) * realImageDims.y / chunksPerDim, realImageDims.y);
 
-        PLImg::cuda::raw::filters::CUDAmedianFilter(subImage, subResult);
-
-        // Calculate the range where the median filter was applied and where the chunk will be placed.
-        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, xMax - xMin, yMax - yMin);
-        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
-        subResult(srcRect).copyTo(result(dstRect));
-
-    }
+                // Get chunk of our image and result. Apply padding to the result to ensure that the median filter will run correctly.
+                croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
+                                                        yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
+                croppedImage.copyTo(subImage);
+                croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+                croppedImage.copyTo(subResult);
+                cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE,
+                                   MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+                PLImg::cuda::raw::filters::CUDAmedianFilter(subImage, subResult);
+                // Calculate the range where the median filter was applied and where the chunk will be placed.
+                cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, xMax - xMin, yMax - yMin);
+                cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+                subResult(srcRect).copyTo(result(dstRect));
+            }
+        }  catch (PLImg::GPUOutOfMemoryException& e) {
+            std::cerr << "Ran out of memory because prediction was not accurate enough. Increasing number of chunks" << std::endl;
+            numberOfChunks = numberOfChunks * 4;
+            gpu_exception = true;
+        }
+    } while(gpu_exception);
 
     // Fix output after \r
     std::cout << std::endl;
@@ -363,35 +381,46 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
     int2 realImageDims = {image->cols - 2 * MEDIAN_KERNEL_SIZE, image->rows - 2 * MEDIAN_KERNEL_SIZE};
 
     cv::Mat subImage, subMask, subResult, croppedImage;
-    for(uint it = 0; it < numberOfChunks; ++it) {
-        std::cout << "\rCurrent chunk: " << it + 1 << "/" << numberOfChunks;
-        std::flush(std::cout);
-        // Calculate image boarders
-        xMin = (it % chunksPerDim) * realImageDims.x / chunksPerDim;
-        xMax = fmin((it % chunksPerDim + 1) * realImageDims.x / chunksPerDim, realImageDims.x);
-        yMin = (it / chunksPerDim) * realImageDims.y / chunksPerDim;
-        yMax = fmin((it / chunksPerDim + 1) * realImageDims.y / chunksPerDim, realImageDims.y);
+    bool gpu_exception;
+    do {
+        gpu_exception = false;
+        try {
+            chunksPerDim = fmax(1, sqrtf(numberOfChunks));
+            for(uint it = 0; it < numberOfChunks; ++it) {
+                std::cout << "\rCurrent chunk: " << it + 1 << "/" << numberOfChunks;
+                std::flush(std::cout);
+                // Calculate image boarders
+                xMin = (it % chunksPerDim) * realImageDims.x / chunksPerDim;
+                xMax = fmin((it % chunksPerDim + 1) * realImageDims.x / chunksPerDim, realImageDims.x);
+                yMin = (it / chunksPerDim) * realImageDims.y / chunksPerDim;
+                yMax = fmin((it / chunksPerDim + 1) * realImageDims.y / chunksPerDim, realImageDims.y);
 
-        // Get chunk of our image, mask and result. Apply padding to the result to ensure that the median filter will run correctly.
-        croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
-                                                yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
-        croppedImage.copyTo(subImage);
-        croppedImage = cv::Mat(*mask, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
-                                               yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
-        croppedImage.copyTo(subMask);
-        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subResult);
-        cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE,
-                           MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
+                // Get chunk of our image, mask and result. Apply padding to the result to ensure that the median filter will run correctly.
+                croppedImage = cv::Mat(*image, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
+                                                        yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
+                croppedImage.copyTo(subImage);
+                croppedImage = cv::Mat(*mask, cv::Rect(xMin, yMin, xMax - xMin + 2 * MEDIAN_KERNEL_SIZE,
+                                                       yMax - yMin + 2 * MEDIAN_KERNEL_SIZE));
+                croppedImage.copyTo(subMask);
+                croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+                croppedImage.copyTo(subResult);
+                cv::copyMakeBorder(subResult, subResult, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE,
+                                   MEDIAN_KERNEL_SIZE, cv::BORDER_REPLICATE);
 
-        PLImg::cuda::raw::filters::CUDAmedianFilterMasked(subImage, subMask, subResult);
+                PLImg::cuda::raw::filters::CUDAmedianFilterMasked(subImage, subMask, subResult);
 
-        cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, subResult.cols - 2*MEDIAN_KERNEL_SIZE, subResult.rows - 2*MEDIAN_KERNEL_SIZE);
-        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+                cv::Rect srcRect = cv::Rect(MEDIAN_KERNEL_SIZE, MEDIAN_KERNEL_SIZE, subResult.cols - 2*MEDIAN_KERNEL_SIZE, subResult.rows - 2*MEDIAN_KERNEL_SIZE);
+                cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
 
-        subResult(srcRect).copyTo(result(dstRect));
+                subResult(srcRect).copyTo(result(dstRect));
 
-    }
+            }
+        } catch (PLImg::GPUOutOfMemoryException& e) {
+            std::cerr << "Ran out of memory because prediction was not accurate enough. Increasing number of chunks" << std::endl;
+            numberOfChunks = numberOfChunks * 4;
+            gpu_exception = true;
+        }
+    } while(gpu_exception);
     // Fix output after \r
     std::cout << std::endl;
 
@@ -408,7 +437,7 @@ float PLImg::cuda::labeling::getLargestAreaConnectedComponentsMemoryEstimation(c
 }
 
 float PLImg::cuda::labeling::getConnectedComponentsMemoryEstimation(const cv::Mat& image) {
-    return float(image.total()) * sizeof(unsigned char) + 4.0f * image.total() * sizeof(uint) +
+    return 2.0f * float(image.total()) * sizeof(unsigned char) + 4.0f * image.total() * sizeof(uint) +
     ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * 
     (sizeof(uint) + sizeof(unsigned char));
 }
