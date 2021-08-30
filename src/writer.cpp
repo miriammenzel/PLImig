@@ -249,7 +249,7 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::vector<std::string>& refe
         outputHandler.setStringAttribute("software_revision", Version::versionHash());
 
         std::string software_parameters;
-        for(unsigned i = 1; i < argc; ++i) {
+        for(int i = 1; i < argc; ++i) {
             software_parameters += std::string(argv[i]) + " ";
         }
         if(outputHandler.doesAttributeExist("software_parameters")) {
@@ -261,7 +261,6 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::vector<std::string>& refe
         std::vector<H5::DataSet> reference_datasets;
         std::vector<plim::AttributeHandler> reference_modalities;
         for(auto& reference : reference_maps) {
-            std::cout << reference << std::endl;
             if(reference.find(".h5") != std::string::npos) {
                 try {
                     reference_files.emplace_back();
