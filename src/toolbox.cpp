@@ -451,10 +451,10 @@ float PLImg::cuda::labeling::getConnectedComponentsLargestComponentMemoryEstimat
 cv::Mat PLImg::cuda::labeling::largestAreaConnectedComponents(const cv::Mat& image, cv::Mat mask, float percentPixels) {
     float pixelThreshold;
     if(mask.empty()) {
-        pixelThreshold = float(image.cols) * float(image.rows) * percentPixels / 100;
+        pixelThreshold = float(image.cols) * float(image.rows) * percentPixels / 100.0f;
         mask = cv::Mat::ones(image.rows, image.cols, CV_8UC1);
     } else {
-        pixelThreshold = float(cv::countNonZero(mask)) * percentPixels / 100;
+        pixelThreshold = float(PLImg::Image::maskCountNonZero(mask)) * percentPixels / 100.0f;
     }
 
     double minVal, maxVal;

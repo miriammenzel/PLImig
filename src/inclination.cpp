@@ -170,7 +170,7 @@ float PLImg::Inclination::rmaxWhite() {
         }
 
         size_t numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.90));
-        auto threshold = (unsigned long long) (0.1 * float(numberOfPixels));
+        auto threshold = (unsigned long long) fmin(1.0f, 0.1f * float(numberOfPixels);
 
         // Calculate histogram from our region growing mask
         int channels[] = {0};
@@ -191,22 +191,11 @@ float PLImg::Inclination::rmaxWhite() {
             --binIdx;
         }
 
-        if(sumOfPixels == 0) {
-            numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask);
-            threshold = (unsigned long long) (0.1 * float(numberOfPixels));
-            cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask, hist, 1,
-                         &histSize, &histRange, true, false);
-
-            sumOfPixels = 0;
-            binIdx = MAX_NUMBER_OF_BINS - 1;
-            mean = 0.0f;
-            while (binIdx > 0 && sumOfPixels < threshold) {
-                sumOfPixels += size_t(hist.at<float>(binIdx));
-                mean += hist.at<float>(binIdx) * float(binIdx) / float(histSize);
-                --binIdx;
-            }
+        float temp_rmaxWhite = mean / float(sumOfPixels);
+        if(isnan(temp_rmaxWhite) || isinf(temp_rmaxWhite)) {
+            temp_rmaxWhite = 1.0f;
         }
-        m_rmaxWhite = std::make_unique<float>(mean / float(sumOfPixels));
+        m_rmaxWhite = std::make_unique<float>(temp_rmaxWhite);
 
     }
     return *m_rmaxWhite;
