@@ -170,7 +170,7 @@ float PLImg::Inclination::rmaxWhite() {
         }
 
         size_t numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.90));
-        auto threshold = size_t(0.1 * float(numberOfPixels));
+        auto threshold = (unsigned long long) (0.1 * float(numberOfPixels));
 
         // Calculate histogram from our region growing mask
         int channels[] = {0};
@@ -192,6 +192,8 @@ float PLImg::Inclination::rmaxWhite() {
         }
 
         if(sumOfPixels == 0) {
+            numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask);
+            threshold = (unsigned long long) (0.1 * float(numberOfPixels));
             cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask, hist, 1,
                          &histSize, &histRange, true, false);
 
