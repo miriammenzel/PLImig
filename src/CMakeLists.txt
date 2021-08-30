@@ -14,6 +14,7 @@ set(SOURCE
 
 # Set header files
 set(HEADER
+        exceptions.h
         inclination.h
         maskgeneration.h
         reader.h

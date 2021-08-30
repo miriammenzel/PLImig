@@ -26,6 +26,7 @@
 
 #include "cuda/cuda_toolbox.h"
 #include "cuda/define.h"
+#include "exceptions.h"
 #include <numeric>
 #include <omp.h>
 #include <opencv2/opencv.hpp>

@@ -10,16 +10,11 @@
     if (e != cudaSuccess) { \
         fprintf(stderr, "CUDA error at %s:%d: %d\n", __FILE__, __LINE__, e); \
         cudaDeviceReset(); \
-        exit(EXIT_FAILURE); \
-    } \
-} while (false)
-
-#define CHECK_NPP(S) do { \
-    NppStatus e = S; \
-    if (e != NPP_SUCCESS) { \
-        fprintf(stderr, "NPP error at %s:%d: %d\n", __FILE__, __LINE__, e); \
-        cudaDeviceReset(); \
-        exit(EXIT_FAILURE); \
+        if(e == cudaErrorMemoryAllocation) { \
+            throw PLImg::GPUOutOfMemoryException(); \
+        } else { \
+            throw PLImg::GPUExecutionException(); \
+        } \
     } \
 } while (false)
 

@@ -147,13 +147,25 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
     uint* deviceUniqueMask;
     CHECK_CUDA(cudaMalloc(&deviceUniqueMask, kernelImage.total() * sizeof(uint)));
     CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToDevice));
-    thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
-    uint* deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
-    // Save the new maximum label as a return value for the user
-    uint distance = thrust::distance(deviceUniqueMask, deviceMaxUniqueLabel);
-    if(maxLabelNumber) {
-        *maxLabelNumber = distance;
+
+    uint* deviceMaxUniqueLabel;
+    uint distance;
+    try {
+        thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
+        deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
+        // Save the new maximum label as a return value for the user
+        distance = thrust::distance(deviceUniqueMask, deviceMaxUniqueLabel);
+        if(maxLabelNumber) {
+            *maxLabelNumber = distance;
+        }
+    } catch (thrust::system_error& e) {
+        std::cerr << "Encountered error in Trust execution call" << std::endl;
+        throw PLImg::GPUExecutionException();
+    } catch (std::bad_alloc& e) {
+        std::cerr << "Encountered error in Thrust during allocation of memory" << std::endl;
+        throw PLImg::GPUOutOfMemoryException();
     }
+
     // Reduce numbers in label image to low numbers for following algorithms
     connectedComponentsReduceComponents<<<numBlocks, threadsPerBlock>>>(deviceMask, kernelImage.cols,
                                                                         deviceUniqueMask,

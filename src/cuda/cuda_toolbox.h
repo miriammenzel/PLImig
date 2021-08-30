@@ -29,6 +29,7 @@
 #include <cuda_runtime_api.h>
 #include "cuda_kernels.h"
 #include "define.h"
+#include "exceptions.h"
 #include <driver_types.h>
 #include <iostream>
 #include <memory>
