@@ -206,7 +206,7 @@ float PLImg::MaskGeneration::tMax() {
         fullHist.convertTo(fullHist, CV_32FC1);
         endPosition = MAX_NUMBER_OF_BINS - 1;
 
-        auto peaks = PLImg::Histogram::peaks(fullHist, MAX_NUMBER_OF_BINS / 2, endPosition);
+        auto peaks = PLImg::Histogram::peaks(fullHist, MAX_NUMBER_OF_BINS / 2, endPosition-1);
         if(!peaks.empty()) {
             startPosition = std::min_element(fullHist.begin<float>() + peaks.at(peaks.size() - 1),
                                              fullHist.begin<float>() + endPosition) - fullHist.begin<float>();
