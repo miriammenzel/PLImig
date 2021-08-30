@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
         } else {
             transmittance_basename = transmittance_path;
         }
-        for(std::string extension : std::array<std::string, 5> {".h5", ".tiff", ".tif", ".nii.gz", ".nii"}) {
+        for(std::string& extension : std::array<std::string, 5> {".h5", ".tiff", ".tif", ".nii.gz", ".nii"}) {
             endPosition = transmittance_basename.rfind(extension);
             if(endPosition != std::string::npos) {
                 transmittance_basename = transmittance_basename.substr(0, endPosition);

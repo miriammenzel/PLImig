@@ -100,7 +100,7 @@ float PLImg::Inclination::im() {
             m_regionGrowingMask = std::make_unique<cv::Mat>(
                     PLImg::cuda::labeling::largestAreaConnectedComponents(*m_retardation, backgroundMask));
         }
-        m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask & (*m_blurredMask > 0.95))[0]);
+        m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask & (*m_blurredMask > 0.90))[0]);
     }
     return *m_im;
 }
@@ -169,7 +169,7 @@ float PLImg::Inclination::rmaxWhite() {
                     PLImg::cuda::labeling::largestAreaConnectedComponents(*m_retardation, backgroundMask));
         }
 
-        size_t numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.95));
+        size_t numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.90));
         auto threshold = size_t(0.1 * float(numberOfPixels));
 
         // Calculate histogram from our region growing mask
@@ -179,7 +179,7 @@ float PLImg::Inclination::rmaxWhite() {
         int histSize = MAX_NUMBER_OF_BINS;
 
         cv::Mat hist(histSize, 1, CV_32FC1);
-        cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask & (*m_blurredMask > 0.95), hist, 1,
+        cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask & (*m_blurredMask > 0.90), hist, 1,
                      &histSize, &histRange, true, false);
 
         size_t sumOfPixels = 0;
@@ -190,7 +190,22 @@ float PLImg::Inclination::rmaxWhite() {
             mean += hist.at<float>(binIdx) * float(binIdx) / float(histSize);
             --binIdx;
         }
+
+        if(sumOfPixels == 0) {
+            cv::calcHist(&(*m_retardation), 1, channels, *m_regionGrowingMask, hist, 1,
+                         &histSize, &histRange, true, false);
+
+            sumOfPixels = 0;
+            binIdx = MAX_NUMBER_OF_BINS - 1;
+            mean = 0.0f;
+            while (binIdx > 0 && sumOfPixels < threshold) {
+                sumOfPixels += size_t(hist.at<float>(binIdx));
+                mean += hist.at<float>(binIdx) * float(binIdx) / float(histSize);
+                --binIdx;
+            }
+        }
         m_rmaxWhite = std::make_unique<float>(mean / float(sumOfPixels));
+
     }
     return *m_rmaxWhite;
 }
@@ -206,13 +221,13 @@ sharedMat PLImg::Inclination::inclination() {
         float logIcIm = logf(fmax(1e-15, ic() / im()));
 
         // Generate inclination for every pixel
-        #pragma omp parallel for default(shared) private(tmpVal, blurredMaskVal)
+        #pragma omp parallel for default(shared) private(tmpVal, blurredMaskVal) collapse(2)
         for(int y = 0; y < m_inclination->rows; ++y) {
             for(int x = 0; x < m_inclination->cols; ++x) {
                 // If pixel is in tissue
                 if(m_mask->at<unsigned char>(y, x) > 0) {
                     blurredMaskVal = m_blurredMask->at<float>(y, x);
-                    if(blurredMaskVal > 0.95) {
+                    if(blurredMaskVal > 0.90) {
                         blurredMaskVal = 1;
                     } else if(blurredMaskVal < 0.05) {
                         blurredMaskVal = 0;

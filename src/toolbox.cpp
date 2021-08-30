@@ -523,37 +523,48 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     cv::Mat subImage, subResult, subMask, croppedImage;
     uint nextLabelNumber = 0;
     uint maxLabelNumber = 0;
+    bool gpu_exception;
 
-    for (uint it = 0; it < numberOfChunks; ++it) {
-        std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
-        std::flush(std::cout);
-        // Calculate image boarders
-        xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
-        xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
-        yMin = (it / chunksPerDim) * image.rows / chunksPerDim;
-        yMax = fmin((it / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
+    do {
+        gpu_exception = false;
+        try {
+            chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
+            for (uint it = 0; it < numberOfChunks; ++it) {
+                std::cout << "\rCurrent chunk: " << it+1 << "/" << numberOfChunks;
+                std::flush(std::cout);
+                // Calculate image boarders
+                xMin = (it % chunksPerDim) * image.cols / chunksPerDim;
+                xMax = fmin((it % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols);
+                yMin = (it / chunksPerDim) * image.rows / chunksPerDim;
+                yMax = fmin((it / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows);
 
-        croppedImage = cv::Mat(image, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subImage);
-        croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
-        croppedImage.copyTo(subResult);
-        croppedImage.release();
+                croppedImage = cv::Mat(image, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+                croppedImage.copyTo(subImage);
+                croppedImage = cv::Mat(result, cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin));
+                croppedImage.copyTo(subResult);
+                croppedImage.release();
 
-        cv::copyMakeBorder(subImage, subImage, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
-        cv::copyMakeBorder(subResult, subResult, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
+                cv::copyMakeBorder(subImage, subImage, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
+                cv::copyMakeBorder(subResult, subResult, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
 
-        subResult = PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(subImage, &maxLabelNumber);
+                subResult = PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(subImage, &maxLabelNumber);
 
-        // Increase label number according to the previous chunk. Set background back to 0
-        subMask = subResult == 0;
-        subResult = subResult + cv::Scalar(nextLabelNumber, 0, 0);
-        subResult.setTo(0, subMask);
-        nextLabelNumber = nextLabelNumber + maxLabelNumber;
+                // Increase label number according to the previous chunk. Set background back to 0
+                subMask = subResult == 0;
+                subResult = subResult + cv::Scalar(nextLabelNumber, 0, 0);
+                subResult.setTo(0, subMask);
+                nextLabelNumber = nextLabelNumber + maxLabelNumber;
 
-        cv::Rect srcRect = cv::Rect(1, 1, subResult.cols - 2, subResult.rows - 2);
-        cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
-        subResult(srcRect).copyTo(result(dstRect));
-    }
+                cv::Rect srcRect = cv::Rect(1, 1, subResult.cols - 2, subResult.rows - 2);
+                cv::Rect dstRect = cv::Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+                subResult(srcRect).copyTo(result(dstRect));
+            }
+        } catch (PLImg::GPUOutOfMemoryException& e) {
+            std::cerr << "Ran out of memory because prediction was not accurate enough. Increasing number of chunks" << std::endl;
+            numberOfChunks = numberOfChunks * 4;
+            gpu_exception = true;
+        }
+    } while (gpu_exception);
     std::cout << "\nNumber of labels: " << nextLabelNumber << std::endl;
 
     // Set values of our result labeling to 0 if those originally were caused by the background.
@@ -573,7 +584,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
         std::set<std::pair<int, int>> labelLUT;
         std::cout << "Fixing chunks" << std::endl;
 
-        for (uint chunk = 0; chunk < numberOfChunks; ++chunk) {
+        for (int chunk = 0; chunk < numberOfChunks; ++chunk) {
             int xMin = (chunk % chunksPerDim) * image.cols / chunksPerDim;
             int xMax = fmin((chunk % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols-1);
             int yMin = (chunk / chunksPerDim) * image.rows / chunksPerDim;
@@ -582,7 +593,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
             int curIdx;
             int otherIdx;
             // Check upper and lower border
-            for (uint x = xMin; x < xMax; ++x) {
+            for (int x = xMin; x < xMax; ++x) {
                 curIdx = image.at<int>(yMin, x);
                 if (curIdx > 0 && yMin - 1 >= 0) {
                     otherIdx = image.at<int>(yMin - 1, x);
@@ -609,7 +620,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
             }
 
             // Check left and right border
-            for (uint y = yMin; y < yMax; ++y) {
+            for (int y = yMin; y < yMax; ++y) {
                 curIdx = image.at<int>(y, xMin);
                 if (curIdx > 0 && xMin - 1 >= 0) {
                     otherIdx = image.at<int>(y, xMin - 1);
