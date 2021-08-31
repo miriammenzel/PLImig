@@ -170,7 +170,7 @@ float PLImg::Inclination::rmaxWhite() {
         }
 
         size_t numberOfPixels = PLImg::Image::maskCountNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.90));
-        auto threshold = (unsigned long long) fmin(1.0f, 0.1f * float(numberOfPixels);
+        auto threshold = (unsigned long long) fmin(1.0f, 0.1f * float(numberOfPixels));
 
         // Calculate histogram from our region growing mask
         int channels[] = {0};
