@@ -217,9 +217,9 @@ ulong PLImg::cuda::getTotalMemory() {
 
 float PLImg::cuda::getHistogramMemoryEstimation(const cv::Mat& image, uint numBins) {
     if(numBins * sizeof(uint) < 49152) {
-        return float(ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * numBins) * sizeof(uint) + image.total() * sizeof(float);
+        return float(ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * numBins) * sizeof(uint) + (unsigned long long) image.rows * image.cols * sizeof(float);
     } else {
-        return float(numBins * sizeof(uint) + image.total() * sizeof(float));
+        return float(numBins * sizeof(uint) + sizeof(float) * (unsigned long long) image.rows * image.cols);
     }
 }
 
@@ -299,7 +299,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_pt
         numberOfChunks = fmax(1, pow(4.0, ceil(log(getMedianFilterMemoryEstimation(image) / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
     // Each dimensions will get the same number of chunks. Calculate them by using the square root.
-    uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
+    uint chunksPerDim;
 
     uint xMin, xMax, yMin, yMax;
     // We've increased the image dimensions earlier. Save the original image dimensions for further calculations.
@@ -372,7 +372,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
         numberOfChunks = fmax(1, pow(4.0, ceil(log(getMedianFilterMaskedMemoryEstimation(image, mask) / double(freeMem)) / log(4))));
     }
     // Each dimensions will get the same number of chunks. Calculate them by using the square root.
-    uint chunksPerDim = fmax(1, sqrtf(numberOfChunks));
+    uint chunksPerDim;
 
 
     uint xMin, xMax, yMin, yMax;
@@ -437,9 +437,9 @@ float PLImg::cuda::labeling::getLargestAreaConnectedComponentsMemoryEstimation(c
 }
 
 float PLImg::cuda::labeling::getConnectedComponentsMemoryEstimation(const cv::Mat& image) {
-    return 2.0f * float(image.total()) * sizeof(unsigned char) + 4.0f * image.total() * sizeof(uint) +
-    ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * 
-    (sizeof(uint) + sizeof(unsigned char));
+    return 2.0f * (unsigned long long) image.rows * image.cols * sizeof(unsigned char) +
+           4.0f * (unsigned long long) image.rows * image.cols * sizeof(uint) +
+           ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * (sizeof(uint) + sizeof(unsigned char));
 }
 
 float PLImg::cuda::labeling::getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image) {
@@ -514,7 +514,6 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     if (predictedMemoryUsage > double(PLImg::cuda::getFreeMemory())) {
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
-    chunksPerDim = fmax(1, numberOfChunks/sqrt(numberOfChunks));
 
     // Chunked connected components algorithm.
     // Labels right on the edges will be wrong. This will be fixed in the next step.
