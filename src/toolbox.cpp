@@ -128,8 +128,9 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
 }
 
 std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Mat>& transmittance, std::shared_ptr<cv::Mat>& retardation, float scalingValue) {
-    cv::Mat small_transmittance(transmittance->rows/2, transmittance->cols/2, CV_32FC1);
-    cv::Mat small_retardation(retardation->rows/2, retardation->cols/2, CV_32FC1);
+    scalingValue = 1.0f/scalingValue;
+    cv::Mat small_transmittance(scalingValue * transmittance->rows, scalingValue * transmittance->cols, CV_32FC1);
+    cv::Mat small_retardation(scalingValue * retardation->rows, scalingValue * retardation->cols, CV_32FC1);
 
     unsigned long long numPixels = (unsigned long long) transmittance->rows * (unsigned long long) transmittance->cols;
 
@@ -141,13 +142,14 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
     std::vector<std::mt19937> random_engines(num_threads);
     #pragma omp parallel for default(shared) schedule(static)
     for(unsigned i = 0; i < num_threads; ++i) {
-        random_engines.at(i) = std::mt19937((clock() * i) % LONG_MAX);
+        unsigned long currentTime = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        random_engines.at(i) = std::mt19937(currentTime * (i+1));
     }
     std::uniform_int_distribution<unsigned long long> distribution(0, numPixels);
     unsigned long long selected_element;
 
     // Fill transmittance and retardation with random pixels from our base images
-    #pragma omp parallel for private(selected_element) shared(distribution, random_engines)
+    #pragma omp parallel for private(selected_element) shared(distribution, random_engines, small_retardation, small_transmittance)
     for(int y = 0; y < small_retardation.rows; ++y) {
         for (int x = 0; x < small_retardation.cols; ++x) {
             selected_element = distribution(random_engines.at(omp_get_thread_num()));
