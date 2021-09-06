@@ -277,21 +277,9 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::fullMask() {
         if (!m_grayMask) grayMask();
 
         cv::Mat mask(m_whiteMask->rows, m_whiteMask->cols, CV_8UC1);
-
-        #pragma omp parallel for collapse(2)
-        for(int y = 0; y < mask.rows; ++y) {
-            for(int x = 0; x < mask.cols; ++x) {
-                // Set value based on white or gray
-                if (m_whiteMask->at<unsigned char>(y, x) > 0) {
-                    mask.at<unsigned char>(y, x) = WHITE_VALUE;
-                } else if (m_grayMask->at<unsigned char>(y, x) > 0) {
-                    mask.at<unsigned char>(y, x) = GRAY_VALUE;
-                } else {
-                    mask.at<unsigned char>(y, x) = 0;
-                }
-            }
-        }
-
+        mask.setTo(0);
+        mask.setTo(200, *whiteMask());
+        mask.setTo(100, *grayMask());
         m_fullMask = std::make_shared<cv::Mat>(mask);
     }
     return m_fullMask;
