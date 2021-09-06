@@ -2,6 +2,7 @@
 #include <CLI/CLI.hpp>
 #include "maskgeneration.h"
 #include "reader.h"
+#include "writer.h"
 
 int main(int argc, char** argv) {
     CLI::App app;
@@ -96,6 +97,10 @@ int main(int argc, char** argv) {
             transmittance = nullptr;
             std::cout << "Med10Transmittance generated" << std::endl;
             generation.setModalities(retardation, medTransmittance);
+            generation.tMax();
+            generation.tMin();
+            generation.tRet();
+            generation.tTra();
 
             std::cout << "Will run " << num_retakes << " takes with " << num_iterations << " each" << std::endl;
             for (int take = 0; take < num_retakes; ++take) {
@@ -111,91 +116,112 @@ int main(int argc, char** argv) {
                 //////////////////////////////
                 //////////////////////////////
 
-                std::shared_ptr<cv::Mat> small_retardation = std::make_shared<cv::Mat>(retardation->rows / scale_factor,
-                                                                                       retardation->cols / scale_factor,
-                                                                                       CV_32FC1);
-                std::shared_ptr<cv::Mat> small_transmittance = std::make_shared<cv::Mat>(medTransmittance->rows / scale_factor,
-                                                                                         medTransmittance->cols / scale_factor,
-                                                                                         CV_32FC1);
-                PLImg::MaskGeneration blurredGeneration(small_retardation, small_transmittance);
-                int numPixels = retardation->rows * retardation->cols;
-
-                uint num_threads;
-                #pragma omp parallel default(shared)
-                num_threads = omp_get_num_threads();
-
-                std::vector<std::mt19937> random_engines(num_threads);
-                #pragma omp parallel for default(shared) schedule(static)
-                for (unsigned i = 0; i < num_threads; ++i) {
-                    random_engines.at(i) = std::mt19937((clock() * i) % LONG_MAX);
-                }
-                std::uniform_int_distribution<int> distribution(0, numPixels);
-                int selected_element;
-
                 std::vector<float> above_tRet;
                 std::vector<float> below_tRet;
                 std::vector<float> above_tTra;
                 std::vector<float> below_tTra;
+                auto probabilityMask = std::make_shared<cv::Mat>(retardation->rows, retardation->cols, CV_32FC1);
 
-                float t_ret, t_tra;
-                float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
-                for (unsigned i = 0; i < num_iterations; ++i) {
-                    std::cout << "\rBlurred Mask Generation: Iteration " << i << " of " << num_iterations;
-                    std::flush(std::cout);
-                    // Fill transmittance and retardation with random pixels from our base images
-                    #pragma omp parallel for firstprivate(distribution, selected_element) schedule(static) default(shared)
-                    for (int y = 0; y < small_retardation->rows; ++y) {
-                        for (int x = 0; x < small_retardation->cols; ++x) {
-                            selected_element = distribution(random_engines.at(omp_get_thread_num()));
-                            small_retardation->at<float>(y, x) = retardation->at<float>(
-                                    selected_element / retardation->cols, selected_element % retardation->cols);
-                            small_transmittance->at<float>(y, x) = medTransmittance->at<float>(
-                                    selected_element / medTransmittance->cols, selected_element % medTransmittance->cols);
+                // We're trying to calculate the maximum possible number of threads than can be used simultaneously to calculate multiple iterations at once.
+                float predictedMemoryUsage = PLImg::cuda::getHistogramMemoryEstimation(PLImg::Image::randomizedModalities(medTransmittance, retardation, scale_factor)[0], MAX_NUMBER_OF_BINS);
+                // Calculate the number of threads that will be used based on the free memory and the maximum number of threads
+                int numberOfThreads;
+                #pragma omp parallel
+                numberOfThreads = omp_get_num_threads();
+                numberOfThreads = fmax(1, fmin(numberOfThreads, uint(float(PLImg::cuda::getFreeMemory()) / predictedMemoryUsage)));
+
+                std::cout << "OpenMP version used during compilation (doesn't have to match the executing OpenMP version): " << _OPENMP << std::endl;
+                #if _OPENMP < 201611
+                    omp_set_nested(true);
+                #endif
+                auto omp_levels = omp_get_max_active_levels();
+                omp_set_max_active_levels(3);
+                ushort numberOfFinishedIterations = 0;
+                #pragma omp parallel shared(numberOfThreads, above_tRet, above_tTra, below_tRet, below_tTra, numberOfFinishedIterations)
+                {
+                    #pragma omp single
+                    {
+                        std::cout << "Computing " << numberOfThreads << " iterations in parallel with max. " << omp_get_max_threads() / numberOfThreads << " threads per iteration." << std::endl;
+                    }
+                    omp_set_num_threads(omp_get_max_threads() / numberOfThreads);
+
+                    // Only work with valid threads. The other threads won't do any work.
+                    if(omp_get_thread_num() < numberOfThreads) {
+                        std::shared_ptr<cv::Mat> small_retardation;
+                        std::shared_ptr<cv::Mat> small_transmittance;
+                        PLImg::MaskGeneration iter_generation(small_retardation, small_transmittance);
+
+                        float t_ret, t_tra;
+                        uint ownNumberOfIterations = num_iterations / numberOfThreads;
+                        uint overhead = num_iterations % numberOfThreads;
+                        if (overhead > 0 && omp_get_thread_num() < overhead) {
+                            ++ownNumberOfIterations;
+                        }
+
+                        for (int i = 0; i < ownNumberOfIterations; ++i) {
+                            auto small_modalities = PLImg::Image::randomizedModalities(medTransmittance, retardation, scale_factor);
+                            small_transmittance = std::make_shared<cv::Mat>(small_modalities[0]);
+                            small_retardation = std::make_shared<cv::Mat>(small_modalities[1]);
+
+                            iter_generation.setModalities(small_retardation, small_transmittance);
+                            iter_generation.set_tMin(generation.tMin());
+                            iter_generation.set_tMax(generation.tMax());
+
+                            t_ret = iter_generation.tRet();
+                            t_tra = iter_generation.tTra();
+
+                            #pragma omp critical
+                            {
+                                if (t_tra >= generation.tTra()) {
+                                    above_tTra.push_back(t_tra);
+                                } else if (t_tra <= generation.tTra() && t_tra > 0) {
+                                    below_tTra.push_back(t_tra);
+                                }
+                                if (t_ret >= generation.tRet()) {
+                                    above_tRet.push_back(t_ret);
+                                } else if (t_ret <= generation.tRet()) {
+                                    below_tRet.push_back(t_ret);
+                                }
+
+                                ++numberOfFinishedIterations;
+                                std::cout << "\rProbability Mask Generation: Iteration " << numberOfFinishedIterations << " of "
+                                          << num_iterations;
+                                std::flush(std::cout);
+
+                                float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
+                                if (above_tRet.empty()) {
+                                    diff_tRet_p = generation.tRet();
+                                } else {
+                                    diff_tRet_p = std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / above_tRet.size();
+                                }
+                                if (below_tRet.empty()) {
+                                    diff_tRet_m = generation.tRet();
+                                } else {
+                                    diff_tRet_m = std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / below_tRet.size();
+                                }
+                                if (above_tTra.empty()) {
+                                    diff_tTra_p = generation.tTra();
+                                } else {
+                                    diff_tTra_p = std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / above_tTra.size();
+                                }
+                                if (below_tTra.empty()) {
+                                    diff_tTra_m = generation.tTra();
+                                } else {
+                                    diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();
+                                }
+
+                                param_file << numberOfFinishedIterations << "," << diff_tRet_p << "," << generation.tRet() << "," << diff_tRet_m << "," << t_ret << ","
+                                                                         << diff_tTra_p << "," << generation.tTra() << "," << diff_tTra_m << "," << t_tra << std::endl;
+                            }
                         }
                     }
-
-                    blurredGeneration.setModalities(small_retardation, small_transmittance);
-                    blurredGeneration.set_tMin(generation.tMin());
-                    blurredGeneration.set_tMax(generation.tMax());
-
-                    t_ret = blurredGeneration.tRet();
-                    if (t_ret > generation.tRet()) {
-                        above_tRet.push_back(t_ret);
-                    } else if (t_ret < generation.tRet()) {
-                        below_tRet.push_back(t_ret);
-                    }
-
-                    t_tra = blurredGeneration.tTra();
-                    if (t_tra > generation.tTra()) {
-                        above_tTra.push_back(t_tra);
-                    } else if (t_tra < generation.tTra() && t_tra > 0) {
-                        below_tTra.push_back(t_tra);
-                    }
-
-                    if (above_tRet.empty()) {
-                        diff_tRet_p = generation.tRet();
-                    } else {
-                        diff_tRet_p = std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / above_tRet.size();
-                    }
-                    if (below_tRet.empty()) {
-                        diff_tRet_m = generation.tRet();
-                    } else {
-                        diff_tRet_m = std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / below_tRet.size();
-                    }
-                    if (above_tTra.empty()) {
-                        diff_tTra_p = generation.tTra();
-                    } else {
-                        diff_tTra_p = std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / above_tTra.size();
-                    }
-                    if (below_tTra.empty()) {
-                        diff_tTra_m = generation.tTra();
-                    } else {
-                        diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();
-                    }
-
-                    param_file << i << "," << diff_tRet_p << "," << generation.tRet() << "," << diff_tRet_m << ","
-                                           << diff_tTra_p << "," << generation.tTra() << "," << diff_tTra_m << std::endl;
                 }
+
+                omp_set_max_active_levels(omp_levels);
+                #if _OPENMP < 201611
+                    omp_set_nested(false);
+                #endif
+
                 std::cout << std::endl;
                 param_file.flush();
                 param_file.close();
@@ -203,3 +229,4 @@ int main(int argc, char** argv) {
         }
     }
 }
+
