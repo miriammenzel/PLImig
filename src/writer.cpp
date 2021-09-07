@@ -185,6 +185,7 @@ void PLImg::HDF5Writer::open() {
     } else {
         m_hdf5file = H5::H5File(m_filename, H5F_ACC_TRUNC);
     }
+    sleep(1);
 }
 
 void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) {
