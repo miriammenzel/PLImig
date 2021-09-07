@@ -6,3 +6,4 @@
 [submodule "extern/PLIM"]
 	path = extern/PLIM
 	url = ../../../libraries/PLIM
+    branch = master
