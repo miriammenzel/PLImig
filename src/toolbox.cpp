@@ -205,14 +205,14 @@ bool PLImg::cuda::runCUDAchecks() {
 
 unsigned long PLImg::cuda::getFreeMemory() {
     PLImg::cuda::runCUDAchecks();
-    unsigned long free;
+    size_t free;
     CHECK_CUDA(cudaMemGetInfo(&free, nullptr));
     return free;
 }
 
 unsigned long PLImg::cuda::getTotalMemory() {
     PLImg::cuda::runCUDAchecks();
-    unsigned long total;
+    size_t total;
     CHECK_CUDA(cudaMemGetInfo(nullptr, &total));
     return total;
 }
@@ -242,7 +242,7 @@ cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLa
         numberOfChunks = fmax(numberOfChunks, pow(4, ceil(log(predictedMemoryUsage / double(PLImg::cuda::getFreeMemory())) / log(4))));
     }
 
-    bool gpu_exception;
+    bool gpu_exception = false;
     do {
         gpu_exception = false;
         try {
@@ -308,7 +308,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_pt
     int2 realImageDims = {image->cols - 2 * MEDIAN_KERNEL_SIZE, image->rows - 2 * MEDIAN_KERNEL_SIZE};
     cv::Mat subImage, subResult, croppedImage;
 
-    bool gpu_exception;
+    bool gpu_exception = false;
     do {
         gpu_exception = false;
         try {
@@ -381,7 +381,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
     int2 realImageDims = {image->cols - 2 * MEDIAN_KERNEL_SIZE, image->rows - 2 * MEDIAN_KERNEL_SIZE};
 
     cv::Mat subImage, subMask, subResult, croppedImage;
-    bool gpu_exception;
+    bool gpu_exception = false;
     do {
         gpu_exception = false;
         try {
@@ -522,7 +522,7 @@ cv::Mat PLImg::cuda::labeling::connectedComponents(const cv::Mat &image) {
     cv::Mat subImage, subResult, subMask, croppedImage;
     uint nextLabelNumber = 0;
     uint maxLabelNumber = 0;
-    bool gpu_exception;
+    bool gpu_exception = false;
 
     do {
         gpu_exception = false;

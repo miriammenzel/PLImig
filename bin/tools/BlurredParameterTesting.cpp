@@ -134,8 +134,10 @@ int main(int argc, char** argv) {
                 #if _OPENMP < 201611
                     omp_set_nested(true);
                 #endif
-                auto omp_levels = omp_get_max_active_levels();
-                omp_set_max_active_levels(3);
+                #ifdef __GNUC__
+                    auto omp_levels = omp_get_max_active_levels();
+                    omp_set_max_active_levels(3);
+                #endif
                 ushort numberOfFinishedIterations = 0;
                 #pragma omp parallel shared(numberOfThreads, above_tRet, above_tTra, below_tRet, below_tTra, numberOfFinishedIterations)
                 {
@@ -216,8 +218,9 @@ int main(int argc, char** argv) {
                         }
                     }
                 }
-
-                omp_set_max_active_levels(omp_levels);
+                #ifdef __GNUC__
+                    omp_set_max_active_levels(omp_levels);
+                #endif
                 #if _OPENMP < 201611
                     omp_set_nested(false);
                 #endif

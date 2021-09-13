@@ -34,7 +34,7 @@
 #include "toolbox.h"
 
 /// Number of iterations that will be used to generate the probabilityMask() parameter.
-#define PROBABILITY_MASK_ITERATIONS 200
+constexpr auto PROBABILITY_MASK_ITERATIONS = 200;
 
 /**
  * @file

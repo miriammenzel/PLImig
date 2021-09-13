@@ -8,7 +8,7 @@ find_path(PLIM_INCLUDE_DIRS
 )
 
 find_library(PLIM_LIBRARIES
-        NAMES libplim.so libplim.a plim.lib
+        NAMES libplim.so libplim.a plim.dll plim.lib
         HINTS
         ${PLIM_INCLUDE_DIRS}/../../lib/
 )

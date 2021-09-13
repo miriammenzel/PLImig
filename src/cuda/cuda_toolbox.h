@@ -25,17 +25,18 @@
 #ifndef PLIMG_TOOLBOX_CUH
 #define PLIMG_TOOLBOX_CUH
 
+#include <opencv2/opencv.hpp>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
-#include "cuda_kernels.h"
-#include "define.h"
-#include "exceptions.h"
 #include <driver_types.h>
 #include <iostream>
 #include <memory>
 #include <thrust/device_vector.h>
 #include <thrust/unique.h>
-#include <opencv2/opencv.hpp>
+
+#include "cuda_kernels.h"
+#include "define.h"
+#include "exceptions.h"
 
 /**
  * @file

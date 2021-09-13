@@ -33,6 +33,7 @@
     #include <unistd.h>
     #include <pwd.h>
 #else
+    #define NOMINMAX
     #include <Windows.h>
     #include <lmcons.h>
 #endif

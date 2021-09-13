@@ -28,13 +28,11 @@
 #include <cuda.h>
 #include <cassert>
 #include <cuda_runtime_api.h>
-#include <cstdio>
-#include <cmath>
 
 /// Fixed median kernel size
-#define MEDIAN_KERNEL_SIZE 5
+constexpr auto MEDIAN_KERNEL_SIZE = 5;
 /// Number of CUDA Kernel threads used for kernel execution
-#define CUDA_KERNEL_NUM_THREADS 32
+constexpr auto CUDA_KERNEL_NUM_THREADS = 32;
 
 __device__ void shellSort(float* array, unsigned int low, unsigned int high);
 
@@ -62,8 +60,7 @@ __global__ void connectedComponentsInitializeMask(const unsigned char* image, in
     unsigned int* mask, int mask_stride, int line_width);
 __global__ void connectedComponentsIteration(unsigned int* mask, int mask_stride, int2 maskDims, volatile bool* changeOccured);
 __global__ void connectedComponentsReduceComponents(unsigned int* mask, int mask_stride,
-                                                    const unsigned int* lutKeys,
-    unsigned int lutSize);
+                                                    const unsigned int* lutKeys, unsigned int lutSize);
 
 __global__ void histogram(const float* image, int image_width, int image_height, unsigned int* histogram, float minVal, float maxVal, unsigned int numBins);
 __global__ void histogramSharedMem(const float* image, int image_width, int image_height, unsigned int* histogram, float minVal, float maxVal, unsigned int numBins);

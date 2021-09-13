@@ -38,9 +38,9 @@
 #include <vector>
 
 /// Minimum number of bins used for the calculation of tRet() and tTra()
-#define MIN_NUMBER_OF_BINS 64
+constexpr auto MIN_NUMBER_OF_BINS = 64;
 /// Maximum number of bins used for the calculation of tRet() and tTra(). This value will also be used as the default number of bins for all other operations.
-#define MAX_NUMBER_OF_BINS 256
+constexpr auto MAX_NUMBER_OF_BINS = 256;
 
 /**
  * @file
