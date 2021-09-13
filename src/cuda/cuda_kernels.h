@@ -36,7 +36,7 @@
 /// Number of CUDA Kernel threads used for kernel execution
 #define CUDA_KERNEL_NUM_THREADS 32
 
-__device__ void shellSort(float* array, uint low, uint high);
+__device__ void shellSort(float* array, unsigned int low, unsigned int high);
 
 __global__ void medianFilterKernel(const float* image, int image_stride,
                                    float* result_image, int result_image_stride,
@@ -48,25 +48,24 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
                                          int2 imageDims);
 
 //// NEW CONNECTED COMPONENTS ALGORITHM
-__global__ void connectedComponentsUFLocalMerge(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
-                                                uint* labelMap, uint label_stride);
-__global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
-                                                uint* labelMap, uint label_stride);
-__global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
-                                                uint* labelMap, uint label_stride);
-__device__ void connectedComponentsUFUnion(uint* L, uint a, uint b);
-__device__ uint connectedComponentsUFFind(const uint* L, uint index);
+__global__ void connectedComponentsUFLocalMerge(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
+    unsigned int* labelMap, unsigned int label_stride);
+__global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
+    unsigned int* labelMap, unsigned int label_stride);
+__global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
+    unsigned int* labelMap, unsigned int label_stride);
+__device__ void connectedComponentsUFUnion(unsigned int* L, unsigned int a, unsigned int b);
+__device__ unsigned int connectedComponentsUFFind(const unsigned int* L, unsigned int index);
 
 //// OLD CONNECTED COMPONENTS ALGORITHM
 __global__ void connectedComponentsInitializeMask(const unsigned char* image, int image_stride,
-                                                  uint* mask, int mask_stride,
-                                                  int line_width);
-__global__ void connectedComponentsIteration(uint* mask, int mask_stride, int2 maskDims, volatile bool* changeOccured);
-__global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
-                                                    const uint* lutKeys,
-                                                    uint lutSize);
+    unsigned int* mask, int mask_stride, int line_width);
+__global__ void connectedComponentsIteration(unsigned int* mask, int mask_stride, int2 maskDims, volatile bool* changeOccured);
+__global__ void connectedComponentsReduceComponents(unsigned int* mask, int mask_stride,
+                                                    const unsigned int* lutKeys,
+    unsigned int lutSize);
 
-__global__ void histogram(const float* image, int image_width, int image_height, uint* histogram, float minVal, float maxVal, uint numBins);
-__global__ void histogramSharedMem(const float* image, int image_width, int image_height, uint* histogram, float minVal, float maxVal, uint numBins);
+__global__ void histogram(const float* image, int image_width, int image_height, unsigned int* histogram, float minVal, float maxVal, unsigned int numBins);
+__global__ void histogramSharedMem(const float* image, int image_width, int image_height, unsigned int* histogram, float minVal, float maxVal, unsigned int numBins);
 
 #endif //PLIMIG_CUDA_KERNELS_H

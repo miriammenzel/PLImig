@@ -110,7 +110,7 @@ namespace PLImg {
          * @return String with time and date.
          */
         static std::string timeStamp() {
-            std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::high_resolution_clock::now());
+            std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             std::tm now_tm = *std::localtime(&time);
 
             char buffer[21];

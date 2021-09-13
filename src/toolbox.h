@@ -98,12 +98,12 @@ namespace PLImg {
          * @brief Get the total amount of memory in bytes.
          * @return Total amount of VRAM in bytes.
          */
-        ulong getTotalMemory();
+        unsigned long long getTotalMemory();
         /**
          * @brief Get the free amount of memory in bytes.
          * @return Total amount of free VRAM in bytes.
          */
-        ulong getFreeMemory();
+        unsigned long long getFreeMemory();
 
         float getHistogramMemoryEstimation(const cv::Mat& image, uint numBins);
         cv::Mat histogram(const cv::Mat& image, float minLabel, float maxLabel, uint numBins);

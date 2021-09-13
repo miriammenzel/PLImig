@@ -31,7 +31,13 @@ find_package(CUDAToolkit REQUIRED)
 find_package(TIFF REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Filesystem REQUIRED)
-find_package(NIFTI REQUIRED)
+if(WIN32)
+    find_package(NIFTI CONFIG REQUIRED)
+    set(NIFTI_LIBRARIES NIFTI::znz)
+else()
+    find_package(NIFTI REQUIRED)
+endif(WIN32)
+
 
 
 option(PLIM_SUBMODULE "Build plim through submodule. If this option is disabled CMake will try to find a local installation of plim" ON)
@@ -67,6 +73,6 @@ add_subdirectory(bin)
 add_subdirectory(docs)
 
 if(BUILD_TESTING)
-   enable_testing()
-   add_subdirectory(tests)
+   # enable_testing()
+   # add_subdirectory(tests)
 endif()

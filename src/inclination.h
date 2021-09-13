@@ -24,6 +24,7 @@
 
 #ifndef PLIMG_INCLINATION_H
 #define PLIMG_INCLINATION_H
+#define _USE_MATH_DEFINES
 
 #include <cmath>
 #include <memory>

@@ -185,7 +185,11 @@ void PLImg::HDF5Writer::open() {
     } else {
         m_hdf5file = H5::H5File(m_filename, H5F_ACC_TRUNC);
     }
-    sleep(1);
+    #ifdef __GNUC__
+        sleep(1);
+    #else
+        Sleep(1000);
+    #endif
 }
 
 void PLImg::HDF5Writer::createDirectoriesIfMissing(const std::string &filename) {
@@ -223,11 +227,18 @@ void PLImg::HDF5Writer::writePLIMAttributes(const std::vector<std::string>& refe
     outputHandler.setStringAttribute("image_modality", modality);
 
     std::string username;
-    uid_t uid = geteuid();
-    struct passwd *pw = getpwuid(uid);
-    if (pw) {
-        username = pw->pw_name;
-    }
+    #ifdef __GNUC__
+        uid_t uid = geteuid();
+        struct passwd *pw = getpwuid(uid);
+        if (pw) {
+            username = pw->pw_name;
+        }
+    #else
+        char username_arr[UNLEN + 1];
+        DWORD username_len = UNLEN + 1;
+        GetUserName(username_arr, &username_len);
+        username = std::string(username_arr);
+    #endif
     if(outputHandler.doesAttributeExist("created_by")) {
         outputHandler.deleteAttribute("created_by");
     }

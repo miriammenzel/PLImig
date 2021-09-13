@@ -141,7 +141,7 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
     // Generate different random engines for each thread
     std::vector<std::mt19937> random_engines(num_threads);
     #pragma omp parallel for default(shared) schedule(static)
-    for(unsigned i = 0; i < num_threads; ++i) {
+    for(int i = 0; i < num_threads; ++i) {
         unsigned long currentTime = std::chrono::high_resolution_clock::now().time_since_epoch().count();
         random_engines.at(i) = std::mt19937(currentTime * (i+1));
     }
@@ -203,16 +203,16 @@ bool PLImg::cuda::runCUDAchecks() {
 
 }
 
-ulong PLImg::cuda::getFreeMemory() {
+unsigned long long PLImg::cuda::getFreeMemory() {
     PLImg::cuda::runCUDAchecks();
-    ulong free;
+    unsigned long long free;
     CHECK_CUDA(cudaMemGetInfo(&free, nullptr));
     return free;
 }
 
-ulong PLImg::cuda::getTotalMemory() {
+unsigned long long PLImg::cuda::getTotalMemory() {
     PLImg::cuda::runCUDAchecks();
-    ulong total;
+    unsigned long long total;
     CHECK_CUDA(cudaMemGetInfo(nullptr, &total));
     return total;
 }
@@ -365,13 +365,13 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
     // The image might be too large to be saved completely in the video memory.
     // Therefore chunks will be used if the amount of memory is too small.
     uint numberOfChunks = 1;
-    ulong freeMem;
+    unsigned long long freeMem;
     // Check the free video memory
     CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
     // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
     // with the power of four (1, 4, 16, 256, 1024, ...)
     if(getMedianFilterMaskedMemoryEstimation(image, mask) > double(freeMem)) {
-        numberOfChunks = fmax(1, pow(4.0, ceil(log(getMedianFilterMaskedMemoryEstimation(image, mask) / double(freeMem)) / log(4))));
+        numberOfChunks = fmax(1, powf(4.0, ceil(log(getMedianFilterMaskedMemoryEstimation(image, mask) / double(freeMem)) / log(4))));
     }
     // Each dimensions will get the same number of chunks. Calculate them by using the square root.
     uint chunksPerDim;

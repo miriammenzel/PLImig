@@ -23,8 +23,6 @@
  */
 
 #include "inclination.h"
-#include <cmath>
-#include <iostream>
 
 PLImg::Inclination::Inclination() : m_transmittance(), m_retardation(), m_blurredMask(), m_mask(),
                                     m_im(nullptr), m_ic(nullptr), m_rmaxWhite(nullptr), m_rmaxGray(nullptr),

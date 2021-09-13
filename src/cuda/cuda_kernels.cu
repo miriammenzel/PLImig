@@ -24,26 +24,26 @@
 
 #include "cuda_kernels.h"
 
-__device__ void shellSort(float* array, uint low, uint high) {
+__device__ void shellSort(float* array, unsigned int low, unsigned int high) {
     // Using the Ciura, 2001 sequence for best performance
-    uint gaps[8] = {1, 4, 10, 23, 57, 132, 301, 701};
+    unsigned int gaps[8] = {1, 4, 10, 23, 57, 132, 301, 701};
     if(low < high) {
         float* subArr = array + low;
-        uint n = high - low;
+        unsigned int n = high - low;
         for (int pos = 7; pos > 0; --pos) {
-            uint gap = gaps[pos];
+            unsigned int gap = gaps[pos];
             // Do a gapped insertion sort for this gap size.
             // The first gap elements a[0..gap-1] are already in gapped order
             // keep adding one more element until the entire array is
             // gap sorted
-            for (uint i = gap; i < n; i += 1) {
+            for (unsigned int i = gap; i < n; i += 1) {
                 // add a[i] to the elements that have been gap sorted
                 // save a[i] in temp and make a hole at position i
                 float temp = subArr[i];
 
                 // shift earlier gap-sorted elements up until the correct
                 // location for a[i] is found
-                uint j;
+                unsigned int j;
                 for (j = i; j >= gap && subArr[j - gap] > temp; j -= gap) {
                     subArr[j] = subArr[j - gap];
                 }
@@ -59,10 +59,10 @@ __global__ void medianFilterKernel(const float* image, int image_stride,
                                    float* result_image, int result_image_stride,
                                    int2 imageDims) {
     // Calculate actual position in image based on thread number and block number
-    uint x = blockIdx.x * blockDim.x + threadIdx.x;
-    uint y = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
     // The valid values will be counted to ensure that the median will be calculated correctly
-    uint validValues = 0;
+    unsigned int validValues = 0;
     int cy_bound;
     // Median filter buffer
     float buffer[4 * MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE];
@@ -90,10 +90,10 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
                                          const unsigned char* mask, int mask_stride,
                                          int2 imageDims) {
     // Calculate actual position in image based on thread number and block number
-    uint x = blockIdx.x * blockDim.x + threadIdx.x;
-    uint y = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
     // The valid values will be counted to ensure that the median will be calculated correctly
-    uint validValues = 0;
+    unsigned int validValues = 0;
     int cy_bound;
     // Median filter buffer
     float buffer[4 * MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE];
@@ -124,23 +124,23 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
 }
 
 __global__ void connectedComponentsInitializeMask(const unsigned char* image, int image_stride,
-                                                  uint* mask, int mask_stride,
+                                                  unsigned int* mask, int mask_stride,
                                                   int line_width) {
     // Calculate actual position in image based on thread number and block number
-    uint x = blockIdx.x * blockDim.x + threadIdx.x;
-    uint y = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    mask[x + y * mask_stride] = (image[x + y * image_stride] & 1) * (y * uint(line_width) + x + 1);
+    mask[x + y * mask_stride] = (image[x + y * image_stride] & 1) * (y * (unsigned int) line_width + x + 1);
 }
 
-__global__ void connectedComponentsIteration(uint* mask, int mask_stride, int2 maskDims, volatile bool* changeOccured) {
+__global__ void connectedComponentsIteration(unsigned int* mask, int mask_stride, int2 maskDims, volatile bool* changeOccured) {
     // Calculate actual position in image based on thread number and block number
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    uint pixelVals[5];
+    unsigned int pixelVals[5];
 
-    uint maxVal = 0;
+    unsigned int maxVal = 0;
     if(mask[x + y * mask_stride] != 0) {
         pixelVals[0] = mask[x + y * mask_stride];
         pixelVals[1] = x-1 >= 0 ? mask[x-1 + y * mask_stride] : 0;
@@ -149,7 +149,7 @@ __global__ void connectedComponentsIteration(uint* mask, int mask_stride, int2 m
         pixelVals[4] = y+1 < maskDims.y ? mask[x + (y+1) * mask_stride] : 0;
 
         #pragma unroll
-        for(uint i = 0; i < 5; ++i) {
+        for(unsigned int i = 0; i < 5; ++i) {
             maxVal = max(maxVal, pixelVals[i]);
         }
 
@@ -160,14 +160,14 @@ __global__ void connectedComponentsIteration(uint* mask, int mask_stride, int2 m
     }
 }
 
-__global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
-                                                    const uint* lutKeys,
-                                                    const uint lutSize) {
+__global__ void connectedComponentsReduceComponents(unsigned int* mask, int mask_stride,
+                                                    const unsigned int* lutKeys,
+                                                    const unsigned int lutSize) {
     // Calculate actual position in image based on thread number and block number
-    uint x = blockIdx.x * blockDim.x + threadIdx.x;
-    uint y = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    for (uint i = 0; i < lutSize; ++i) {
+    for (unsigned int i = 0; i < lutSize; ++i) {
         if(mask[x + y * mask_stride] == lutKeys[i]) {
             mask[x + y * mask_stride] = i;
             break;
@@ -175,8 +175,8 @@ __global__ void connectedComponentsReduceComponents(uint* mask, int mask_stride,
     }
 }
 
-__device__ uint connectedComponentsUFFind(const uint* L, uint index) {
-    uint label = L[index];
+__device__ unsigned int connectedComponentsUFFind(const unsigned int* L, unsigned int index) {
+    unsigned int label = L[index];
     assert(label > 0);
     while (label - 1 != index) {
         index = label - 1;
@@ -186,17 +186,17 @@ __device__ uint connectedComponentsUFFind(const uint* L, uint index) {
     return index;
 }
 
-__device__ void connectedComponentsUFUnion(uint* L, uint a, uint b) {
+__device__ void connectedComponentsUFUnion(unsigned int* L, unsigned int a, unsigned int b) {
     bool done;
     do {
         a = connectedComponentsUFFind(L, a);
         b = connectedComponentsUFFind(L, b);
         if(a < b) {
-            uint old = atomicMin(L + b, a + 1);
+            unsigned int old = atomicMin(L + b, a + 1);
             done = (old == b + 1);
             b = old - 1;
         } else if(b < a) {
-            uint old = atomicMin(L + a, b + 1);
+            unsigned int old = atomicMin(L + a, b + 1);
             done = (old == a + 1);
             a = old - 1;
         } else {
@@ -205,13 +205,13 @@ __device__ void connectedComponentsUFUnion(uint* L, uint a, uint b) {
     } while(!done);
 }
 
-__global__ void connectedComponentsUFLocalMerge(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
-                                                uint* labelMap, uint label_stride) {
+__global__ void connectedComponentsUFLocalMerge(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
+    unsigned int* labelMap, unsigned int label_stride) {
     unsigned global_x = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned global_y = blockIdx.y * blockDim.y + threadIdx.y;
     unsigned local_index = threadIdx.x + threadIdx.y * blockDim.x;
 
-    __shared__ uint labelSM[CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS];
+    __shared__ unsigned int labelSM[CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS];
     __shared__ unsigned char inputBuffer[CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS];
 
     // Initialize shared memory.
@@ -259,8 +259,8 @@ __global__ void connectedComponentsUFLocalMerge(cudaTextureObject_t inputTexture
     }
 }
 
-__global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
-                                                uint* labelMap, uint label_stride) {
+__global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
+                                                 unsigned int* labelMap, unsigned int label_stride) {
     unsigned global_x = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned global_y = blockIdx.y * blockDim.y + threadIdx.y;
     unsigned label_index = global_x + global_y * label_stride;
@@ -287,8 +287,8 @@ __global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTextur
     }
 }
 
-__global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTexture, uint image_width, uint image_height,
-                                                     uint* labelMap, uint label_stride) {
+__global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
+                                                     unsigned int* labelMap, unsigned int label_stride) {
     unsigned global_x = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned global_y = blockIdx.y * blockDim.y + threadIdx.y;
     unsigned label_index = global_x + global_y * label_stride;
@@ -300,29 +300,29 @@ __global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTe
     }
 }
 
-__global__ void histogram(const float* image, int image_width, int image_height, uint* histogram, float minVal, float maxVal, uint numBins) {
+__global__ void histogram(const float* image, int image_width, int image_height, unsigned int* histogram, float minVal, float maxVal, unsigned int numBins) {
     // Calculate actual position in image based on thread number and block number
-    const uint x = blockIdx.x * blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y * blockDim.y + threadIdx.y;
+    const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     const float binWidth = (float(maxVal) - float(minVal)) / float(numBins);
     if(x < image_width && y < image_height) {
         if(image[x + y * image_width] >= minVal && image[x + y * image_width] <= maxVal) {
-            uint bin = min(uint((image[x + y * image_width] - minVal) / binWidth), numBins - 1);
-            atomicAdd(&histogram[bin], uint(1));
+            unsigned int bin = min((unsigned int) ((image[x + y * image_width] - minVal) / binWidth), numBins - 1);
+            atomicAdd(&histogram[bin], (unsigned int) 1);
         }
     }
 }
 
-__global__ void histogramSharedMem(const float* image, int image_width, int image_height, uint* histogram, float minVal, float maxVal, uint numBins) {
+__global__ void histogramSharedMem(const float* image, int image_width, int image_height, unsigned int* histogram, float minVal, float maxVal, unsigned int numBins) {
     // Calculate actual position in image based on thread number and block number
-    const uint x = blockIdx.x * blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y * blockDim.y + threadIdx.y;
+    const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    const uint locId = threadIdx.y*blockDim.x+threadIdx.x;
+    const unsigned int locId = threadIdx.y*blockDim.x+threadIdx.x;
     const float binWidth = (float(maxVal) - float(minVal)) / float(numBins);
 
-    extern __shared__ uint localHistogram[];
+    extern __shared__ unsigned int localHistogram[];
     #pragma unroll
     for(unsigned i = locId; i < numBins; i += blockDim.x * blockDim.y) {
         localHistogram[i] = 0;
@@ -332,8 +332,8 @@ __global__ void histogramSharedMem(const float* image, int image_width, int imag
 
     if(x < image_width && y < image_height) {
         if(image[x + y * image_width] >= minVal && image[x + y * image_width] <= maxVal) {
-            uint bin = min(uint((image[x + y * image_width] - minVal) / binWidth), numBins - 1);
-            atomicAdd(&localHistogram[bin], uint(1));
+            unsigned int bin = min((unsigned int) ((image[x + y * image_width] - minVal) / binWidth), numBins - 1);
+            atomicAdd(&localHistogram[bin], (unsigned int) 1);
         }
     }
 

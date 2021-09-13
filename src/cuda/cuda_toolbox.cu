@@ -222,7 +222,7 @@ void PLImg::cuda::raw::filters::CUDAmedianFilter(cv::Mat& image, cv::Mat& result
 void PLImg::cuda::raw::filters::CUDAmedianFilterMasked(cv::Mat& image, cv::Mat& mask, cv::Mat& result) {
     float* deviceImage, *deviceResult;
     uchar* deviceMask;
-    ulong nSrcStep, nMaskStep, nResStep;
+    unsigned long long nSrcStep, nMaskStep, nResStep;
     // Apply median filter
     // Calculate offsets for image and result. Starting at the edge would result in errors because we would
     // go out of bounds.

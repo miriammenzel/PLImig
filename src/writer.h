@@ -27,10 +27,15 @@
 
 #include <filesystem>
 #include <H5Cpp.h>
-#include <pwd.h>
 #include <opencv2/core.hpp>
 #include <string>
-#include <unistd.h>
+#ifdef __GNUC__
+    #include <unistd.h>
+    #include <pwd.h>
+#else
+    #include <Windows.h>
+    #include <lmcons.h>
+#endif
 
 #include "plim/AttributeHandler.h"
 #include "plim/PlimExceptions.h"
