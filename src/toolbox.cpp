@@ -219,7 +219,7 @@ ulong PLImg::cuda::getTotalMemory() {
 
 float PLImg::cuda::getHistogramMemoryEstimation(const cv::Mat& image, uint numBins) {
     if(numBins * sizeof(uint) < 49152) {
-        return float(ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * numBins) * sizeof(uint) + (unsigned long long) image.rows * image.cols * sizeof(float);
+        return float(ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * numBins * sizeof(uint) + (unsigned long long) image.rows * image.cols * sizeof(float));
     } else {
         return float(numBins * sizeof(uint) + sizeof(float) * (unsigned long long) image.rows * image.cols);
     }
