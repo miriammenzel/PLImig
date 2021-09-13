@@ -26,7 +26,12 @@ set(HEADER
         cuda/define.h)
 
 # Generate executable file
-add_library(PLImig SHARED ${SOURCE})
+if(WIN32)
+    add_library(PLImig ${SOURCE})
+else()
+    add_library(PLImig SHARED ${SOURCE})
+endif(WIN32)
+
 target_link_libraries(PLImig ${OpenCV_LIBS} CLI11::CLI11 ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES} ${NIFTI_LIBRARIES}
         CUDA::cudart OpenMP::OpenMP_CXX OpenMP::OpenMP_C std::filesystem ${PLIM_LIBRARIES})
 
