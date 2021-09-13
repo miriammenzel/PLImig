@@ -203,16 +203,16 @@ bool PLImg::cuda::runCUDAchecks() {
 
 }
 
-unsigned long long PLImg::cuda::getFreeMemory() {
+unsigned long PLImg::cuda::getFreeMemory() {
     PLImg::cuda::runCUDAchecks();
-    unsigned long long free;
+    unsigned long free;
     CHECK_CUDA(cudaMemGetInfo(&free, nullptr));
     return free;
 }
 
-unsigned long long PLImg::cuda::getTotalMemory() {
+unsigned long PLImg::cuda::getTotalMemory() {
     PLImg::cuda::runCUDAchecks();
-    unsigned long long total;
+    unsigned long total;
     CHECK_CUDA(cudaMemGetInfo(nullptr, &total));
     return total;
 }
@@ -365,9 +365,7 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
     // The image might be too large to be saved completely in the video memory.
     // Therefore chunks will be used if the amount of memory is too small.
     uint numberOfChunks = 1;
-    unsigned long long freeMem;
-    // Check the free video memory
-    CHECK_CUDA(cudaMemGetInfo(&freeMem, nullptr));
+    unsigned long freeMem = getFreeMemory();
     // If the total free memory is smaller than the estimated amount of memory, calculate the number of chunks
     // with the power of four (1, 4, 16, 256, 1024, ...)
     if(getMedianFilterMaskedMemoryEstimation(image, mask) > double(freeMem)) {
