@@ -25,8 +25,8 @@
 #include "reader.h"
 
 bool PLImg::Reader::fileExists(const std::string& filename) {
-    struct stat buffer{};
-    return (stat (filename.c_str(), &buffer) == 0);
+    std::filesystem::path file{ filename };
+    return std::filesystem::exists(file);
 }
 
 cv::Mat PLImg::Reader::imread(const std::string& filename, const std::string& dataset) {

@@ -96,7 +96,11 @@ int main(int argc, char** argv) {
         std::cout << transmittance_path << std::endl;
         std::cout << retardation_path << std::endl;
 
-        unsigned long long int endPosition = transmittance_path.find_last_of('/');
+        #ifdef WIN32
+                unsigned long long int endPosition = transmittance_path.find_last_of('\\');
+        #else
+                unsigned long long int endPosition = transmittance_path.find_last_of('/');
+        #endif
         if(endPosition != std::string::npos) {
             transmittance_basename = transmittance_path.substr(endPosition+1);
         } else {
