@@ -28,6 +28,7 @@
 #include <H5Cpp.h>
 #include <string>
 #include <vector>
+#include <array>
 
 int main(int argc, char** argv) {
     CLI::App app;
@@ -37,15 +38,15 @@ int main(int argc, char** argv) {
     std::string dataset;
     auto required = app.add_option_group("Required parameters");
     required->add_option("-i, --input", files, "Input mask files from PLImg")
-            ->required()
-            ->check(CLI::ExistingFile);
+        ->required()
+        ->check(CLI::ExistingFile);
     required->add_option("-o, --output", output_folder, "Output folder")
-            ->required()
-            ->check(CLI::ExistingDirectory);
+        ->required()
+        ->check(CLI::ExistingDirectory);
 
     auto optional = app.add_option_group("Optional parameters");
     optional->add_option("-d, --dataset", dataset, "HDF5 dataset")
-            ->default_val("/Image");
+        ->default_val("/Image");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -56,7 +57,7 @@ int main(int argc, char** argv) {
     H5::Exception::dontPrint();
 
     std::array<std::string, 4> maskAttributes = {"r_thres", "i_lower", "i_rmax", "i_upper"};
-    std::array<std::string, 4> inclinationAttributes = {"im", "ic", "rmax_gray", "rmax_white"};
+    std::array<std::string, 4> inclinationAttributes = { "im", "ic", "rmax_gray", "rmax_white" };
     for(const auto& file : files) {
         H5::H5File input;
         input.openFile(file, H5F_ACC_RDONLY);
