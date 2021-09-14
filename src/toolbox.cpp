@@ -128,11 +128,10 @@ std::vector<unsigned> PLImg::Histogram::peaks(cv::Mat hist, int start, int stop,
 }
 
 std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Mat>& transmittance, std::shared_ptr<cv::Mat>& retardation, float scalingValue) {
-    scalingValue = 1.0f/scalingValue;
     cv::Mat small_transmittance(scalingValue * transmittance->rows, scalingValue * transmittance->cols, CV_32FC1);
     cv::Mat small_retardation(scalingValue * retardation->rows, scalingValue * retardation->cols, CV_32FC1);
 
-    unsigned long long numPixels = (unsigned long long) transmittance->rows * (unsigned long long) transmittance->cols;
+    size_t numPixels = size_t(transmittance->rows) * size_t(transmittance->cols);
 
     // Get the number of threads
     uint num_threads;
@@ -145,18 +144,18 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
         unsigned long currentTime = std::chrono::high_resolution_clock::now().time_since_epoch().count();
         random_engines.at(i) = std::mt19937(currentTime * (i+1));
     }
-    std::uniform_int_distribution<unsigned long long> distribution(0, numPixels);
-    unsigned long long selected_element;
+    std::uniform_int_distribution<unsigned long long> distribution(0, numPixels-1);
+    size_t selected_element;
 
     // Fill transmittance and retardation with random pixels from our base images
     #pragma omp parallel for private(selected_element) shared(distribution, random_engines, small_retardation, small_transmittance)
     for(int y = 0; y < small_retardation.rows; ++y) {
         for (int x = 0; x < small_retardation.cols; ++x) {
             selected_element = distribution(random_engines.at(omp_get_thread_num()));
-            small_retardation.at<float>(y, x) = retardation->at<float>(
-                    int(selected_element / retardation->cols), int(selected_element % retardation->cols));
-            small_transmittance.at<float>(y, x) = transmittance->at<float>(
-                    int(selected_element / transmittance->cols), int(selected_element % transmittance->cols));
+            int selected_x = selected_element % retardation->cols;
+            int selected_y = selected_element / retardation->cols;
+            small_retardation.at<float>(y, x) = retardation->at<float>(selected_y, selected_x);
+            small_transmittance.at<float>(y, x) = transmittance->at<float>(selected_y, selected_x);
         }
     }
 
@@ -203,26 +202,28 @@ bool PLImg::cuda::runCUDAchecks() {
 
 }
 
-unsigned long PLImg::cuda::getFreeMemory() {
+size_t PLImg::cuda::getFreeMemory() {
     PLImg::cuda::runCUDAchecks();
     size_t free;
     CHECK_CUDA(cudaMemGetInfo(&free, nullptr));
     return free;
 }
 
-unsigned long PLImg::cuda::getTotalMemory() {
+size_t PLImg::cuda::getTotalMemory() {
     PLImg::cuda::runCUDAchecks();
     size_t total;
     CHECK_CUDA(cudaMemGetInfo(nullptr, &total));
     return total;
 }
 
-float PLImg::cuda::getHistogramMemoryEstimation(const cv::Mat& image, uint numBins) {
+size_t PLImg::cuda::getHistogramMemoryEstimation(const cv::Mat& image, uint numBins) {
+    size_t memoryEstimation;
     if(numBins * sizeof(uint) < 49152) {
-        return float(ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * numBins * sizeof(uint) + (unsigned long long) image.rows * image.cols * sizeof(float));
+        memoryEstimation = size_t(32) * numBins * sizeof(uint) + size_t(image.rows) * image.cols * sizeof(float);
     } else {
-        return float(numBins * sizeof(uint) + sizeof(float) * (unsigned long long) image.rows * image.cols);
+        memoryEstimation = numBins * sizeof(uint) + sizeof(float) * size_t(image.rows) * image.cols;
     }
+    return memoryEstimation;
 }
 
 cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLabel, uint numBins) {
@@ -277,11 +278,13 @@ cv::Mat PLImg::cuda::histogram(const cv::Mat &image, float minLabel, float maxLa
     return hist;
 }
 
-float PLImg::cuda::filters::getMedianFilterMemoryEstimation(const std::shared_ptr<cv::Mat>& image) {
-    return float(image->total()) * float(image->elemSize()) * 2.1;
+size_t PLImg::cuda::filters::getMedianFilterMemoryEstimation(const std::shared_ptr<cv::Mat>& image) {
+    size_t memoryEstimation = size_t(image->rows) * image->cols * image->elemSize() * 2.1;
+    return memoryEstimation;
 }
-float PLImg::cuda::filters::getMedianFilterMaskedMemoryEstimation(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask) {
-    return float(image->total()) * float(image->elemSize()) * 3.1;
+size_t PLImg::cuda::filters::getMedianFilterMaskedMemoryEstimation(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask) {
+    size_t memoryEstimation = size_t(image->rows) * image->cols * image->elemSize() * 3.1;
+    return memoryEstimation;
 }
 
 std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilter(const std::shared_ptr<cv::Mat>& image) {
@@ -431,18 +434,20 @@ std::shared_ptr<cv::Mat> PLImg::cuda::filters::medianFilterMasked(const std::sha
     return std::make_shared<cv::Mat>(result);
 }
 
-float PLImg::cuda::labeling::getLargestAreaConnectedComponentsMemoryEstimation(const cv::Mat& image) {
-    return getConnectedComponentsMemoryEstimation(image) +
-    getConnectedComponentsLargestComponentMemoryEstimation(image);
+size_t PLImg::cuda::labeling::getLargestAreaConnectedComponentsMemoryEstimation(const cv::Mat& image) {
+    size_t memoryEstimation = getConnectedComponentsMemoryEstimation(image) +
+        getConnectedComponentsLargestComponentMemoryEstimation(image);
+    return memoryEstimation;
 }
 
-float PLImg::cuda::labeling::getConnectedComponentsMemoryEstimation(const cv::Mat& image) {
-    return 2.0f * (unsigned long long) image.rows * image.cols * sizeof(unsigned char) +
-           4.0f * (unsigned long long) image.rows * image.cols * sizeof(uint) +
-           ceil(float(image.cols) / CUDA_KERNEL_NUM_THREADS) * ceil(float(image.rows) / CUDA_KERNEL_NUM_THREADS) * (sizeof(uint) + sizeof(unsigned char));
+size_t PLImg::cuda::labeling::getConnectedComponentsMemoryEstimation(const cv::Mat& image) {
+    size_t memoryEstimation = 2 * size_t(image.rows) * image.cols * sizeof(unsigned char) +
+                              4 * size_t(image.rows) * image.cols * sizeof(uint) +
+                              size_t(32) * CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS * (sizeof(uint) + sizeof(unsigned char));
+    return memoryEstimation;
 }
 
-float PLImg::cuda::labeling::getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image) {
+size_t PLImg::cuda::labeling::getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image) {
     double minVal, maxVal;
     cv::minMaxIdx(image, &minVal, &maxVal);
     return getHistogramMemoryEstimation(image, uint(maxVal - minVal));

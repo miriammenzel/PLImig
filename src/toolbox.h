@@ -98,19 +98,19 @@ namespace PLImg {
          * @brief Get the total amount of memory in bytes.
          * @return Total amount of VRAM in bytes.
          */
-        unsigned long getTotalMemory();
+        size_t getTotalMemory();
         /**
          * @brief Get the free amount of memory in bytes.
          * @return Total amount of free VRAM in bytes.
          */
-        unsigned long getFreeMemory();
+        size_t getFreeMemory();
 
-        float getHistogramMemoryEstimation(const cv::Mat& image, uint numBins);
+        size_t getHistogramMemoryEstimation(const cv::Mat& image, uint numBins);
         cv::Mat histogram(const cv::Mat& image, float minLabel, float maxLabel, uint numBins);
 
         namespace filters {
-            float getMedianFilterMemoryEstimation(const std::shared_ptr<cv::Mat>& image);
-            float getMedianFilterMaskedMemoryEstimation(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
+            size_t getMedianFilterMemoryEstimation(const std::shared_ptr<cv::Mat>& image);
+            size_t getMedianFilterMaskedMemoryEstimation(const std::shared_ptr<cv::Mat>& image, const std::shared_ptr<cv::Mat>& mask);
             /**
              * This method applies a circular median filter with a radius of 10 to the given image.
              * @brief Apply circular median filter with a radius of 10 to the image
@@ -137,9 +137,9 @@ namespace PLImg {
         }
 
         namespace labeling {
-            float getLargestAreaConnectedComponentsMemoryEstimation(const cv::Mat& image);
-            float getConnectedComponentsMemoryEstimation(const cv::Mat& image);
-            float getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image);
+            size_t getLargestAreaConnectedComponentsMemoryEstimation(const cv::Mat& image);
+            size_t getConnectedComponentsMemoryEstimation(const cv::Mat& image);
+            size_t getConnectedComponentsLargestComponentMemoryEstimation(const cv::Mat& image);
 
             /**
              * This method allows to search the largest connected component in an image. This connected component will
