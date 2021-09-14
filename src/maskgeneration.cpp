@@ -325,7 +325,9 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
             {
                 std::cout << "Computing " << numberOfThreads << " iterations in parallel with max. " << omp_get_max_threads() / numberOfThreads << " threads per iteration." << std::endl;
             }
-            omp_set_num_threads(omp_get_max_threads() / numberOfThreads);
+            #ifdef __GNUC__
+                omp_set_num_threads(omp_get_max_threads() / numberOfThreads);
+            #endif
 
             // Only work with valid threads. The other threads won't do any work.
             if(omp_get_thread_num() < numberOfThreads) {
