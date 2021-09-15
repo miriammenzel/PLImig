@@ -17,3 +17,5 @@ CMakeLists.txt.user
 */*/.ipynb_checkpoints/*.ipynb
 *.ipynb
 *.pyc
+.vs
+CMakeSettings.json
