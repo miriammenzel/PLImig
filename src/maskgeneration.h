@@ -72,6 +72,13 @@ namespace PLImg {
         void resetParameters();
 
         /**
+         * By using the parameter tMax() we can separate the tissue from the background. Using this information,
+         * the resulting mask quality can be enhanced significantly, if the background fills the majority of the 
+         * image. Usage of this method is recommended if the resulting parameter maps aren't good yet.
+         */
+        void removeBackground();
+
+        /**
          * Retrieve the point of maximum curvature in first half of the retardation histogram. If this was calculated already, retrieve the
          * calculated value instead. If the value was set manually, no calculation will be done. Instead the set value will be returned.
          * @brief Point of maximum curvature in first half of the retardation histogram.

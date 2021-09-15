@@ -74,6 +74,12 @@ void PLImg::MaskGeneration::resetParameters() {
     this->m_probabilityMask = nullptr;
 }
 
+void PLImg::MaskGeneration::removeBackground() {
+    auto transmittanceThreshold = this->tMax();
+    m_transmittance->setTo(m_maxTransmittance, *m_transmittance > transmittanceThreshold);
+    m_retardation->setTo(m_minRetardation, *m_transmittance > transmittanceThreshold);
+}
+
 void PLImg::MaskGeneration::set_tMax(float tMax) {
     this->m_tMax = std::make_unique<float>(tMax);
 }

@@ -173,6 +173,7 @@ int main(int argc, char** argv) {
         if(tmax >= 0) {
             generation.set_tMax(tmax);
         }
+        generation.removeBackground();
 
         writer.set_path(output_folder + "/" + mask_basename + ".h5");
         writer.write_dataset("/Image", *generation.fullMask(), true);

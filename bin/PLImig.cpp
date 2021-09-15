@@ -173,6 +173,7 @@ int main(int argc, char** argv) {
         if(tmax >= 0) {
             generation.set_tMax(tmax);
         }
+        generation.removeBackground();
 
         mask_path = output_folder + "/" + mask_basename + ".h5";
         writer.set_path(mask_path);
