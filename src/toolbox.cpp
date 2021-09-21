@@ -597,10 +597,10 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
 
         int* imagePtr = (int*) image.data;
         for (int chunk = 0; chunk < numberOfChunks; ++chunk) {
-            int xMin = (chunk % chunksPerDim) * image.cols / chunksPerDim;
-            int xMax = fmin((chunk % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols-1);
-            int yMin = (chunk / chunksPerDim) * image.rows / chunksPerDim;
-            int yMax = fmin((chunk / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows-1);
+            int yMin = (chunk % chunksPerDim) * image.cols / chunksPerDim;
+            int yMax = fmin((chunk % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols-1);
+            int xMin = (chunk / chunksPerDim) * image.rows / chunksPerDim;
+            int xMax = fmin((chunk / chunksPerDim + 1) * image.rows / chunksPerDim, image.rows-1);
 
             int curIdx;
             int otherIdx;
