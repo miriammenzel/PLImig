@@ -206,31 +206,38 @@ sharedMat PLImg::Inclination::inclination() {
         float asinGRMax = std::asin(rmaxGray());
         float logIcIm = logf(fmax(1e-15, ic() / im()));
 
+        // Get pointers from OpenCV matrices to prevent overflow errors when image is larger than UINT_MAX
+        float* inclinationPtr = (float*) m_inclination->data;
+        const float* retardationPtr = (float*) m_retardation->data;
+        const float* transmittancePtr = (float*) m_transmittance->data;
+        const float* blurredMaskptr = (float*) m_blurredMask->data;
+        const unsigned char* maskPtr = (unsigned char*) m_mask->data;
+
         // Generate inclination for every pixel
         #pragma omp parallel for default(shared) private(tmpVal, blurredMaskVal, transmittanceVal) collapse(2)
         for(int y = 0; y < m_inclination->rows; ++y) {
             for(int x = 0; x < m_inclination->cols; ++x) {
                 // If pixel is in tissue
-                if(m_mask->at<unsigned char>(y, x) > 0) {
-                    blurredMaskVal = m_blurredMask->at<float>(y, x);
-                    transmittanceVal= fmax(im(), m_transmittance->at<float>(y, x));
-                    if(blurredMaskVal > 0.90) {
+                if(maskPtr[y * m_inclination->cols + x] > 0) {
+                    blurredMaskVal = blurredMaskptr[y * m_inclination->cols + x];
+                    transmittanceVal= fmax(im(), transmittancePtr[y * m_inclination->cols + x]);
+                    if(blurredMaskVal > 0.95) {
                         blurredMaskVal = 1;
-                    } else if(blurredMaskVal < 0.10) {
+                    } else if(blurredMaskVal < 0.05) {
                         blurredMaskVal = 0;
                     }
                     // If our blurred mask of PLImg has really low values, calculate the inclination only with the gray matter
                     // as it might result in saturation if both formulas are used
                     tmpVal = blurredMaskVal *
                              (
-                                    asin(m_retardation->at<float>(y, x)) /
+                                    asin(retardationPtr[y * m_inclination->cols + x]) /
                                     asinWRmax *
                                     logIcIm /
                                     fmax(1e-15, logf(ic() / transmittanceVal))
                              )
                              + (1.0f - blurredMaskVal) *
-                              asin(m_retardation->at<float>(y, x)) /
-                              ((asinGRMax * ( 1 - blurredMaskVal)) + asinWRmax * blurredMaskVal);
+                              asin(retardationPtr[y * m_inclination->cols + x]) /
+                              asinGRMax; // * ( 1 - blurredMaskVal)) + asinWRmax * blurredMaskVal)
                     // Prevent negative values for NaN due to sqrt
                     if(tmpVal < 0.0f) {
                         tmpVal = 0.0f;
@@ -240,10 +247,10 @@ sharedMat PLImg::Inclination::inclination() {
                     if(tmpVal > 1.0f) {
                         tmpVal = 1.0f;
                     }
-                    m_inclination->at<float>(y, x) = acosf(tmpVal) * 180.0f / M_PI;
+                    inclinationPtr[y * m_inclination->cols + x] = acosf(tmpVal) * 180.0f / M_PI;
                 // Else set inclination value to 90°
                 } else {
-                    m_inclination->at<float>(y, x) = 90.0f;
+                    inclinationPtr[y * m_inclination->cols + x] = 90.0f;
                 }
             }
         }
@@ -253,24 +260,30 @@ sharedMat PLImg::Inclination::inclination() {
 
 sharedMat PLImg::Inclination::saturation() {
     if(!m_saturation) {
-        m_saturation = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_32FC1);
+        m_saturation = std::make_shared<cv::Mat>(m_retardation->rows, m_retardation->cols, CV_8UC1);
         float inc_val;
+
+        // Get pointers from OpenCV matrices to prevent overflow errors when image is larger than UINT_MAX
+        const float* inclinationPtr = (float*) m_inclination->data;
+        const float* retardationPtr = (float*) m_retardation->data;
+        unsigned char* saturationPtr = (unsigned char*) m_saturation->data;
+
         #pragma omp parallel for default(shared) private(inc_val)
         for(int y = 0; y < m_saturation->rows; ++y) {
             for(int x = 0; x < m_saturation->cols; ++x) {
-                inc_val = m_inclination->at<float>(y, x);
+                inc_val = inclinationPtr[y * m_inclination->cols + x];
                 if(inc_val <= 0 | inc_val >= 90) {
                     if (inc_val <= 0) {
-                       if (m_retardation->at<float>(y, x) > rmaxWhite()) {
-                           m_saturation->at<float>(y, x) = 1;
+                       if (retardationPtr[y * m_inclination->cols + x] > rmaxWhite()) {
+                           saturationPtr[y * m_inclination->cols + x] = 1;
                        } else {
-                           m_saturation->at<float>(y, x) = 3;
+                           saturationPtr[y * m_inclination->cols + x] = 3;
                        }
                     } else {
-                        if (m_retardation->at<float>(y, x) > rmaxWhite()) {
-                            m_saturation->at<float>(y, x) = 2;
+                        if (retardationPtr[y * m_inclination->cols + x] > rmaxWhite()) {
+                            saturationPtr[y * m_inclination->cols + x] = 2;
                         } else {
-                            m_saturation->at<float>(y, x) = 4;
+                            saturationPtr[y * m_inclination->cols + x] = 4;
                         }
                     }
                 }

@@ -425,23 +425,30 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
 
         float diffTra = 0.0f;
         float diffRet = 0.0f;
+
+        // Get pointers from OpenCV matrices to prevent overflow errors when image is larger than UINT_MAX
+        float* probabilityMaskPtr = (float*) m_probabilityMask->data;
+        const float* transmittancePtr = (float*) m_transmittance->data;
+        const float* retardationPtr = (float*) m_retardation->data;
+
+        // Calculate probability mask
         #pragma omp parallel for private(diffTra, diffRet) default(shared) schedule(static)
         for(int y = 0; y < m_retardation->rows; ++y) {
             for (int x = 0; x < m_retardation->cols; ++x) {
-                diffTra = m_transmittance->at<float>(y, x);
+                diffTra = transmittancePtr[y * m_probabilityMask->cols + x];
                 if(diffTra < tTra()) {
                     diffTra = (diffTra - tTra()) / diff_tTra_m;
                 } else {
                     diffTra = (diffTra - tTra()) / diff_tTra_p;
                 }
-                diffRet = m_retardation->at<float>(y, x);
+                diffRet = retardationPtr[y * m_probabilityMask->cols + x];
                 if(diffRet < tRet()) {
                     diffRet = (diffRet - tRet()) / diff_tRet_m;
                 } else {
                     diffRet = (diffRet - tRet()) / diff_tRet_p;
                 }
-                m_probabilityMask->at<float>(y, x) = (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
-                                                            sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
+                probabilityMaskPtr[y * m_probabilityMask->cols + x] = (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
+                                                                      sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
             }
         }
     }

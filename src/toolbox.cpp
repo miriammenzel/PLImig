@@ -147,6 +147,12 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
     std::uniform_int_distribution<unsigned long long> distribution(0, numPixels-1);
     size_t selected_element;
 
+    // Get pointers from OpenCV matrices to prevent overflow errors when image is larger than UINT_MAX
+    const float* retardationPtr = (float*) retardation->data;
+    const float* transmittancePtr = (float*) transmittance->data;
+    float* smallRetardationPtr = (float*) small_retardation.data;
+    float* smallTransmittancePtr = (float*) small_transmittance.data;
+
     // Fill transmittance and retardation with random pixels from our base images
     #pragma omp parallel for private(selected_element) shared(distribution, random_engines, small_retardation, small_transmittance)
     for(int y = 0; y < small_retardation.rows; ++y) {
@@ -154,8 +160,8 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
             selected_element = distribution(random_engines.at(omp_get_thread_num()));
             int selected_x = selected_element % retardation->cols;
             int selected_y = selected_element / retardation->cols;
-            small_retardation.at<float>(y, x) = retardation->at<float>(selected_y, selected_x);
-            small_transmittance.at<float>(y, x) = transmittance->at<float>(selected_y, selected_x);
+            smallRetardationPtr[y * small_retardation.cols + x] = retardationPtr[selected_y * retardation->cols + selected_x];
+            smallTransmittancePtr[y * small_transmittance.cols + x] = transmittancePtr[selected_y * transmittance->cols + selected_x];
         }
     }
 
@@ -166,10 +172,11 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
 unsigned long long PLImg::Image::maskCountNonZero(const cv::Mat &mask) {
     unsigned long long nonZeroPixels = 0;
 
+    const unsigned char* maskPtr = mask.data;
     #pragma omp parallel for reduction(+ : nonZeroPixels) collapse(2)
     for(int x = 0; x < mask.cols; ++x) {
         for(int y = 0; y < mask.rows; ++y) {
-            if(mask.at<uchar>(y, x) > 0) ++nonZeroPixels;
+            if(maskPtr[y * mask.cols + x] > 0) ++nonZeroPixels;
         }
     }
 
@@ -588,6 +595,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
         std::set<std::pair<int, int>> labelLUT;
         std::cout << "Fixing chunks" << std::endl;
 
+        int* imagePtr = (int*) image.data;
         for (int chunk = 0; chunk < numberOfChunks; ++chunk) {
             int xMin = (chunk % chunksPerDim) * image.cols / chunksPerDim;
             int xMax = fmin((chunk % chunksPerDim + 1) * image.cols / chunksPerDim, image.cols-1);
@@ -598,9 +606,9 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
             int otherIdx;
             // Check upper and lower border
             for (int x = xMin; x < xMax; ++x) {
-                curIdx = image.at<int>(yMin, x);
+                curIdx = imagePtr[yMin * image.cols + x];
                 if (curIdx > 0 && yMin - 1 >= 0) {
-                    otherIdx = image.at<int>(yMin - 1, x);
+                    otherIdx =imagePtr[(yMin - 1) * image.cols + x];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -610,9 +618,9 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
                     }
                 }
 
-                curIdx = image.at<int>(yMax, x);
+                curIdx = imagePtr[yMax * image.cols + x];
                 if (curIdx > 0 && yMax + 1 < image.rows) {
-                    otherIdx = image.at<int>(yMax + 1, x);
+                    otherIdx = imagePtr[(yMax + 1) * image.cols + x];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -625,9 +633,9 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
 
             // Check left and right border
             for (int y = yMin; y < yMax; ++y) {
-                curIdx = image.at<int>(y, xMin);
+                curIdx = imagePtr[y * image.cols + xMin];
                 if (curIdx > 0 && xMin - 1 >= 0) {
-                    otherIdx = image.at<int>(y, xMin - 1);
+                    otherIdx = imagePtr[y * image.cols + xMin - 1];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -637,9 +645,9 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
                     }
                 }
 
-                curIdx = image.at<int>(y, xMax);
+                curIdx = imagePtr[y * image.cols + xMax];
                 if (curIdx > 0 && xMax + 1 < image.cols) {
-                    otherIdx = image.at<int>(y, xMax + 1);
+                    otherIdx = imagePtr[y * image.cols + xMax + 1];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -676,10 +684,10 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
             #pragma omp parallel for schedule(guided)
             for(int x = 0; x < image.cols; ++x) {
                 for(int y = 0; y < image.rows; ++y) {
-                    if(image.at<int>(y, x) > 0) {
+                    if(imagePtr[y * image.cols + x] > 0) {
                         for (std::pair<int, int> pair : labelLUT) {
-                            if(image.at<int>(y, x) == pair.first) {
-                                image.at<int>(y, x) = pair.second;
+                            if(imagePtr[y * image.cols + x] == pair.first) {
+                                imagePtr[y * image.cols + x] = pair.second;
                             }
                         }
                     }
