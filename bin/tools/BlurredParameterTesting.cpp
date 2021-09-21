@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     std::string dataset;
     int num_iterations;
     int num_retakes;
-    int scale_factor;
+    float scale_factor;
 
     auto required = app.add_option_group("Required parameters");
     required->add_option("--itra", transmittance_files, "Input transmittance files")
@@ -32,9 +32,9 @@ int main(int argc, char** argv) {
     optional->add_option("--nit", num_iterations, "Number of iterations for the blurred mask")
             ->default_val(500);
     optional->add_option("--retakes", num_retakes, "Number of retakes")
-            ->default_val(100);
-    optional->add_option("--scaleFactor", scale_factor, "Scale subimages in blurring algorithm by 1/n")
             ->default_val(10);
+    optional->add_option("--scaleFactor", scale_factor, "Scale subimages in blurring algorithm by 1/n")
+            ->default_val(0.1f);
     CLI11_PARSE(app, argc, argv);
 
     PLImg::MaskGeneration generation;
@@ -42,7 +42,12 @@ int main(int argc, char** argv) {
     std::string retardation_path;
     bool retardation_found;
     for(const auto& transmittance_path : transmittance_files) {
-        unsigned long long int endPosition = transmittance_path.find_last_of('/');
+        #ifdef WIN32
+                unsigned long long int endPosition = transmittance_path.find_last_of('\\');
+        #else
+                unsigned long long int endPosition = transmittance_path.find_last_of('/');
+        #endif
+        
         if (endPosition != std::string::npos) {
             transmittance_basename = transmittance_path.substr(endPosition + 1);
         } else {
@@ -57,9 +62,6 @@ int main(int argc, char** argv) {
 
         // Get name of retardation and check if transmittance has median filer applied.
         retardation_basename = std::string(transmittance_basename);
-        if (retardation_basename.find("median10") != std::string::npos) {
-            retardation_basename = retardation_basename.replace(retardation_basename.find("median10"), 8, "");
-        }
         if (retardation_basename.find("NTransmittance") != std::string::npos) {
             retardation_basename = retardation_basename.replace(retardation_basename.find("NTransmittance"), 14,
                                                                 "Retardation");
@@ -85,12 +87,9 @@ int main(int argc, char** argv) {
             std::cout << "Files read" << std::endl;
 
             std::shared_ptr<cv::Mat> medTransmittance = transmittance;
-            if (transmittance_path.find("median10") == std::string::npos) {
+            if (transmittance_path.find("median") == std::string::npos) {
                 // Generate med10Transmittance
                 medTransmittance = PLImg::cuda::filters::medianFilter(transmittance);
-                // Write it to a file
-                std::string medTraName(retardation_basename);
-                medTraName.replace(retardation_basename.find("Retardation"), 10, "median10NTransmittance");
             } else {
                 medTransmittance = transmittance;
             }
@@ -109,7 +108,12 @@ int main(int argc, char** argv) {
                 if (param_basename.find("Retardation") != std::string::npos) {
                     param_basename = param_basename.replace(param_basename.find("Retardation"), 11, "Param_" + std::to_string(take));
                 }
-                param_file.open(output_folder + "/" + param_basename + ".csv");
+                #ifdef WIN32
+                    param_file.open(output_folder + "\\" + param_basename + ".csv");
+                #else
+                    param_file.open(output_folder + "/" + param_basename + ".csv");
+                #endif      
+                
                 //////////////////////////////
                 //////////////////////////////
                 /// BLURRED MASK ALGORITHM ///
