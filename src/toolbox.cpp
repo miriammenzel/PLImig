@@ -606,9 +606,9 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
             int otherIdx;
             // Check upper and lower border
             for (int x = xMin; x < xMax; ++x) {
-                curIdx = imagePtr[yMin * image.cols + x];
+                curIdx = imagePtr[(unsigned long long) yMin * image.cols + x];
                 if (curIdx > 0 && yMin - 1 >= 0) {
-                    otherIdx =imagePtr[(yMin - 1) * image.cols + x];
+                    otherIdx = imagePtr[(yMin - 1) * image.cols + x];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -618,7 +618,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
                     }
                 }
 
-                curIdx = imagePtr[yMax * image.cols + x];
+                curIdx = imagePtr[(unsigned long long) yMax * image.cols + x];
                 if (curIdx > 0 && yMax + 1 < image.rows) {
                     otherIdx = imagePtr[(yMax + 1) * image.cols + x];
                     if (otherIdx > 0) {
@@ -633,7 +633,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
 
             // Check left and right border
             for (int y = yMin; y < yMax; ++y) {
-                curIdx = imagePtr[y * image.cols + xMin];
+                curIdx = imagePtr[(unsigned long long) y * image.cols + xMin];
                 if (curIdx > 0 && xMin - 1 >= 0) {
                     otherIdx = imagePtr[y * image.cols + xMin - 1];
                     if (otherIdx > 0) {
@@ -645,9 +645,9 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
                     }
                 }
 
-                curIdx = imagePtr[y * image.cols + xMax];
+                curIdx = imagePtr[(unsigned long long) y * image.cols + xMax];
                 if (curIdx > 0 && xMax + 1 < image.cols) {
-                    otherIdx = imagePtr[y * image.cols + xMax + 1];
+                    otherIdx = imagePtr[(unsigned long long) y * image.cols + xMax + 1];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -686,8 +686,8 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
                 for(int y = 0; y < image.rows; ++y) {
                     if(imagePtr[y * image.cols + x] > 0) {
                         for (std::pair<int, int> pair : labelLUT) {
-                            if(imagePtr[y * image.cols + x] == pair.first) {
-                                imagePtr[y * image.cols + x] = pair.second;
+                            if(imagePtr[(unsigned long long) y * image.cols + x] == pair.first) {
+                                imagePtr[(unsigned long long) y * image.cols + x] = pair.second;
                             }
                         }
                     }
