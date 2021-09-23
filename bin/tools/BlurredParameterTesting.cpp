@@ -96,6 +96,7 @@ int main(int argc, char** argv) {
             transmittance = nullptr;
             std::cout << "Med10Transmittance generated" << std::endl;
             generation.setModalities(retardation, medTransmittance);
+            generation.removeBackground();
             generation.tMax();
             generation.tMin();
             generation.tRet();
