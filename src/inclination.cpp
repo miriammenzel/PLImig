@@ -218,9 +218,9 @@ sharedMat PLImg::Inclination::inclination() {
         for(int y = 0; y < m_inclination->rows; ++y) {
             for(int x = 0; x < m_inclination->cols; ++x) {
                 // If pixel is in tissue
-                if(maskPtr[y * m_inclination->cols + x] > 0) {
-                    blurredMaskVal = blurredMaskptr[y * m_inclination->cols + x];
-                    transmittanceVal= fmax(im(), transmittancePtr[y * m_inclination->cols + x]);
+                if(maskPtr[(unsigned long long) y * m_inclination->cols + x] > 0) {
+                    blurredMaskVal = blurredMaskptr[(unsigned long long) y * m_inclination->cols + x];
+                    transmittanceVal= fmax(im(), transmittancePtr[(unsigned long long) y * m_inclination->cols + x]);
                     if(blurredMaskVal > 0.95) {
                         blurredMaskVal = 1;
                     } else if(blurredMaskVal < 0.05) {
@@ -230,13 +230,13 @@ sharedMat PLImg::Inclination::inclination() {
                     // as it might result in saturation if both formulas are used
                     tmpVal = blurredMaskVal *
                              (
-                                    asin(retardationPtr[y * m_inclination->cols + x]) /
+                                    asin(retardationPtr[(unsigned long long) y * m_inclination->cols + x]) /
                                     asinWRmax *
                                     logIcIm /
                                     fmax(1e-15, logf(ic() / transmittanceVal))
                              )
                              + (1.0f - blurredMaskVal) *
-                              asin(retardationPtr[y * m_inclination->cols + x]) /
+                              asin(retardationPtr[(unsigned long long) y * m_inclination->cols + x]) /
                               asinGRMax; // * ( 1 - blurredMaskVal)) + asinWRmax * blurredMaskVal)
                     // Prevent negative values for NaN due to sqrt
                     if(tmpVal < 0.0f) {
@@ -247,10 +247,10 @@ sharedMat PLImg::Inclination::inclination() {
                     if(tmpVal > 1.0f) {
                         tmpVal = 1.0f;
                     }
-                    inclinationPtr[y * m_inclination->cols + x] = acosf(tmpVal) * 180.0f / M_PI;
+                    inclinationPtr[(unsigned long long) y * m_inclination->cols + x] = acosf(tmpVal) * 180.0f / M_PI;
                 // Else set inclination value to 90°
                 } else {
-                    inclinationPtr[y * m_inclination->cols + x] = 90.0f;
+                    inclinationPtr[(unsigned long long) y * m_inclination->cols + x] = 90.0f;
                 }
             }
         }
@@ -271,19 +271,19 @@ sharedMat PLImg::Inclination::saturation() {
         #pragma omp parallel for default(shared) private(inc_val)
         for(int y = 0; y < m_saturation->rows; ++y) {
             for(int x = 0; x < m_saturation->cols; ++x) {
-                inc_val = inclinationPtr[y * m_inclination->cols + x];
-                if(inc_val <= 0 | inc_val >= 90) {
+                inc_val = inclinationPtr[(unsigned long long) y * m_inclination->cols + x];
+                if((inc_val <= 0) || (inc_val >= 90)) {
                     if (inc_val <= 0) {
-                       if (retardationPtr[y * m_inclination->cols + x] > rmaxWhite()) {
-                           saturationPtr[y * m_inclination->cols + x] = 1;
+                       if (retardationPtr[(unsigned long long)y * m_inclination->cols + x] > rmaxWhite()) {
+                           saturationPtr[(unsigned long long) y * m_inclination->cols + x] = 1;
                        } else {
-                           saturationPtr[y * m_inclination->cols + x] = 3;
+                           saturationPtr[(unsigned long long) y * m_inclination->cols + x] = 3;
                        }
                     } else {
-                        if (retardationPtr[y * m_inclination->cols + x] > rmaxWhite()) {
-                            saturationPtr[y * m_inclination->cols + x] = 2;
+                        if (retardationPtr[(unsigned long long) y * m_inclination->cols + x] > rmaxWhite()) {
+                            saturationPtr[(unsigned long long) y * m_inclination->cols + x] = 2;
                         } else {
-                            saturationPtr[y * m_inclination->cols + x] = 4;
+                            saturationPtr[(unsigned long long) y * m_inclination->cols + x] = 4;
                         }
                     }
                 }

@@ -435,20 +435,21 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         #pragma omp parallel for private(diffTra, diffRet) default(shared) schedule(static)
         for(int y = 0; y < m_retardation->rows; ++y) {
             for (int x = 0; x < m_retardation->cols; ++x) {
-                diffTra = transmittancePtr[y * m_probabilityMask->cols + x];
+                diffTra = transmittancePtr[(unsigned long long) y * m_probabilityMask->cols + x];
                 if(diffTra < tTra()) {
                     diffTra = (diffTra - tTra()) / diff_tTra_m;
                 } else {
                     diffTra = (diffTra - tTra()) / diff_tTra_p;
                 }
-                diffRet = retardationPtr[y * m_probabilityMask->cols + x];
+                diffRet = retardationPtr[(unsigned long long) y * m_probabilityMask->cols + x];
                 if(diffRet < tRet()) {
                     diffRet = (diffRet - tRet()) / diff_tRet_m;
                 } else {
                     diffRet = (diffRet - tRet()) / diff_tRet_p;
                 }
-                probabilityMaskPtr[y * m_probabilityMask->cols + x] = (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
-                                                                      sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
+                probabilityMaskPtr[(unsigned long long) y * m_probabilityMask->cols + x] = 
+                    (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
+                    sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
             }
         }
     }

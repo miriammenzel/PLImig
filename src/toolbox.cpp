@@ -160,8 +160,8 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
             selected_element = distribution(random_engines.at(omp_get_thread_num()));
             int selected_x = selected_element % retardation->cols;
             int selected_y = selected_element / retardation->cols;
-            smallRetardationPtr[y * small_retardation.cols + x] = retardationPtr[selected_y * retardation->cols + selected_x];
-            smallTransmittancePtr[y * small_transmittance.cols + x] = transmittancePtr[selected_y * transmittance->cols + selected_x];
+            smallRetardationPtr[(unsigned long long) y * small_retardation.cols + x] = retardationPtr[(unsigned long long) selected_y * retardation->cols + selected_x];
+            smallTransmittancePtr[(unsigned long long) y * small_transmittance.cols + x] = transmittancePtr[(unsigned long long) selected_y * transmittance->cols + selected_x];
         }
     }
 
@@ -176,7 +176,7 @@ unsigned long long PLImg::Image::maskCountNonZero(const cv::Mat &mask) {
     #pragma omp parallel for reduction(+ : nonZeroPixels) collapse(2)
     for(int x = 0; x < mask.cols; ++x) {
         for(int y = 0; y < mask.rows; ++y) {
-            if(maskPtr[y * mask.cols + x] > 0) ++nonZeroPixels;
+            if(maskPtr[(unsigned long long) y * mask.cols + x] > 0) ++nonZeroPixels;
         }
     }
 
@@ -608,7 +608,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
             for (int x = xMin; x < xMax; ++x) {
                 curIdx = imagePtr[(unsigned long long) yMin * image.cols + x];
                 if (curIdx > 0 && yMin - 1 >= 0) {
-                    otherIdx = imagePtr[(yMin - 1) * image.cols + x];
+                    otherIdx = imagePtr[(unsigned long long) (yMin - 1) * image.cols + x];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -620,7 +620,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
 
                 curIdx = imagePtr[(unsigned long long) yMax * image.cols + x];
                 if (curIdx > 0 && yMax + 1 < image.rows) {
-                    otherIdx = imagePtr[(yMax + 1) * image.cols + x];
+                    otherIdx = imagePtr[(unsigned long long) (yMax + 1) * image.cols + x];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -635,7 +635,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
             for (int y = yMin; y < yMax; ++y) {
                 curIdx = imagePtr[(unsigned long long) y * image.cols + xMin];
                 if (curIdx > 0 && xMin - 1 >= 0) {
-                    otherIdx = imagePtr[y * image.cols + xMin - 1];
+                    otherIdx = imagePtr[(unsigned long long) y * image.cols + xMin - 1];
                     if (otherIdx > 0) {
                         if(otherIdx > curIdx) {
                             labelLUT.insert(std::pair<int, int> {otherIdx, curIdx});
@@ -684,7 +684,7 @@ void PLImg::cuda::labeling::connectedComponentsMergeChunks(cv::Mat &image, int n
             #pragma omp parallel for schedule(guided)
             for(int x = 0; x < image.cols; ++x) {
                 for(int y = 0; y < image.rows; ++y) {
-                    if(imagePtr[y * image.cols + x] > 0) {
+                    if(imagePtr[(unsigned long long) y * image.cols + x] > 0) {
                         for (std::pair<int, int> pair : labelLUT) {
                             if(imagePtr[(unsigned long long) y * image.cols + x] == pair.first) {
                                 imagePtr[(unsigned long long) y * image.cols + x] = pair.second;
