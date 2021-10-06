@@ -26,7 +26,7 @@
 
 #include "cuda/cuda_toolbox.h"
 #include "cuda/define.h"
-#include "exceptions.h"
+#include "cuda/exceptions.h"
 #include <chrono>
 #include <numeric>
 #include <omp.h>

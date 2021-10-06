@@ -71,6 +71,7 @@ void PLImg::MaskGeneration::resetParameters() {
     this->m_tTra = nullptr;
     this->m_whiteMask = nullptr;
     this->m_grayMask = nullptr;
+    this->m_fullMask = nullptr;
     this->m_probabilityMask = nullptr;
 }
 
