@@ -218,9 +218,9 @@ sharedMat PLImg::Inclination::inclination() {
         for(int y = 0; y < m_inclination->rows; ++y) {
             for(int x = 0; x < m_inclination->cols; ++x) {
                 // If pixel is in tissue
-                if(maskPtr[(unsigned long long) y * m_inclination->cols + x] > 0) {
-                    blurredMaskVal = blurredMaskptr[(unsigned long long) y * m_inclination->cols + x];
-                    transmittanceVal= fmax(im(), transmittancePtr[(unsigned long long) y * m_inclination->cols + x]);
+                if(maskPtr[(unsigned long long) y * m_mask->cols + x] > 0) {
+                    blurredMaskVal = blurredMaskptr[(unsigned long long) y * m_blurredMask->cols + x];
+                    transmittanceVal = fmax(im(), transmittancePtr[(unsigned long long) y * m_transmittance->cols + x]);
                     if(blurredMaskVal > 0.95) {
                         blurredMaskVal = 1;
                     } else if(blurredMaskVal < 0.05) {
@@ -230,13 +230,13 @@ sharedMat PLImg::Inclination::inclination() {
                     // as it might result in saturation if both formulas are used
                     tmpVal = blurredMaskVal *
                              (
-                                    asin(retardationPtr[(unsigned long long) y * m_inclination->cols + x]) /
+                                    asin(retardationPtr[(unsigned long long) y * m_retardation->cols + x]) /
                                     asinWRmax *
                                     logIcIm /
                                     fmax(1e-15, logf(ic() / transmittanceVal))
                              )
                              + (1.0f - blurredMaskVal) *
-                              asin(retardationPtr[(unsigned long long) y * m_inclination->cols + x]) /
+                              asin(retardationPtr[(unsigned long long) y * m_retardation->cols + x]) /
                               (asinGRMax * (1 - blurredMaskVal) + asinWRmax * blurredMaskVal);
                     // Prevent negative values for NaN due to sqrt
                     if(tmpVal < 0.0f) {

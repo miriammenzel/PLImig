@@ -59,8 +59,8 @@ __global__ void medianFilterKernel(const float* image, int image_stride,
                                    float* result_image, int result_image_stride,
                                    int2 imageDims) {
     // Calculate actual position in image based on thread number and block number
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+    long long x = (long long) blockIdx.x * blockDim.x + threadIdx.x;
+    long long y = (long long) blockIdx.y * blockDim.y + threadIdx.y;
     // The valid values will be counted to ensure that the median will be calculated correctly
     unsigned int validValues = 0;
     int cy_bound;
@@ -90,8 +90,8 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
                                          const unsigned char* mask, int mask_stride,
                                          int2 imageDims) {
     // Calculate actual position in image based on thread number and block number
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+    long long x = (long long) blockIdx.x * blockDim.x + threadIdx.x;
+    long long y = (long long) blockIdx.y * blockDim.y + threadIdx.y;
     // The valid values will be counted to ensure that the median will be calculated correctly
     unsigned int validValues = 0;
     int cy_bound;
@@ -106,7 +106,7 @@ __global__ void medianFilterMaskedKernel(const float* image, int image_stride,
             cy_bound = sqrtf(MEDIAN_KERNEL_SIZE * MEDIAN_KERNEL_SIZE - cx * cx);
             for (int cy = -cy_bound; cy <= cy_bound; ++cy) {
                 // If the pixel in the kernel matches the current pixel on the gray / white mask
-                if (mask[x + y * mask_stride] == mask[x + cx + (y + cy) * image_stride]) {
+                if (mask[x + y * mask_stride] == mask[x + cx + (y + cy) * mask_stride]) {
                     // Save values in buffer
                     buffer[validValues] = image[x + cx + (y + cy) * image_stride];
                     ++validValues;
@@ -127,16 +127,16 @@ __global__ void connectedComponentsInitializeMask(const unsigned char* image, in
                                                   unsigned int* mask, int mask_stride,
                                                   int line_width) {
     // Calculate actual position in image based on thread number and block number
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned long long x = (unsigned long long) blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long y = (unsigned long long) blockIdx.y * blockDim.y + threadIdx.y;
 
-    mask[x + y * mask_stride] = (image[x + y * image_stride] & 1) * (y * (unsigned int) line_width + x + 1);
+    mask[x + y * mask_stride] = (image[x + y * image_stride] & 1) * (y * (unsigned long long) line_width + x + 1);
 }
 
 __global__ void connectedComponentsIteration(unsigned int* mask, int mask_stride, int2 maskDims, volatile bool* changeOccured) {
     // Calculate actual position in image based on thread number and block number
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    long long x = (long long) blockIdx.x * blockDim.x + threadIdx.x;
+    long long y = (long long) blockIdx.y * blockDim.y + threadIdx.y;
 
     unsigned int pixelVals[5];
 
@@ -164,8 +164,8 @@ __global__ void connectedComponentsReduceComponents(unsigned int* mask, int mask
                                                     const unsigned int* lutKeys,
                                                     const unsigned int lutSize) {
     // Calculate actual position in image based on thread number and block number
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned long long x = (unsigned long long) blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long y = (unsigned long long) blockIdx.y * blockDim.y + threadIdx.y;
 
     for (unsigned int i = 0; i < lutSize; ++i) {
         if(mask[x + y * mask_stride] == lutKeys[i]) {
@@ -207,9 +207,9 @@ __device__ void connectedComponentsUFUnion(unsigned int* L, unsigned int a, unsi
 
 __global__ void connectedComponentsUFLocalMerge(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
     unsigned int* labelMap, unsigned int label_stride) {
-    unsigned global_x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned global_y = blockIdx.y * blockDim.y + threadIdx.y;
-    unsigned local_index = threadIdx.x + threadIdx.y * blockDim.x;
+    unsigned long long global_x = (unsigned long long) blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long global_y = (unsigned long long) blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned long long local_index = (unsigned long long) threadIdx.x + threadIdx.y * blockDim.x;
 
     __shared__ unsigned int labelSM[CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS];
     __shared__ unsigned char inputBuffer[CUDA_KERNEL_NUM_THREADS * CUDA_KERNEL_NUM_THREADS];
@@ -261,9 +261,9 @@ __global__ void connectedComponentsUFLocalMerge(cudaTextureObject_t inputTexture
 
 __global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
                                                  unsigned int* labelMap, unsigned int label_stride) {
-    unsigned global_x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned global_y = blockIdx.y * blockDim.y + threadIdx.y;
-    unsigned label_index = global_x + global_y * label_stride;
+    unsigned long long global_x = (unsigned long long) blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long global_y = (unsigned long long) blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned long long label_index = global_x + global_y * label_stride;
 
     if(global_x < image_width && global_y < image_height) {
         if(tex2D<unsigned char>(inputTexture, global_x, global_y)) {
@@ -289,9 +289,9 @@ __global__ void connectedComponentsUFGlobalMerge(cudaTextureObject_t inputTextur
 
 __global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTexture, unsigned int image_width, unsigned int image_height,
                                                      unsigned int* labelMap, unsigned int label_stride) {
-    unsigned global_x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned global_y = blockIdx.y * blockDim.y + threadIdx.y;
-    unsigned label_index = global_x + global_y * label_stride;
+    unsigned long long global_x = (unsigned long long) blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long global_y = (unsigned long long) blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned long long label_index = global_x + global_y * label_stride;
 
     if(global_x < image_width && global_y < image_height) {
         if(tex2D<unsigned char>(inputTexture, global_x, global_y)) {
@@ -302,8 +302,8 @@ __global__ void connectedComponentsUFPathCompression(cudaTextureObject_t inputTe
 
 __global__ void histogram(const float* image, int image_width, int image_height, unsigned int* histogram, float minVal, float maxVal, unsigned int numBins) {
     // Calculate actual position in image based on thread number and block number
-    const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+    const long long x = (long long) blockIdx.x * blockDim.x + threadIdx.x;
+    const long long y = (long long) blockIdx.y * blockDim.y + threadIdx.y;
 
     const float binWidth = (float(maxVal) - float(minVal)) / float(numBins);
     if(x < image_width && y < image_height) {
@@ -316,10 +316,10 @@ __global__ void histogram(const float* image, int image_width, int image_height,
 
 __global__ void histogramSharedMem(const float* image, int image_width, int image_height, unsigned int* histogram, float minVal, float maxVal, unsigned int numBins) {
     // Calculate actual position in image based on thread number and block number
-    const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+    const long long x = (long long) blockIdx.x * blockDim.x + threadIdx.x;
+    const long long y = (long long) blockIdx.y * blockDim.y + threadIdx.y;
 
-    const unsigned int locId = threadIdx.y*blockDim.x+threadIdx.x;
+    const long long locId = (long long) threadIdx.y * blockDim.x + threadIdx.x;
     const float binWidth = (float(maxVal) - float(minVal)) / float(numBins);
 
     extern __shared__ unsigned int localHistogram[];

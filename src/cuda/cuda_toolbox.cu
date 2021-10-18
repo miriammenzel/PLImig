@@ -42,9 +42,9 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponents(const cv::Mat& image
     bool* deviceChangeOccured;
     bool changeOccured;
 
-    CHECK_CUDA(cudaMalloc(&deviceImage, kernelImage.total() * sizeof(uchar)));
-    CHECK_CUDA(cudaMemcpy(deviceImage, kernelImage.data, kernelImage.total() * sizeof(uchar), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMalloc(&deviceMask, kernelImage.total() * sizeof(uint)));
+    CHECK_CUDA(cudaMalloc(&deviceImage, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uchar)));
+    CHECK_CUDA(cudaMemcpy(deviceImage, kernelImage.data, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uchar), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMalloc(&deviceMask, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uint)));
     CHECK_CUDA(cudaMalloc(&deviceChangeOccured, sizeof(bool)));
 
     dim3 threadsPerBlock, numBlocks;
@@ -62,10 +62,10 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponents(const cv::Mat& image
     CHECK_CUDA(cudaFree(deviceChangeOccured));
 
     uint* deviceUniqueMask;
-    CHECK_CUDA(cudaMalloc(&deviceUniqueMask, kernelImage.total() * sizeof(uint)));
-    CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToDevice));
-    thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
-    uint* deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
+    CHECK_CUDA(cudaMalloc(&deviceUniqueMask, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uint)));
+    CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uint), cudaMemcpyDeviceToDevice));
+    thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + (unsigned long long) kernelImage.cols * kernelImage.rows);
+    uint* deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + (unsigned long long) kernelImage.cols * kernelImage.rows);
 
     uint distance = thrust::distance(deviceUniqueMask, deviceMaxUniqueLabel);
     connectedComponentsReduceComponents<<<numBlocks, threadsPerBlock>>>(deviceMask, kernelImage.cols,
@@ -73,11 +73,11 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponents(const cv::Mat& image
                                                                         distance);
     CHECK_CUDA(cudaFree(deviceUniqueMask));
 
-    uint* deviceMaxLabel = thrust::max_element(thrust::device, deviceMask, deviceMask + kernelImage.total());
+    uint* deviceMaxLabel = thrust::max_element(thrust::device, deviceMask, deviceMask + (unsigned long long) kernelImage.cols * kernelImage.rows);
     CHECK_CUDA(cudaMemcpy(maxLabelNumber, deviceMaxLabel, sizeof(uint), cudaMemcpyDeviceToHost));
 
     // Copy result from GPU back to CPU
-    CHECK_CUDA(cudaMemcpy(result.data, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(result.data, deviceMask, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uint), cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaFree(deviceMask));
     CHECK_CUDA(cudaDeviceSynchronize());
 
@@ -123,7 +123,7 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
     // Step 3: Create texture object
     cudaTextureObject_t texObj = 0;
     CHECK_CUDA(cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL));
-    CHECK_CUDA(cudaMalloc(&deviceMask, kernelImage.total() * sizeof(uint)));
+    CHECK_CUDA(cudaMalloc(&deviceMask, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uint)));
 
     // Define CUDA kernel parameters
     dim3 threadsPerBlock, numBlocks;
@@ -145,13 +145,13 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
 
     // Fourth step. Reduce label numbers to reasonable numbers.
     uint* deviceUniqueMask;
-    CHECK_CUDA(cudaMalloc(&deviceUniqueMask, kernelImage.total() * sizeof(uint)));
-    CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToDevice));
+    CHECK_CUDA(cudaMalloc(&deviceUniqueMask, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uint)));
+    CHECK_CUDA(cudaMemcpy(deviceUniqueMask, deviceMask, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uint), cudaMemcpyDeviceToDevice));
 
     uint* deviceMaxUniqueLabel;
     uint distance;
     try {
-        thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
+        thrust::sort(thrust::device, deviceUniqueMask, deviceUniqueMask + (unsigned long long) kernelImage.cols * kernelImage.rows);
         deviceMaxUniqueLabel = thrust::unique(thrust::device, deviceUniqueMask, deviceUniqueMask + kernelImage.total());
         // Save the new maximum label as a return value for the user
         distance = thrust::distance(deviceUniqueMask, deviceMaxUniqueLabel);
@@ -172,7 +172,7 @@ cv::Mat PLImg::cuda::raw::labeling::CUDAConnectedComponentsUF(const cv::Mat &ima
                                                                         distance);
     CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaFree(deviceUniqueMask));
-    CHECK_CUDA(cudaMemcpy(result.data, deviceMask, kernelImage.total() * sizeof(uint), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(result.data, deviceMask, (unsigned long long) kernelImage.cols * kernelImage.rows * sizeof(uint), cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaFree(deviceMask));
 
     cv::Mat croppedImage = cv::Mat(result, cv::Rect(widthPadding, heightPadding, result.cols - widthPadding, result.rows - heightPadding));
@@ -190,16 +190,16 @@ void PLImg::cuda::raw::filters::CUDAmedianFilter(cv::Mat& image, cv::Mat& result
     // go out of bounds.
     dim3 threadsPerBlock, numBlocks;
     // Allocate GPU memory for the original image and its result
-    CHECK_CUDA(cudaMalloc((void **) &deviceImage, image.total() * image.elemSize()));
+    CHECK_CUDA(cudaMalloc((void **) &deviceImage, (unsigned long long) image.cols * image.rows * image.elemSize()));
     // Length of columns
     nSrcStep = image.cols;
 
-    CHECK_CUDA(cudaMalloc((void **) &deviceResult, image.total() * image.elemSize()));
+    CHECK_CUDA(cudaMalloc((void **) &deviceResult, (unsigned long long) image.cols * image.rows * image.elemSize()));
     // Length of columns
     nResStep = result.cols;
 
     // Copy image from CPU to GPU
-    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * image.elemSize(), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, (unsigned long long) image.cols * image.rows * image.elemSize(), cudaMemcpyHostToDevice));
 
     // Apply median filter
     subImageDims = {result.cols, result.rows};
@@ -211,7 +211,7 @@ void PLImg::cuda::raw::filters::CUDAmedianFilter(cv::Mat& image, cv::Mat& result
                                                        subImageDims);
 
     // Copy result from GPU back to CPU
-    CHECK_CUDA(cudaMemcpy(result.data, deviceResult, image.total() * image.elemSize(), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(result.data, deviceResult, (unsigned long long) image.cols * image.rows * image.elemSize(), cudaMemcpyDeviceToHost));
 
     // Free reserved memory
     CHECK_CUDA(cudaFree(deviceImage));
@@ -230,21 +230,21 @@ void PLImg::cuda::raw::filters::CUDAmedianFilterMasked(cv::Mat& image, cv::Mat& 
     int2 subImageDims;
 
     // Allocate GPU memory for the original image, mask and its result
-    CHECK_CUDA(cudaMalloc((void **) &deviceImage, image.total() * image.elemSize()));
+    CHECK_CUDA(cudaMalloc((void **) &deviceImage, (unsigned long long) image.cols * image.rows * image.elemSize()));
     // Length of columns
     nSrcStep = image.cols;
 
-    CHECK_CUDA(cudaMalloc((void **) &deviceMask, mask.total() * mask.elemSize()));
+    CHECK_CUDA(cudaMalloc((void **) &deviceMask, (unsigned long long) mask.rows * mask.cols * mask.elemSize()));
     // Length of columns
     nMaskStep = mask.cols;
 
-    CHECK_CUDA(cudaMalloc((void **) &deviceResult, image.total() * image.elemSize()));
+    CHECK_CUDA(cudaMalloc((void **) &deviceResult, (unsigned long long) image.cols * image.rows * image.elemSize()));
     // Length of columns
     nResStep = result.cols;
 
     // Copy image from CPU to GPU
-    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * image.elemSize(), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMemcpy(deviceMask, mask.data, mask.total() * mask.elemSize(), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, (unsigned long long) image.cols * image.rows * image.elemSize(), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(deviceMask, mask.data, (unsigned long long) mask.cols * mask.rows * mask.elemSize(), cudaMemcpyHostToDevice));
 
     // Apply median filter
     subImageDims = {image.cols, image.rows};
@@ -256,7 +256,7 @@ void PLImg::cuda::raw::filters::CUDAmedianFilterMasked(cv::Mat& image, cv::Mat& 
                                                              deviceMask, nMaskStep,
                                                              subImageDims);
 
-    CHECK_CUDA(cudaMemcpy(result.data, deviceResult, image.total() * image.elemSize(), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(result.data, deviceResult, (unsigned long long) image.cols * image.rows * image.elemSize(), cudaMemcpyDeviceToHost));
 
     // Free reserved memory
     CHECK_CUDA(cudaFree(deviceImage));
@@ -269,8 +269,8 @@ cv::Mat PLImg::cuda::raw::CUDAhistogram(const cv::Mat &image, float minLabel, fl
     float* deviceImage;
     uint* deviceHistogram;
 
-    CHECK_CUDA(cudaMalloc(&deviceImage, image.total() * sizeof(float)));
-    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, image.total() * sizeof(float), cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMalloc(&deviceImage, (unsigned long long) image.cols * image.rows * sizeof(float)));
+    CHECK_CUDA(cudaMemcpy(deviceImage, image.data, (unsigned long long) image.cols * image.rows * sizeof(float), cudaMemcpyHostToDevice));
 
     CHECK_CUDA(cudaMalloc(&deviceHistogram, numBins * sizeof(uint)));
     CHECK_CUDA(cudaMemset(deviceHistogram, 0, numBins * sizeof(uint)));
