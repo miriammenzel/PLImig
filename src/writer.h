@@ -43,6 +43,8 @@
 #include "reader.h"
 #include "version.h"
 
+constexpr hsize_t hdf5_writer_chunk_dimensions[2] = {1024, 1024};
+
 /**
  * @file
  * @brief PLImg::HDF5Writer class
