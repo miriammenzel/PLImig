@@ -218,43 +218,42 @@ sharedMat PLImg::Inclination::inclination() {
         // Generate inclination for every pixel
         #pragma omp parallel for default(shared) private(tmpVal, blurredMaskVal, transmittanceVal)
         for(unsigned long long idx = 0; idx < ((unsigned long long) m_inclination->rows * m_inclination->cols); ++idx) {
-                // If pixel is in tissue
-                if(maskPtr[idx] > 0) {
-                    blurredMaskVal = blurredMaskptr[idx];
-                    transmittanceVal = fmax(im(), transmittancePtr[idx]);
-                    if(blurredMaskVal > 0.95) {
-                        blurredMaskVal = 1;
-                    } else if(blurredMaskVal < 0.05) {
-                        blurredMaskVal = 0;
-                    }
-                    // If our blurred mask of PLImg has really low values, calculate the inclination only with the gray matter
-                    // as it might result in saturation if both formulas are used
-                    tmpVal = blurredMaskVal *
-                             (
-                                    asin(retardationPtr[idx]) /
-                                    asinWRmax *
-                                    logIcIm /
-                                    fmax(1e-15, logf(ic() / transmittanceVal))
-                             )
-                             + (1.0f - blurredMaskVal) *
-                              asin(retardationPtr[idx]) /
-                              (asinGRMax * (1 - blurredMaskVal) + asinWRmax * blurredMaskVal);
-                    // Prevent negative values for NaN due to sqrt
-                    if(tmpVal < 0.0f) {
-                        tmpVal = 0.0f;
-                    }
-                    tmpVal = sqrtf(tmpVal);
-                    // Prevent values above 1 because of NaN due to acos
-                    if(tmpVal > 1.0f) {
-                        tmpVal = 1.0f;
-                    }
-                    inclinationPtr[idx] = acosf(tmpVal) * 180.0f / M_PI;
-                // Else set inclination value to 90°
-                } else {
-                    inclinationPtr[idx] = 90.0f;
+            // If pixel is in tissue
+            if(maskPtr[idx] > 0) {
+                blurredMaskVal = blurredMaskptr[idx];
+                transmittanceVal = fmax(im(), transmittancePtr[idx]);
+                if(blurredMaskVal > 0.95) {
+                    blurredMaskVal = 1;
+                } else if(blurredMaskVal < 0.05) {
+                    blurredMaskVal = 0;
                 }
+                // If our blurred mask of PLImg has really low values, calculate the inclination only with the gray matter
+                // as it might result in saturation if both formulas are used
+                tmpVal = blurredMaskVal *
+                         (
+                                asin(retardationPtr[idx]) /
+                                asinWRmax *
+                                logIcIm /
+                                fmax(1e-15, logf(ic() / transmittanceVal))
+                         )
+                         + (1.0f - blurredMaskVal) *
+                          asin(retardationPtr[idx]) /
+                          (asinGRMax * (1 - blurredMaskVal) + asinWRmax * blurredMaskVal);
+                // Prevent negative values for NaN due to sqrt
+                if(tmpVal < 0.0f) {
+                    tmpVal = 0.0f;
+                }
+                tmpVal = sqrtf(tmpVal);
+                // Prevent values above 1 because of NaN due to acos
+                if(tmpVal > 1.0f) {
+                    tmpVal = 1.0f;
+                }
+                inclinationPtr[idx] = acosf(tmpVal) * 180.0f / M_PI;
+            // Else set inclination value to 90°
+            } else {
+                inclinationPtr[idx] = 90.0f;
             }
-        
+        }
     }
     return m_inclination;
 }
@@ -270,22 +269,20 @@ sharedMat PLImg::Inclination::saturation() {
         unsigned char* saturationPtr = (unsigned char*) m_saturation->data;
 
         #pragma omp parallel for default(shared) private(inc_val)
-        for(int y = 0; y < m_saturation->rows; ++y) {
-            for(int x = 0; x < m_saturation->cols; ++x) {
-                inc_val = inclinationPtr[(unsigned long long) y * m_inclination->cols + x];
-                if((inc_val <= 0) || (inc_val >= 90)) {
-                    if (inc_val <= 0) {
-                       if (retardationPtr[(unsigned long long)y * m_inclination->cols + x] > rmaxWhite()) {
-                           saturationPtr[(unsigned long long) y * m_inclination->cols + x] = 1;
-                       } else {
-                           saturationPtr[(unsigned long long) y * m_inclination->cols + x] = 3;
-                       }
+        for(unsigned long long idx = 0; idx < ((unsigned long long) m_inclination->rows * m_inclination->cols); ++idx) {
+            inc_val = inclinationPtr[idx];
+            if((inc_val <= 0) || (inc_val >= 90)) {
+                if (inc_val <= 0) {
+                   if (retardationPtr[idx] > rmaxWhite()) {
+                       saturationPtr[idx] = 1;
+                   } else {
+                       saturationPtr[idx] = 3;
+                   }
+                } else {
+                    if (retardationPtr[idx] > rmaxWhite()) {
+                        saturationPtr[idx] = 2;
                     } else {
-                        if (retardationPtr[(unsigned long long) y * m_inclination->cols + x] > rmaxWhite()) {
-                            saturationPtr[(unsigned long long) y * m_inclination->cols + x] = 2;
-                        } else {
-                            saturationPtr[(unsigned long long) y * m_inclination->cols + x] = 4;
-                        }
+                        saturationPtr[idx] = 4;
                     }
                 }
             }

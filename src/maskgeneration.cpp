@@ -343,13 +343,13 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
                 MaskGeneration generation(small_retardation, small_transmittance);
 
                 float t_ret, t_tra;
-                uint ownNumberOfIterations = PROBABILITY_MASK_ITERATIONS / numberOfThreads;
-                uint overhead = PROBABILITY_MASK_ITERATIONS % numberOfThreads;
+                unsigned int ownNumberOfIterations = PROBABILITY_MASK_ITERATIONS / numberOfThreads;
+                int overhead = PROBABILITY_MASK_ITERATIONS % numberOfThreads;
                 if (overhead > 0 && omp_get_thread_num() < overhead) {
                     ++ownNumberOfIterations;
                 }
 
-                for (int i = 0; i < ownNumberOfIterations; ++i) {
+                for (unsigned int i = 0; i < ownNumberOfIterations; ++i) {
                     auto small_modalities = Image::randomizedModalities(m_transmittance, m_retardation, 0.5f);
                     small_transmittance = std::make_shared<cv::Mat>(small_modalities[0]);
                     small_retardation = std::make_shared<cv::Mat>(small_modalities[1]);
@@ -434,24 +434,22 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
 
         // Calculate probability mask
         #pragma omp parallel for private(diffTra, diffRet) default(shared) schedule(static)
-        for(int y = 0; y < m_retardation->rows; ++y) {
-            for (int x = 0; x < m_retardation->cols; ++x) {
-                diffTra = transmittancePtr[(unsigned long long) y * m_probabilityMask->cols + x];
-                if(diffTra < tTra()) {
-                    diffTra = (diffTra - tTra()) / diff_tTra_m;
-                } else {
-                    diffTra = (diffTra - tTra()) / diff_tTra_p;
-                }
-                diffRet = retardationPtr[(unsigned long long) y * m_probabilityMask->cols + x];
-                if(diffRet < tRet()) {
-                    diffRet = (diffRet - tRet()) / diff_tRet_m;
-                } else {
-                    diffRet = (diffRet - tRet()) / diff_tRet_p;
-                }
-                probabilityMaskPtr[(unsigned long long) y * m_probabilityMask->cols + x] = 
-                    (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
-                    sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
+        for(unsigned long long idx = 0; idx < ((unsigned long long) m_probabilityMask->rows * m_probabilityMask->cols); ++idx) {
+            diffTra = transmittancePtr[idx];
+            if(diffTra < tTra()) {
+                diffTra = (diffTra - tTra()) / diff_tTra_m;
+            } else {
+                diffTra = (diffTra - tTra()) / diff_tTra_p;
             }
+            diffRet = retardationPtr[idx];
+            if(diffRet < tRet()) {
+                diffRet = (diffRet - tRet()) / diff_tRet_m;
+            } else {
+                diffRet = (diffRet - tRet()) / diff_tRet_p;
+            }
+            probabilityMaskPtr[idx] =
+                (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
+                sqrtf(diffTra * diffTra + diffRet * diffRet) * 2) + 1) / 2.0f;
         }
     }
     return m_probabilityMask;

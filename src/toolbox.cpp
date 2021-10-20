@@ -155,14 +155,12 @@ std::array<cv::Mat, 2> PLImg::Image::randomizedModalities(std::shared_ptr<cv::Ma
 
     // Fill transmittance and retardation with random pixels from our base images
     #pragma omp parallel for private(selected_element) shared(distribution, random_engines, small_retardation, small_transmittance)
-    for(int y = 0; y < small_retardation.rows; ++y) {
-        for (int x = 0; x < small_retardation.cols; ++x) {
-            selected_element = distribution(random_engines.at(omp_get_thread_num()));
-            int selected_x = selected_element % retardation->cols;
-            int selected_y = selected_element / retardation->cols;
-            smallRetardationPtr[(unsigned long long) y * small_retardation.cols + x] = retardationPtr[(unsigned long long) selected_y * retardation->cols + selected_x];
-            smallTransmittancePtr[(unsigned long long) y * small_transmittance.cols + x] = transmittancePtr[(unsigned long long) selected_y * transmittance->cols + selected_x];
-        }
+    for(unsigned long long idx = 0; idx < ((unsigned long long) small_retardation.rows * small_retardation.cols); ++idx) {
+        selected_element = distribution(random_engines.at(omp_get_thread_num()));
+        int selected_x = selected_element % retardation->cols;
+        int selected_y = selected_element / retardation->cols;
+        smallRetardationPtr[idx] = retardationPtr[(unsigned long long) selected_y * retardation->cols + selected_x];
+        smallTransmittancePtr[idx] = transmittancePtr[(unsigned long long) selected_y * transmittance->cols + selected_x];
     }
 
     return std::array<cv::Mat, 2> {small_transmittance, small_retardation};
