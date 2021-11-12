@@ -66,7 +66,7 @@ cd -
 
 ### Clone the project
 ```bash
-git clone git@jugit.fz-juelich.de:j.reuter/PLImig.git 
+git clone git@github.com:3d-pli/PLImig.git
 cd PLImig
 ```
 
@@ -168,7 +168,7 @@ Please keep in mind that only **NTransmittance** files can be processed as non-n
 erroneous parameters and therefore also wrong inclination angles.
 
 Applying a median filter before calling the tool is optional as **PLImig** does include a basic median filter functionality using CUDA.
-The filter kernel size can only be changed by setting `MEDIAN_KERNEL_SIZE` during compilation. The default parameter is `10`.
+The filter kernel size can only be changed by setting `MEDIAN_KERNEL_SIZE` before compilation. The default parameter is `5`. This value was chosen because it reduces artifacts of lower median kernels while keeping the basic structure of the tissue. Higher median kernels will result in stronger clouding artifacts in the inclination.
 
 ## Generation of masks
 
@@ -182,9 +182,8 @@ and retardation. For reference both histograms are shown below:
 
 While the structure of those histograms is similar for complete measurements, this tool will fail if only a part
 of a measurement is used as the input for **PLImig**. 
-If a non median filtered NTransmittance is used as input, **PLImig** will generate the median10NTransmittance
-automatically and save it as **[...]_Mask_[...].h5**. The dataset will match the original dataset of the input
-files or is set by the `--dataset` parameter when starting the program.
+If a non median filtered NTransmittance is used as input, **PLImig** will generate the median5NTransmittance
+automatically and save it as **[...]\_median5NTransmittance\_[...].h5**. The dataset will match the original dataset of the input files or is set by the `--dataset` parameter when starting the program.
 
 After reading all files the parameters will be generated independently. Only `I_lower` will depend on `I_rmax`.
 
@@ -212,7 +211,7 @@ $`\kappa = \frac{y^{''}}{(1+(y^{'})^2)^{3/2}}`$
 
 To get both maxima and minima the first derivative is needed
 
-$`\kappa^' = \frac{y^{'''}(1+(y^{'})^2) - 3y^{'}(y^{''}^2}{(1+(y^{'})^2)^{5/2}}`$
+$`\kappa^{'} = \frac{y^{'''}(1+(y^{'})^2) - 3y^{'}((y^{''})^2}{(1+(y^{'})^{2})^{5/2}}`$
 
 At each point where $`\kappa^{'}`$ reaches a value of 0 either a maxima or minima is located.
 
@@ -222,8 +221,8 @@ $`f^{'}(x) = \frac{f(x+1) - f(x)}{h}`$
 
 $`f^{''}(x) = \frac{f(x+1) - 2f(x) + f(x-1)}{h^2}`$
 
-As we're not able to calculate the maxima of $`\kappa`$ directly we just choose the 
-highest value of $`\kappa`$ for our point of maximum curvature.
+As we're not able to calculate the maxima of $`\kappa`$ directly we can choose the 
+highest value of $`\kappa`$ for our point of maximum curvature. However, this might result in issues when there are slight varaitions in the histogram curve caused by higher bin sizes. To circumvent this issue, we can instead look at the number of peaks in our curvature plot and choose the first peak.
 
 `I_upper` or *maximum transmittance value* separates the background of the transmittance from the tissue. 
 The background is discernible by a clearly visible peak in the latter half of the histogram. The peak itself and all pixels with a value above the 
@@ -240,20 +239,13 @@ An example for the resulting mask can be seen below.
 ### r_tres
 
 After most of the necessary parameters are generated on the transmittance, one parameter in the retardation is needed to 
-generate the desired white and gray fiber masks. The general procedure follows the algorithm used for `I_upper`. However, to ensure that
-the result is not influenced by small interferences or more than one peak, we change the algorithm a bit.
-
-We start using a histogram of only 16 bins to get a first estimation of `r_tres`. In each following iteration we increase the number of
-bins by a factor of 2 up to 256 bins. In each iteration we take the last estimation and choose a interval around the last estimation
-for our current one. This ensures that we do not end in a small dip which becomes visible with higher bin counts.
-
-In addition if there's more than one peak in our interval, we start at the last peak. This is chosen because there might be a 
-background peak resulting in erroneous parameters.
+generate the desired white and gray fiber masks. The general procedure follows the algorithm used for `I_upper`. 
 
 The resulting mask can be seen below. This mask generally gets most of the white substance but might still miss a few
 areas. Those will be filled in combination with `I_lower`.
 
 ![](./img/tRetExample.png)
+
 
 ### I_lower
 
@@ -261,6 +253,17 @@ While `I_rmax` is a good estimation in the transmittance some fine fibers might 
 transmittance value. Therefore we use the curvature formula again to estimate a point which contains more finer fibers without
 including too much to the gray matter. Our range will be limited by the next peak starting from `I_rmax`.
 If not enough values are present to calculate $`\kappa`$ then `I_rmax` will be used as our value.
+
+### Additional considerations for the algorithm
+To ensure that our resulting thresholding parameters are not influenced by small interferences or more than one peak, we change the algorithm a bit.
+
+We start using a histogram of only 64 bins to get a first estimation our thresholding parameters. In each following iteration we increase the number of
+bins by a factor of 2 up to 256 bins. In each iteration we take the last estimation and choose a interval around the last estimation for our current one. This ensures that we do not end in a small dip which becomes visible with higher bin counts.
+
+In addition if there's more than one peak in our interval, we start at the last peak. This is chosen because there might be a  background peak resulting in erroneous parameters.
+
+To ensure that our parameters aren't influenced by the background, we implement a last quality improvement. We will calculate `I_upper` as our first parameter. As `I_upper` is our only parameter which separates the tissue from our background, we can use this value to mask the tissue and evaluate all other parameters only with the tissue. This helps with an invalid calculation of `r_thres` for example just because too many background pixels resulted in an invalud background peak. 
+
 
 ### White mask
 After generating all of our parameters we can finally build our masks which separate the white and gray matter.
@@ -278,7 +281,7 @@ While the parameters generated above are finite and will not change in subsequen
 might change the result significantly. In addition, just using the white mask for our inclination calculation will result 
 in sharp edges which do not represent the reality. Therefore the blurred mask is calculated.
 
-Currently 100 iterations on 1/10th of the image size is used as our kernel. 
+Currently 100 iterations on 25\% of the image size is used as our kernel. 
 In each iteration `I_rmax` and `I_upper` are fix values. A retardation and transmittance image will be generated by choosing random
 pixels from our initial retardation and median filtered transmittance. Pixels can be chosen multiple times. 
 

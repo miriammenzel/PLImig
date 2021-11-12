@@ -43,7 +43,7 @@
 #include "reader.h"
 #include "version.h"
 
-constexpr hsize_t hdf5_writer_chunk_dimensions[2] = {1024, 1024};
+constexpr hsize_t hdf5_writer_chunk_dimensions[2] = {2048, 2048};
 
 /**
  * @file
