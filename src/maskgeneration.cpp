@@ -190,7 +190,7 @@ float PLImg::MaskGeneration::tRet() {
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
         cv::Mat backgroundMask =  *m_retardation > 0 & *m_transmittance > 0 & *m_transmittance < tMax();
-        cv::Mat mask = cuda::labeling::largestAreaConnectedComponents(*m_retardation, cv::Mat());
+        cv::Mat mask = cuda::labeling::largestAreaConnectedComponents(*m_retardation, backgroundMask);
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
     }
