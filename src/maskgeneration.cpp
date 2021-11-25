@@ -189,7 +189,7 @@ float PLImg::MaskGeneration::tRet() {
 
 float PLImg::MaskGeneration::tMin() {
     if(!m_tMin) {
-        cv::Mat backgroundMask =  *m_retardation > 0 & *m_transmittance > 0 & *m_transmittance < tMax();
+        cv::Mat backgroundMask = *m_retardation > 0 & *m_transmittance > 0 & *m_transmittance < tMax();
         cv::Mat mask = cuda::labeling::largestAreaConnectedComponents(*m_retardation, backgroundMask);
         cv::Scalar mean = cv::mean(*m_transmittance, mask);
         m_tMin = std::make_unique<float>(mean[0]);
@@ -204,8 +204,8 @@ float PLImg::MaskGeneration::tMax() {
 
         // Determine start and end on full histogram
         int startPosition, endPosition;
-        endPosition = std::max_element(fullHist.begin<float>() + MAX_NUMBER_OF_BINS / 2, fullHist.end<float>()) - fullHist.begin<float>();
-
+        startPosition = MAX_NUMBER_OF_BINS / 3;
+        endPosition = std::max_element(fullHist.begin<float>() + startPosition, fullHist.end<float>()) - fullHist.begin<float>();
         float histMaximum = endPosition * (m_maxTransmittance - m_minTransmittance) / MAX_NUMBER_OF_BINS + m_minTransmittance;
         fullHist = PLImg::cuda::histogram(*m_transmittance, m_minTransmittance,
                                           histMaximum,
