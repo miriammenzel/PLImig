@@ -1,10 +1,9 @@
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-    set(default_build_type "Debug")
 
     # Update submodules as needed
-    option(PLIMG_SUBMODULE "Check submodules during build" ON)
-    if(PLIMG_SUBMODULE)
+    option(UPDATE_SUBMODULES "Check submodules during build" ON)
+    if(UPDATE_SUBMODULES)
         message(STATUS "Submodule update")
         execute_process(
                 COMMAND ${GIT_EXECUTABLE} submodule update --init
