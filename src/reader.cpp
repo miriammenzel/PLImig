@@ -141,14 +141,32 @@ std::vector<std::string> PLImg::Reader::datasets(hid_t group_id) {
         id_type = H5Gget_objtype_by_idx(group_id, i);
 
         if(id_type == H5G_DATASET) {
-            names.push_back(memb_name);
+            // Get the dimensions of our image dataset
+            std::string dataset_string = ""; //[";
+
+            /* dataset = H5Dopen(group_id, memb_name, H5P_DEFAULT);
+            hid_t dataspace = H5Dget_space(dataset);
+            hsize_t ndims = H5Sget_simple_extent_ndims(dataspace);
+            hsize_t* dims = new hsize_t[ndims];
+            H5Sget_simple_extent_dims(dataspace, dims, nullptr);
+            for(unsigned dim = 0; dim < ndims; ++dim) {
+                dataset_string += std::to_string(dims[dim]);
+                if(dim + 1 < ndims) dataset_string += ", ";
+            }
+            dataset_string += "]";
+            H5Sclose(dataspace);
+            H5Dclose(dataset);
+            delete [] dims;*/
+
+            dataset_string = std::string(memb_name); //+ " " + dataset_string;
+            names.push_back(dataset_string);
         } else if(id_type == H5G_GROUP) {
-            hid_t group = H5Gopen1(group_id, memb_name);
+            hid_t group = H5Gopen(group_id, memb_name, H5P_DEFAULT);
             auto recursive_names = datasets(group);
             for(auto& name: recursive_names) {
                 name = std::string(memb_name) + "/" + name;
             }
-            names.insert(recursive_names.begin(), recursive_names.end(), names.end());
+            names.insert(names.end(), recursive_names.begin(), recursive_names.end());
             H5Gclose(group);
         }
     }
