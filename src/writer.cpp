@@ -132,9 +132,14 @@ void PLImg::HDF5Writer::write_dataset(const std::string& dataset, const cv::Mat&
         dims[0] = static_cast<hsize_t>(image.rows);
         dims[1] = static_cast<hsize_t>(image.cols);
         dataSpace = H5::DataSpace(2, dims);
-        H5::DSetCreatPropList ds_creatplist;  // create dataset creation prop list
-        ds_creatplist.setChunk( 2, hdf5_writer_chunk_dimensions );  // then modify it for compression
-        dset = m_hdf5file.createDataSet(dataset, dtype, dataSpace, ds_creatplist);
+
+        if(image.cols > hdf5_writer_chunk_dimensions[1] && image.rows > hdf5_writer_chunk_dimensions[0]) {
+            H5::DSetCreatPropList ds_creatplist;  // create dataset creation prop list
+            ds_creatplist.setChunk( 2, hdf5_writer_chunk_dimensions );  // then modify it for compression
+            dset = m_hdf5file.createDataSet(dataset, dtype, dataSpace, ds_creatplist);
+        } else {
+            dset = m_hdf5file.createDataSet(dataset, dtype, dataSpace);
+        }
         dset.write(image.data, dtype);
 
         if(create_softlink) {
