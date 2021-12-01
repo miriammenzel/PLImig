@@ -74,15 +74,13 @@ float PLImg::Inclination::ic() {
     if(!m_ic) {
         // ic will be calculated by taking the gray portion of the
         // transmittance and calculating the maximum value in the histogram
-        cv::Mat selection = (*m_mask == GRAY_VALUE) & *m_blurredMask < 0.05;
-
         int channels[] = {0};
         float histBounds[] = {0.0f, 1.0f};
         const float* histRange = { histBounds };
         int histSize = 1000;
 
         cv::Mat hist(histSize, 1, CV_32FC1);
-        cv::calcHist(&(*m_transmittance), 1, channels, selection, hist, 1, &histSize, &histRange, true, false);
+        cv::calcHist(&(*m_transmittance), 1, channels, (*m_mask == GRAY_VALUE) & *m_blurredMask < 0.05, hist, 1, &histSize, &histRange, true, false);
 
         int max_pos = std::max_element(hist.begin<float>(), hist.end<float>()) - hist.begin<float>();
         m_ic = std::make_unique<float>(float(max_pos) / float(histSize));
@@ -94,10 +92,10 @@ float PLImg::Inclination::im() {
     if(!m_im) {
         // im is the mean value in the transmittance based on the highest retardation values
         auto regionGrowingMask = this->regionGrowingMask();
-        if(PLImg::Image::maskCountNonZero(*m_regionGrowingMask & (*m_blurredMask > 0.90)) == 0) {
-            m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask)[0]);
+        if(PLImg::Image::maskCountNonZero(*regionGrowingMask & (*m_blurredMask > 0.90)) == 0) {
+            m_im = std::make_unique<float>(cv::mean(*m_transmittance, *regionGrowingMask)[0]);
         } else {
-            m_im = std::make_unique<float>(cv::mean(*m_transmittance, *m_regionGrowingMask & (*m_blurredMask > 0.90))[0]);
+            m_im = std::make_unique<float>(cv::mean(*m_transmittance, *regionGrowingMask & (*m_blurredMask > 0.90))[0]);
         }
     }
     return *m_im;
