@@ -26,6 +26,7 @@
 #define PLIMG_READER_H
 
 #include <filesystem>
+#include <vector>
 #include <hdf5.h>
 #include <nifti/nifti1_io.h>
 #include <opencv2/core.hpp>
@@ -52,6 +53,12 @@ namespace PLImg {
          * @return OpenCV Matrix containing the image.
          */
         static cv::Mat imread(const std::string& filename, const std::string& dataset="/Image");
+        /**
+         * Returns a list of all readable datasets within the given HDF5 file
+         * @param filename Path to the file which shall be opened.
+         * @return Vector of readable datasets
+         */
+        static std::vector<std::string> datasets(const std::string& filename);
     private:
         /**
          * Opens and reads an image with file ending .h5
@@ -72,6 +79,8 @@ namespace PLImg {
          * @return OpenCV Matrix containing the image.
          */
         static cv::Mat readNIFTI(const std::string& filename);
+
+        static std::vector<std::string> datasets(hid_t group_id);
     };
 
 }

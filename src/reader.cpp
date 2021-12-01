@@ -103,6 +103,7 @@ cv::Mat PLImg::Reader::readNIFTI(const std::string &filename) {
             break;
         case 2:
             cv_type = CV_8SC1;
+        break;
         default:
             throw std::runtime_error("Did expect 32-bit floating point or 8/16/32-bit integer image!");
     }
@@ -114,4 +115,43 @@ cv::Mat PLImg::Reader::readNIFTI(const std::string &filename) {
 
 cv::Mat PLImg::Reader::readTiff(const std::string &filename) {
     return cv::imread(filename, cv::IMREAD_ANYDEPTH);
+}
+
+std::vector<std::string> PLImg::Reader::datasets(const std::string &filename) {
+    std::vector<std::string> names;
+    hid_t file = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    names = datasets(file);
+    H5Fclose(file);
+    return names;
+}
+
+std::vector<std::string> PLImg::Reader::datasets(hid_t group_id) {
+    std::vector<std::string> names;
+
+    char memb_name[1024];
+    int id_type;
+    herr_t error;
+
+    hsize_t number_of_objects;
+    error = H5Gget_num_objs(group_id, &number_of_objects);
+    if(error) return names;
+
+    for(unsigned i = 0; i < number_of_objects; ++i) {
+        H5Gget_objname_by_idx(group_id, i, memb_name, 1024);
+        id_type = H5Gget_objtype_by_idx(group_id, i);
+
+        if(id_type == H5G_DATASET) {
+            names.push_back(memb_name);
+        } else if(id_type == H5G_GROUP) {
+            hid_t group = H5Gopen1(group_id, memb_name);
+            auto recursive_names = datasets(group);
+            for(auto& name: recursive_names) {
+                name = std::string(memb_name) + "/" + name;
+            }
+            names.insert(recursive_names.begin(), recursive_names.end(), names.end());
+            H5Gclose(group);
+        }
+    }
+
+    return names;
 }
