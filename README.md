@@ -14,10 +14,10 @@
 - [Performance measurements](#performance-measurements)
 
 # Introduction
-To better understand the brain’s function and treat neurological diseases, a detailed reconstruction of the intricate and denselygrown nerve fibre network is needed. The method 3D polarised light imaging (3D-PLI) has been developed a decade agoto analyse the three-dimensional course of nerve fibre pathways in brain tissue with micrometer resolution ([Axer et al. 2011](https://doi.org/10.1016/j.neuroimage.2010.08.075)). While the in-plane fibre directions can be determined with high accuracy, the computation of the out-of-plane fibre inclinations is more challenging because they are derived from the amplitude of thebirefringence signals (retardation), which depends e. g. on the amount of nerve fibres. 
-Here, we introduce an automated, optimised computation of the fibreinclinations, allowing for a much faster, reproducible determination of fibre orientations in 3D-PLI. Depending on the degree ofmyelination, the algorithm uses different models (transmittance-weighted, unweighted, or a linear combination), allowing togo beyond traditional definitions of white and grey matter and account for regionally specific behaviour. As the algorithm is parallelised and GPU optimised, and uses images from standard 3D-PLI (retardation and transmittance), it can be applied to large data sets, also from previous measurements.
+To better understand the brain's function and treat neurological diseases, a detailed reconstruction of the intricate and densely grown nerve fiber network is needed. The method 3D polarized light imaging (3D-PLI) has been developed a decade ago to analyze the three-dimensional course of nerve fibre pathways in brain tissue with micrometer resolution ([Axer et al. 2011](https://doi.org/10.1016/j.neuroimage.2010.08.075)). While the in-plane fiber directions can be determined with high accuracy, the computation of the out-of-plane fiber inclinations is more challenging because they are derived from the amplitude of the birefringence signals (retardation), which depends e.g. on the amount of nerve fibers. 
+Here, we introduce an automated, optimized computation of the fiber inclinations, allowing for a much faster, reproducible determination of fiber orientations in 3D-PLI. Depending on the degree of myelination, the algorithm uses different models (transmittance-weighted, unweighted, or a linear combination), allowing to account for regionally specific behavior. As the algorithm is parallelized and GPU optimized, and uses images from standard 3D-PLI (retardation and transmittance), it can be applied to large data sets, also from previous measurements.
 
-The software uses the (normalised) transmittance and retardation images from 3D-PLI measurements as input and computes the corresponding HM-probability and inclination images. Common image formats (TIFF, NIfTI, HDF5) are supported. The computation runs completely automatically and requires no additional parameters. For testing purposes and to study different scenarios (e.g. unweighted vs. transmittance-weighted model), the user can define specific parameters for different steps in the computation.
+The software uses the (normalized) transmittance and retardation images from 3D-PLI measurements as input and computes the corresponding HM-probability and inclination images. Common image formats (TIFF, NIfTI, HDF5) are supported. The computation runs completely automatically and requires no additional parameters. For testing purposes and to study different scenarios (e.g. unweighted vs. transmittance-weighted model), the user can define specific parameters for different steps in the computation.
 
 The software uses CUDA for the GPU implementation, OpenCV as image container, and OpenMP (supporting multi-platform shared-memory multiprocessing programming). 
 
@@ -26,10 +26,10 @@ Further information about the program and the corresponding study can be found [
 
 # Functionality of the toolbox
 
-PLImig is designed as a standalone tool but can also be used in other projects for preparation or processing steps. 
-The three command line tool allow basic processing functionalities and can be used freely to process standard 3D-PLI measurements.
+PLImig is designed as a standalone tool, but can also be used in other projects for preparation or processing steps. 
+The three command line tool allows basic processing functionalities and can be used freely to process standard 3D-PLI measurements.
 Please keep in mind that only **NTransmittance** files can be processed as non-normalized transmittance files could result in erroneous parameters and therefore also wrong inclination angles.
-Normalized transmittance images are defined as the transmittance image divided by the transmittance of an empty measurement done just before the actual measurement of the tissue. 
+Normalized transmittance images are defined as the transmittance image divided by the transmittance of a measurement without sample. 
 
 Applying a median filter before calling the tool is optional as **PLImig** does include a basic median filter functionality using CUDA.
 The filter kernel size can only be changed by setting `MEDIAN_KERNEL_SIZE` before compilation. The default parameter is `5`. This value was chosen because it reduces artifacts of lower median kernels while keeping the basic structure of the tissue. Higher median kernels will result in stronger clouding artifacts in the inclination.
@@ -37,114 +37,98 @@ The filter kernel size can only be changed by setting `MEDIAN_KERNEL_SIZE` befor
 ## Generation of masks
 
 Both the mask and inclination require specific parameters which are determined by the histograms in both the median filtered transmittance
-and retardation. For reference both histograms are shown below:
+and retardation. For reference, both histograms are shown below:
 
 **Retardation:**
 ![](./img/hist_retardation_256bins.png)
 **Median10Transmittance:**
 ![](./img/hist_transmittance_256bins.png)
 
-The structure of those histograms is somewhat similar for measurements. Both the retardation and transmittance show a distinct peak either at the front or back of the histogram, depending on the modality. We use those peaks to define the background and separate regions with low and high myelination.
+The histograms show similar features for most measurements. The retardation and transmittance show a distinct peak at the front and the back of the histogram, respectively. We use those peaks to define the background and separate regions with low and high myelination.
 The separation of low and high myelination is then expanded by further parameters to include crossing and highly inclined regions of the tissue.
 
 If a non median filtered NTransmittance is used as input, **PLImig** will generate the median5NTransmittance automatically and save it as **[...]\_median5NTransmittance\_[...].h5**. The dataset will match the original dataset of the input files or is set by the `--dataset` parameter when starting the program.
 
 ### I_rmax
-`I_rmax` or *minimal transmittance value* is considered as the average value of the transmittance within a connected region in the retardation with the highest values.
-As the highest retardation values represent mostly white matter fibers, this can be used to get a first estimation of the white matter values in the transmittance.
+`I_rmax` or *minimal transmittance value* is considered as the average value of the transmittance within a connected region with the highest retardation values.
+As the highest retardation values represent mostly flat white matter fibers, this can be used to get a first estimation of the white matter values in the transmittance.
 
-To get the average transmittance value masks based on a difference value are generated. There, the connected components algorithm
+To get the average transmittance value, masks based on a difference value are generated. There, the connected components algorithm
 is executed.
 
 ![](./img/tMinExample.png)
 
-If the number of pixels in the connected region is large enough (0.01% of the number of pixels in the image)
-the resulting mask will be used to calculate the mean transmittance value. Otherwise the difference will be reduced by one bin size 1/256 = 0.00390625
+If the number of pixels in the connected region is large enough (0.01% of the number of pixels in the image), the resulting mask will be used to calculate the mean transmittance value. Otherwise, the difference will be reduced by one bin size 1/256 = 0.00390625.
 
 ### I_upper
 
-All other parameters rely on the same procedure to calculate the value. As seen in the histograms above,
-both the transmittance and retardation show a somewhat smooth curve. Our interest is the point of maximum curvature
-which separates the wanted regions from each other.
+All other parameters rely on the same procedure to calculate the value. As seen in the histograms above, both the transmittance and retardation show a somewhat smooth curve. Our interest is the point of maximum curvature which separates the desired regions from each other.
 
 The curvature formula can be found [here](https://tutorial.math.lamar.edu/classes/calciii/curvature.aspx) for example and is adapted to be used on non-continous data.
 
-As we're not able to calculate the maxima of the curvatures directly we can choose the 
-highest value of the curvatures for our point of maximum curvature. However, this might result in issues when there are slight varaitions in the histogram curve caused by higher bin sizes. To circumvent this issue, we can instead look at the number of peaks in our curvature plot and choose the first peak.
+As we are not able to calculate the maxima of the curvatures directly, we can choose the highest value of the curvatures for our point of maximum curvature. However, this might result in issues when there are slight variations in the histogram curve caused by higher bin sizes. To circumvent this issue, we can instead look at the number of peaks in our curvature plot and choose the first peak.
 
 `I_upper` or *maximum transmittance value* separates the background of the transmittance from the tissue. 
 The background is discernible by a clearly visible peak in the latter half of the histogram. The peak itself and all pixels with a value above the 
-point of maximum curvature represent the background and will not be visible in the white / gray mask.
+point of maximum curvature represent the background and will not be visible in the mask for low/high myelinated regions.
 
-To find the maximum curvature a search interval between the second half of the histogram and absolute maximum value is selected.
-In between this interval the next local minima in the left direction from the absolute maximum is selected as the left bound for the
-maximum curvature. 
+To find the maximum curvature, a search interval between the second half of the histogram and absolute maximum value is selected.
+In between this interval, the next local minima in the left direction from the absolute maximum is selected as the left bound for the maximum curvature. 
 
-An example for the resulting mask can be seen below.
+An example for the resulting mask is shown below.
 
 ![](./img/tMaxExample.png)
 
 ### r_tres
 
-After most of the necessary parameters are generated on the transmittance, one parameter in the retardation is needed to 
-generate the desired white and gray fiber masks. The general procedure follows the algorithm used for `I_upper`. 
+After most of the necessary parameters are generated on the transmittance, one parameter in the retardation is needed to generate the desired masks for low/high myelinated regions. The general procedure follows the algorithm used for `I_upper`. 
 
-The resulting mask can be seen below. This mask generally gets most of the white substance but might still miss a few
-areas. Those will be filled in combination with `I_lower`.
+The resulting mask can be seen below. This mask generally gets most of the regions with high myelination, but might still miss a few areas. Those will be filled in combination with `I_lower`.
 
 ![](./img/tRetExample.png)
 
 
 ### I_lower
 
-While `I_rmax` is a good estimation in the transmittance some fine fibers might not be caught by simply using the mean
-transmittance value. Therefore we use the curvature formula again to estimate a point which contains more finer fibers without
-including too much to the gray matter. Our range will be limited by the next peak starting from `I_rmax`.
-If not enough values are present to calculate the curvatures, then `I_rmax` will be used as our value.
+While `I_rmax` is a good estimation in the transmittance, some fine fibers might not be caught by simply using the mean transmittance value. Therefore, we use the curvature formula again to estimate a point which contains more finer fibers without including too much of the gray matter. Our range will be limited by the next peak starting from `I_rmax`.
+If not enough values are present to calculate the curvatures, `I_rmax` will be used as our value.
 
 ### Additional considerations for the algorithm
 To ensure that our resulting thresholding parameters are not influenced by small interferences or more than one peak, we change the algorithm a bit.
 
-We start using a histogram of only 64 bins to get a first estimation our thresholding parameters. In each following iteration we increase the number of
-bins by a factor of 2 up to 256 bins. In each iteration we take the last estimation and choose a interval around the last estimation for our current one. This ensures that we do not end in a small dip which becomes visible with higher bin counts.
+We start using a histogram of only 64 bins to get a first estimation of our thresholding parameters. In each following iteration, we increase the number of
+bins by a factor of 2 up to 256 bins. In each iteration, we take the last estimation and choose a interval around the last estimation for our current one. This ensures that we do not end in a small dip which becomes visible with higher bin counts.
 
-In addition if there's more than one peak in our interval, we start at the last peak. This is chosen because there might be a  background peak resulting in erroneous parameters.
+In addition, if there is more than one peak in our interval, we start at the last peak. This is chosen because there might be a background peak resulting in erroneous parameters.
 
-To ensure that our parameters aren't influenced by the background, we implement a last quality improvement. We will calculate `I_upper` as our first parameter. As `I_upper` is our only parameter which separates the tissue from our background, we can use this value to mask the tissue and evaluate all other parameters only with the tissue. This helps with an invalid calculation of `r_thres` for example just because too many background pixels resulted in an invalud background peak. 
+To ensure that our parameters are not influenced by the background, we implement a last quality improvement. We calculate `I_upper` as our first parameter. As `I_upper` is our only parameter which separates the tissue from our background, we can use this value to mask the tissue and evaluate all other parameters only with the tissue. This helps with an invalid calculation of `r_thres` for example, just because too many background pixels resulted in an invalid background peak. 
 
 
-### White mask
-After generating all of our parameters we can finally build our masks which separate the white and gray matter.
+### White mask (regions with high myelination)
+After generating all of our parameters, we can finally build our masks which separate low/high myelinated regions.
 The formula for both masks as well as an example are shown below:
 
 Mask[White] = ((I_T < I_lower) and (I_T > 0)) or (r > r_thres)
 ![](./img/WhiteMaskExample.png)
 
-### Gray mask
+### Gray mask (regions with low myelination)
 Mask[Gray] = (I_T >= I_lower) and (I_T <= I_upper) or (r < r_tres)
 ![](./img/GrayMaskExample.png)
 
 ### Probability mask
-While the parameters generated above are finite and will not change in subsequent executions slight errors due to the camera
-might change the result significantly. In addition, just using the white mask for our inclination calculation will result 
-in sharp edges which do not represent the reality. Therefore the blurred mask is calculated.
+While the parameters generated above are finite and will not change in subsequent executions, statistic errors like camera noise changes the results significantly. In addition, just using the white mask for our inclination calculation will result in sharp edges which do not represent the reality. Therefore the probability mask is calculated.
 
-Currently 100 iterations on 25\% of the image size is used as our kernel. 
-In each iteration `I_rmax` and `I_upper` are fix values. A retardation and transmittance image will be generated by choosing random
-pixels from our initial retardation and median filtered transmittance. Pixels can be chosen multiple times. 
+Currently, 100 iterations on 25\% of the image size is used as our kernel. 
+In each iteration, `I_rmax` and `I_upper` are fix values. A retardation and transmittance image will be generated by choosing random pixels from our initial retardation and median filtered transmittance. Pixels can be chosen multiple times. 
 
-After the generation of a random image we calculate `r_thres` and `I_lower` with our normal procedures and save values which differ
-from our initial values.
+After the generation of a random image, we calculate `r_thres` and `I_lower` with our normal procedures and save values which differ from our initial values.
 
-After our number of iterations we calculate each pixel of our blurred mask with the formula found in the paper. An example of a resulting probability mask is shown below. All values are in range of $`[0, 1]`$.
+After our number of iterations, we calculate each pixel of our probability mask with the formula given in the paper. An example of such a probability mask is shown below. All values are in the range of $`[0, 1]`$.
 
 ![](./img/BlurredMaskExample.png)
 
 ### No nerve fiber mask
-The gray matter doesn't have as many fibers as the white matter. When calculating the inclination some parts might be
-wrong because no fibers are present. This mask gives an esimation which parts of the gray matter might not have any fibers.
-To archive this the mean and standard deviation of the background are used. Regions in the gray matter with a value below
-mean + 2*stddev are considered as a region without any fibers.
+The gray matter does not have as many fibers as the white matter. When calculating the inclination, some parts might be wrong because no fibers are present. This mask gives an esimation which parts of the gray matter might not have any fibers. To archive this, the mean and standard deviation of the background are used. Regions in the gray matter with a value below mean + 2*stddev are considered as a region without any fibers.
 
 ![](./img/NoNerveFiberExample.png)
 
@@ -154,8 +138,7 @@ mean + 2*stddev are considered as a region without any fibers.
 The `im` value matches the calculation of `I_rmax` in our mask generation.
 
 ### ic
-`ic` is considered as the mode of the transmittance in the gray substance. The gray substance is defined by
-our blurred mask with values below 0.01. 
+`ic` is considered as the mode of the transmittance in the gray substance. The gray substance is defined by our probability mask with values below 0.01. 
 
 ### rmaxGray
 The `rmaxGray` calculation matches the calculation of `r_tres` in our mask generation.
@@ -163,19 +146,18 @@ This value will be used as our maximum value which is present in the gray substa
 
 ### rmaxWhite
 `rmaxWhite` will be calculated using the region growing algorithm described above. However, instead of using the resulting mask
-to calculate the mean transmittance value like in `I_lower` here the mean retardation value of the mask
-is calculated.
+to calculate the mean transmittance value like in `I_lower`, the mean retardation value of the mask is calculated.
 
 ### Inclination
 
-The inclination formula will convert the transmittance and retardation values to an angle between $`0^\circ`$ and $`90^\circ`$ depending on our chosen parameters. The white and gray substance will use different formulas. Regions which have values between zero and one in the blurred mask will use a linear interplation of both formulas.
+The inclination formula will convert the transmittance and retardation values to an angle between $`0^\circ`$ and $`90^\circ`$ depending on our chosen parameters. Different formulas will be used for white and gray matter regions. The inclination angles in regions that have values between zero and one in the probability mask will be computed using a linear interplation of both formulas.
 
 The formula for the inclination can be found in the paper.
 
 ![](./img/InclinationExample.png)
 
 ### Saturation map
-The saturation map is an optional parameter map which will be written after the inclination generation. Here, all pixels with a value of 0° or below and 90° or above are marked by a value between 0 and 4.
+The saturation map is an optional parameter map which is generated after the inclination. Here, all pixels with a value of 0° or below and 90° or above are marked by a value between 0 and 4.
 
 The numbers can be interpreted like this:
 
@@ -214,8 +196,7 @@ For testing purposes:
 Install all needed dependencies using your package manager or by compiling them from source.
 
 ## Setting up the program for execution
-The following install instructions are exemplary for Ubuntu 20.04. Please replace `focal` with the code name or your 
-Ubuntu distribution. The install instructions may vary based on your system.
+The following install instructions are exemplary for Ubuntu 20.04. Please replace `focal` with the code name or your Ubuntu distribution. The install instructions may vary based on your system.
 
 ### Install dependencies
 ```bash
@@ -229,7 +210,7 @@ apt-get install -y libopencv-dev libhdf5-dev libnifti-dev
 ```
 
 ## Setting up the program for development
-In addition to the install instructions for the exeuction of PLImig some other packages are needed for tests and documentation.
+In addition to the install instructions for the exeuction of PLImig, some other packages are needed for tests and documentation.
 
 Example using Ubuntu or Debian:
 ```bash
@@ -256,10 +237,10 @@ cmake ..
 make && make test
 ```
 
-If everything ran successful the generated programs are located at `PLImig/build/bin/` and can be started from there.
+If everything ran successfully, the generated programs are located at `PLImig/build/bin/` and can be started from there.
 
 ## Changing options
-By default the following options are set:
+By default, the following options are set:
 ```
 BUILD_TESTING = ON
 CMAKE_BUILD_TYPE = Release
@@ -334,6 +315,6 @@ PLImigPipeline --itra [input-ntransmittance] --iret [input-retardation] --output
 | `--detailed` | Using this parameter will add two more parameter maps to the output file. This will include a full mask of both the white and gray matter as well as a mask showing an appoximation of regions without any nerve fibers. The inclination file will also include a parameter map indicating saturated pixels. |
 
 # Performance measurements
-The determination of the histogram threshold parameters (initial separation of LM/HM-regions) and the computation of the fibre inclinations are completely implemented on the GPU, so that no speedup is expected when increasing the number of CPU cores. The generation of the HM-probability map (generation of slightly different histograms by bootstrapping) uses CPUs, so that the computing time can be reduced with increasing numbers of CPU cores (running multiple iterations in parallel on the GPU). 
+The determination of the histogram threshold parameters and the computation of the fiber inclinations are completely implemented on the GPU, so that no speedup is expected when increasing the number of CPU cores. The generation of the probability map uses CPUs, so that the computing time can be reduced with increasing numbers of CPU cores (running multiple iterations in parallel on the GPU). 
 
 The size of the graphics memory determines the number of parallel iterations: each iteration requires twice the image size used for bootstrapping (here: 25\,\% of the original image size). As only histograms are calculated in each iteration, this part is memory and bandwidth bound on the GPU side, and CPU bound in the time it takes to create the random image. With increasing number of CPU cores, the program will be more GPU bound.
