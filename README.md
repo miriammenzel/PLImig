@@ -142,11 +142,11 @@ The `T_M` value matches the calculation of `T_ref` in our mask generation.
 `T_c` is considered as the mode of the transmittance in the gray substance. The gray substance is defined by our probability mask with values below 0.01. 
 
 ### rmaxGray
-The `rmaxGray` calculation matches the calculation of `R_thres` in our mask generation.
+The `R_ref,LM` calculation matches the calculation of `R_thres` in our mask generation.
 This value will be used as our maximum value which is present in the gray substance.
 
 ### rmaxWhite
-`rmaxWhite` will be calculated using the region growing algorithm described above. However, instead of using the resulting mask
+`R_ref,HM` will be calculated using the region growing algorithm described above. However, instead of using the resulting mask
 to calculate the mean transmittance value like in `T_ref`, the mean retardation value of the mask is calculated.
 
 ### Inclination
@@ -163,10 +163,10 @@ The saturation map is an optional parameter map which is generated after the inc
 The numbers can be interpreted like this:
 
 - 0 -- No saturated pixel
-- 1 -- Saturated pixel. Inclination angle is 0° or below. The retardation was higher than `rmaxWhite`
-- 2 -- Saturated pixel. Inclination angle is 90° or above. The retardation was higher than `rmaxWhite`
-- 3 -- Saturated pixel. Inclination angle is 0° or below. The retardation was lower than `rmaxWhite`
-- 4 -- Saturated pixel. Inclination angle is 90° or above. The retardation was lower than `rmaxWhite`
+- 1 -- Saturated pixel. Inclination angle is 0° or below. The retardation was higher than `R_ref,HM`
+- 2 -- Saturated pixel. Inclination angle is 90° or above. The retardation was higher than `R_ref,HM`
+- 3 -- Saturated pixel. Inclination angle is 0° or below. The retardation was lower than `R_ref,HM`
+- 4 -- Saturated pixel. Inclination angle is 90° or above. The retardation was lower than `R_ref,HM`
 
 ![](./img/SaturationExample.png)
 
@@ -290,8 +290,8 @@ PLIInclination --itra [input-ntransmittance] --iret [input-retardation] --imask 
 | `--dataset` | Read and write from/to the given dataset instead of `/Image` |
 | `--tm`  | Mean value in the transmittance based on the highest retardation value|
 | `--tc` | Maximum value in the gray matter of the transmittance where blurred mask is below 0.01 |
-| `--rmaxWhite` | Mean value in the retardation based on the highest retardation values |
-| `--rmaxGray` | Point of maximum curvature in the gray matter of the retardation |
+| `--rrefhm` | Mean value in the retardation based on the highest retardation values |
+| `--rreflm` | Point of maximum curvature in the gray matter of the retardation |
 | `--detailed` | Add saturation map to the inclination HDF5 file marking each region with values <0° or >90° |
 
 ## PLImigPipeline

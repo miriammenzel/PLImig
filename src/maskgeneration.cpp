@@ -398,30 +398,30 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
 
         std::cout << std::endl;
 
-        float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
+        float diff_rthres_p, diff_rthres_m, diff_tthres_p, diff_tthres_m;
         if (above_rthres.empty()) {
-            diff_tRet_p = R_thres();
+            diff_rthres_p = R_thres();
         } else {
-            diff_tRet_p = std::accumulate(above_rthres.begin(), above_rthres.end(), 0.0f) / above_rthres.size();
+            diff_rthres_p = std::accumulate(above_rthres.begin(), above_rthres.end(), 0.0f) / above_rthres.size();
         }
         if (below_rthres.empty()) {
-            diff_tRet_m = R_thres();
+            diff_rthres_m = R_thres();
         } else {
-            diff_tRet_m = std::accumulate(below_rthres.begin(), below_rthres.end(), 0.0f) / below_rthres.size();
+            diff_rthres_m = std::accumulate(below_rthres.begin(), below_rthres.end(), 0.0f) / below_rthres.size();
         }
         if (above_tthres.empty()) {
-            diff_tTra_p = T_thres();
+            diff_tthres_p = T_thres();
         } else {
-            diff_tTra_p = std::accumulate(above_tthres.begin(), above_tthres.end(), 0.0f) / above_tthres.size();
+            diff_tthres_p = std::accumulate(above_tthres.begin(), above_tthres.end(), 0.0f) / above_tthres.size();
         }
         if (below_tthres.empty()) {
-            diff_tTra_m = T_thres();
+            diff_tthres_m = T_thres();
         } else {
-            diff_tTra_m = std::accumulate(below_tthres.begin(), below_tthres.end(), 0.0f) / below_tthres.size();
+            diff_tthres_m = std::accumulate(below_tthres.begin(), below_tthres.end(), 0.0f) / below_tthres.size();
         }
 
-        std::cout << "Probability parameters: R+:"  << diff_tRet_p << ", R-:" << diff_tRet_m <<
-                                                    ", T+:" << diff_tTra_p << ", T-:" << diff_tTra_m
+        std::cout << "Probability parameters: R+:"  << diff_rthres_p << ", R-:" << diff_rthres_m <<
+                                                    ", T+:" << diff_tthres_p << ", T-:" << diff_tthres_m
                                                     << std::endl;
 
         float diffTra = 0.0f;
@@ -437,15 +437,15 @@ std::shared_ptr<cv::Mat> PLImg::MaskGeneration::probabilityMask() {
         for(unsigned long long idx = 0; idx < ((unsigned long long) m_probabilityMask->rows * m_probabilityMask->cols); ++idx) {
             diffTra = transmittancePtr[idx];
             if(diffTra < T_thres()) {
-                diffTra = (diffTra - T_thres()) / diff_tTra_m;
+                diffTra = (diffTra - T_thres()) / diff_tthres_m;
             } else {
-                diffTra = (diffTra - T_thres()) / diff_tTra_p;
+                diffTra = (diffTra - T_thres()) / diff_tthres_p;
             }
             diffRet = retardationPtr[idx];
             if(diffRet < R_thres()) {
-                diffRet = (diffRet - R_thres()) / diff_tRet_m;
+                diffRet = (diffRet - R_thres()) / diff_rthres_m;
             } else {
-                diffRet = (diffRet - R_thres()) / diff_tRet_p;
+                diffRet = (diffRet - R_thres()) / diff_rthres_p;
             }
             probabilityMaskPtr[idx] =
                 (-erf(cos(3.0f * M_PI / 4.0f - atan2f(diffTra, diffRet)) *
