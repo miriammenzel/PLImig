@@ -46,7 +46,7 @@ TEST(TestMaskgeneration, TestTRet) {
     cv::normalize(image, image, 0, 1, cv::NORM_MINMAX);
     auto shared_ret = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(shared_ret, nullptr);
-    ASSERT_FLOAT_EQ(mask.tRet(), 0.0625f);
+    ASSERT_FLOAT_EQ(mask.R_thres(), 0.0625f);
 }
 
 TEST(TestMaskgeneration, TestTTra) {
@@ -68,7 +68,8 @@ TEST(TestMaskgeneration, TestTTra) {
     auto shared_ret = std::make_shared<cv::Mat>(test_retardation);
     auto shared_tra = std::make_shared<cv::Mat>(test_transmittance);
     auto mask = PLImg::MaskGeneration(shared_ret, shared_tra);
-    ASSERT_FLOAT_EQ(mask.tTra(), 0.3456f);
+    mask.set_tref(0.3456f);
+    ASSERT_FLOAT_EQ(mask.T_thres(), 0.3456f);
 }
 
 TEST(TestMaskgeneration, TestTMin) {
@@ -90,8 +91,8 @@ TEST(TestMaskgeneration, TestTMin) {
     auto shared_ret = std::make_shared<cv::Mat>(test_retardation);
     auto shared_tra = std::make_shared<cv::Mat>(test_transmittance);
     auto mask = PLImg::MaskGeneration(shared_ret, shared_tra);
-    mask.set_tMax(1.0f);
-    ASSERT_FLOAT_EQ(mask.tMin(), 0.3366);
+    mask.set_tback(1.0f);
+    ASSERT_FLOAT_EQ(mask.T_ref(), 0.3366);
     mask.resetParameters();
 }
 
@@ -128,19 +129,19 @@ TEST(TestMaskgeneration, TestTMax) {
 
     auto shared_tra = std::make_shared<cv::Mat>(image);
     auto mask = PLImg::MaskGeneration(nullptr, shared_tra);
-    ASSERT_FLOAT_EQ(mask.tMax(), 0.9494018f);
+    ASSERT_FLOAT_EQ(mask.T_back(), 0.9494018f);
 }
 
 TEST(TestMaskgeneration, TestSetGet) {
     PLImg::MaskGeneration mask = PLImg::MaskGeneration();
-    mask.set_tMax(0.01);
-    ASSERT_FLOAT_EQ(mask.tMax(), 0.01);
-    mask.set_tMin(0.02);
-    ASSERT_FLOAT_EQ(mask.tMin(), 0.02);
-    mask.set_tRet(0.03);
-    ASSERT_FLOAT_EQ(mask.tRet(), 0.03);
-    mask.set_tTra(0.04);
-    ASSERT_FLOAT_EQ(mask.tTra(), 0.04);
+    mask.set_tback(0.01);
+    ASSERT_FLOAT_EQ(mask.T_back(), 0.01);
+    mask.set_tref(0.02);
+    ASSERT_FLOAT_EQ(mask.T_ref(), 0.02);
+    mask.set_rthres(0.03);
+    ASSERT_FLOAT_EQ(mask.R_thres(), 0.03);
+    mask.set_tthres(0.04);
+    ASSERT_FLOAT_EQ(mask.T_thres(), 0.04);
 }
 
 TEST(TestMaskgeneration, TestWhiteMask) {
@@ -169,10 +170,10 @@ TEST(TestMaskgeneration, TestWhiteMask) {
     auto traPtr = std::make_shared<cv::Mat>(transmittance);
     PLImg::MaskGeneration generation(retPtr, traPtr);
 
-    generation.set_tTra(0.5f);
-    generation.set_tRet(0.1f);
-    generation.set_tMin(-1.0f);
-    generation.set_tMax(-1.0f);
+    generation.set_tthres(0.5f);
+    generation.set_rthres(0.1f);
+    generation.set_tref(-1.0f);
+    generation.set_tback(-1.0f);
 
     std::shared_ptr<cv::Mat> mask = generation.whiteMask();
     for(int i = 0; i < mask->rows; ++i) {
@@ -212,10 +213,10 @@ TEST(TestMaskgeneration, TestGrayMask) {
     auto traPtr = std::make_shared<cv::Mat>(transmittance);
     PLImg::MaskGeneration generation(retPtr, traPtr);
 
-    generation.set_tTra(0.5f);
-    generation.set_tRet(0.1f);
-    generation.set_tMin(-1.0f);
-    generation.set_tMax(0.9f);
+    generation.set_tthres(0.5f);
+    generation.set_rthres(0.1f);
+    generation.set_tref(-1.0f);
+    generation.set_tback(0.9f);
 
     std::shared_ptr<cv::Mat> mask = generation.grayMask();
     for(int i = 0; i < mask->rows; ++i) {
@@ -255,10 +256,10 @@ TEST(TestMaskgeneration, TestFullMask) {
     auto traPtr = std::make_shared<cv::Mat>(transmittance);
     PLImg::MaskGeneration generation(retPtr, traPtr);
 
-    generation.set_tTra(0.5f);
-    generation.set_tRet(0.1f);
-    generation.set_tMin(0.0f);
-    generation.set_tMax(0.9f);
+    generation.set_tthres(0.5f);
+    generation.set_rthres(0.1f);
+    generation.set_tref(0.0f);
+    generation.set_tback(0.9f);
 
     auto whiteMask = generation.whiteMask();
     auto grayMask = generation.grayMask();

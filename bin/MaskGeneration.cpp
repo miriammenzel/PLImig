@@ -75,13 +75,13 @@ int main(int argc, char** argv) {
     optional->add_flag("--detailed", detailed);
     optional->add_flag("--probability", blurred);
     auto parameters = optional->add_option_group("Parameters", "Control the generated masks by setting parameters manually");
-    parameters->add_option("--ilower", ttra, "Average transmittance value of brightest retardation values")
+    parameters->add_option("--ilower, --tthres", ttra, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
     parameters->add_option("--rthres", tret, "Plateau in retardation histogram")
               ->default_val(-1);
-    parameters->add_option("--irmax", tmin, "Average transmittance value of brightest retardation values")
+    parameters->add_option("--irmax, --tref", tmin, "Average transmittance value of brightest retardation values")
               ->default_val(-1);
-    parameters->add_option("--iupper", tmax, "Separator of gray matter and background")
+    parameters->add_option("--iupper, --tback", tmax, "Separator of gray matter and background")
               ->default_val(-1);
     CLI11_PARSE(app, argc, argv);
 
@@ -162,26 +162,26 @@ int main(int argc, char** argv) {
 
         generation.setModalities(retardation, medTransmittance);
         if(ttra >= 0) {
-            generation.set_tTra(ttra);
+            generation.set_tthres(ttra);
         }
         if(tret >= 0) {
-            generation.set_tRet(tret);
+            generation.set_rthres(tret);
         }
         if(tmin >= 0) {
-            generation.set_tMin(tmin);
+            generation.set_tref(tmin);
         }
         if(tmax >= 0) {
-            generation.set_tMax(tmax);
+            generation.set_tback(tmax);
         }
         generation.removeBackground();
 
         writer.set_path(output_folder + "/" + mask_basename + ".h5");
         writer.write_dataset("/Image", *generation.fullMask(), true);
         writer.writePLIMAttributes({median_transmittance_path, retardation_path}, "/Image", "/Image", "Mask", argc, argv);
-        writer.write_attribute("/Image", "i_lower", generation.tTra());
-        writer.write_attribute("/Image", "r_thres", generation.tRet());
-        writer.write_attribute("/Image", "i_rmax", generation.tMin());
-        writer.write_attribute("/Image", "i_upper", generation.tMax());
+        writer.write_attribute("/Image", "i_lower", generation.T_thres());
+        writer.write_attribute("/Image", "r_thres", generation.R_thres());
+        writer.write_attribute("/Image", "i_rmax", generation.T_ref());
+        writer.write_attribute("/Image", "i_upper", generation.T_back());
         // writer.write_attribute("/Image", "version", PLImg::Version::versionHash() + ", " + PLImg::Version::timeStamp());
         std::cout << "Full mask generated and written" << std::endl;
 

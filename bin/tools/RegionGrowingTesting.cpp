@@ -123,9 +123,9 @@ int main(int argc, char** argv) {
                 tMin = mean[0];
                 numberOfMaskPixels = cv::countNonZero(mask);
                 generation.resetParameters();
-                generation.set_tMin(tMin);
+                generation.set_tref(tMin);
 
-                param_file << it << "," << tMin << "," << generation.tTra() << "," << numberOfMaskPixels << std::endl;
+                param_file << it << "," << tMin << "," << generation.T_thres() << "," << numberOfMaskPixels << std::endl;
                 param_file.flush();
             }
             std::cout << std::endl;

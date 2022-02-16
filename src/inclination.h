@@ -76,43 +76,43 @@ namespace PLImg {
          * Get the im value
          * @return Manually set im value or the mean value in the transmittance based on the highest retardation values
          */
-        float im();
+        float T_c();
         /**
          * Get the ic value
          * @return Manually set ic value or the maximum value in the gray matter of the transmittance
          */
-        float ic();
+        float T_M();
         /**
          * Get the rmaxGray value
          * @return Manually set rmaxGray value or point of maximum curvature in the gray matter of the retardation
          */
-        float rmaxGray();
+        float R_refLM();
         /**
          * Get the rmaxWhite value
          * @return Manually set rmaxWhite value or the mean value in the retardation based on the highest retardation values
          */
-        float rmaxWhite();
+        float R_refHM();
 
         /**
          * Set the im value manually. This will reset the current inclination as it is probably different.
          * @param im Manually set im value
          */
-        void set_im(float im);
+        void set_TM(float im);
         /**
          * Set the ic value manually. This will reset the current inclination as it is probably different.
          * @param ic Manually set ic value
          */
-        void set_ic(float ic);
+        void set_Tc(float ic);
         /**
          * Set the rmaxGray value manually. This will reset the current inclination as it is probably different.
          * @param rmaxGray Manually set rmaxGray value
          */
-        void set_rmaxGray(float rmaxGray);
+        void set_RrefLM(float rmaxGray);
         /**
          * Set the rmaxWhite value manually. This will reset the current inclination as it is probably different.
          * @param rmaxWhite Manually set rmaxWhite value
          */
-        void set_rmaxWhite(float rmaxWhite);
+        void set_RrefHM(float rmaxWhite);
 
         /**
          * This method will compute the inclination values based on the given parameter maps
@@ -166,7 +166,7 @@ namespace PLImg {
         sharedMat regionGrowingMask();
 
         ///
-        std::unique_ptr<float> m_im, m_ic, m_rmaxGray, m_rmaxWhite;
+        std::unique_ptr<float> m_tc, m_tm, m_rreflm, m_rrefhm;
         ///
         sharedMat m_regionGrowingMask;
         ///

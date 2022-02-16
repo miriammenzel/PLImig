@@ -25,14 +25,14 @@
 #include "inclination.h"
 
 PLImg::Inclination::Inclination() : m_transmittance(), m_retardation(), m_blurredMask(), m_mask(),
-                                    m_im(nullptr), m_ic(nullptr), m_rmaxWhite(nullptr), m_rmaxGray(nullptr),
+                                    m_tc(nullptr), m_tm(nullptr), m_rrefhm(nullptr), m_rreflm(nullptr),
                                     m_regionGrowingMask(nullptr) {}
 
 PLImg::Inclination::Inclination(sharedMat transmittance, sharedMat retardation,
                                 sharedMat blurredMask, sharedMat mask) :
                                 m_transmittance(std::move(transmittance)), m_retardation(std::move(retardation)), m_blurredMask(std::move(blurredMask)),
-                                m_mask(std::move(mask)), m_im(nullptr), m_ic(nullptr), m_rmaxWhite(nullptr),
-                                m_rmaxGray(nullptr), m_regionGrowingMask(nullptr), m_inclination(nullptr), m_saturation(nullptr) {}
+                                m_mask(std::move(mask)), m_tc(nullptr), m_tm(nullptr), m_rrefhm(nullptr),
+                                m_rreflm(nullptr), m_regionGrowingMask(nullptr), m_inclination(nullptr), m_saturation(nullptr) {}
 
 void PLImg::Inclination::setModalities(sharedMat transmittance, sharedMat retardation,
                                        sharedMat blurredMask, sharedMat mask) {
@@ -41,37 +41,37 @@ void PLImg::Inclination::setModalities(sharedMat transmittance, sharedMat retard
     m_blurredMask = std::move(blurredMask);
     m_mask = std::move(mask);
 
-    m_im = nullptr,
-    m_ic = nullptr;
-    m_rmaxWhite = nullptr;
-    m_rmaxGray = nullptr;
+    m_tc = nullptr,
+    m_tm = nullptr;
+    m_rrefhm = nullptr;
+    m_rreflm = nullptr;
     m_regionGrowingMask = nullptr;
     m_inclination = nullptr;
     m_saturation = nullptr;
 }
 
-void PLImg::Inclination::set_ic(float ic) {
-    m_ic = std::make_unique<float>(ic);
+void PLImg::Inclination::set_Tc(float ic) {
+    m_tm = std::make_unique<float>(ic);
     m_inclination = nullptr;
 }
 
-void PLImg::Inclination::set_im(float im) {
-    m_im = std::make_unique<float>(im);
+void PLImg::Inclination::set_TM(float im) {
+    m_tc = std::make_unique<float>(im);
     m_inclination = nullptr;
 }
 
-void PLImg::Inclination::set_rmaxGray(float rmaxGray) {
-    m_rmaxGray = std::make_unique<float>(rmaxGray);
+void PLImg::Inclination::set_RrefLM(float rmaxGray) {
+    m_rreflm = std::make_unique<float>(rmaxGray);
     m_inclination = nullptr;
 }
 
-void PLImg::Inclination::set_rmaxWhite(float rmaxWhite) {
-    m_rmaxWhite = std::make_unique<float>(rmaxWhite);
+void PLImg::Inclination::set_RrefHM(float rmaxWhite) {
+    m_rrefhm = std::make_unique<float>(rmaxWhite);
     m_inclination = nullptr;
 }
 
-float PLImg::Inclination::ic() {
-    if(!m_ic) {
+float PLImg::Inclination::T_M() {
+    if(!m_tm) {
         // ic will be calculated by taking the gray portion of the
         // transmittance and calculating the maximum value in the histogram
         int channels[] = {0};
@@ -83,26 +83,26 @@ float PLImg::Inclination::ic() {
         cv::calcHist(&(*m_transmittance), 1, channels, (*m_mask == GRAY_VALUE) & *m_blurredMask < 0.05, hist, 1, &histSize, &histRange, true, false);
 
         int max_pos = std::max_element(hist.begin<float>(), hist.end<float>()) - hist.begin<float>();
-        m_ic = std::make_unique<float>(float(max_pos) / float(histSize));
+        m_tm = std::make_unique<float>(float(max_pos) / float(histSize));
     }
-    return *m_ic;
+    return *m_tm;
 }
 
-float PLImg::Inclination::im() {
-    if(!m_im) {
+float PLImg::Inclination::T_c() {
+    if(!m_tc) {
         // im is the mean value in the transmittance based on the highest retardation values
         auto regionGrowingMask = this->regionGrowingMask();
         if(PLImg::Image::maskCountNonZero(*regionGrowingMask & (*m_blurredMask > 0.90)) == 0) {
-            m_im = std::make_unique<float>(cv::mean(*m_transmittance, *regionGrowingMask)[0]);
+            m_tc = std::make_unique<float>(cv::mean(*m_transmittance, *regionGrowingMask)[0]);
         } else {
-            m_im = std::make_unique<float>(cv::mean(*m_transmittance, *regionGrowingMask & (*m_blurredMask > 0.90))[0]);
+            m_tc = std::make_unique<float>(cv::mean(*m_transmittance, *regionGrowingMask & (*m_blurredMask > 0.90))[0]);
         }
     }
-    return *m_im;
+    return *m_tc;
 }
 
-float PLImg::Inclination::rmaxGray() {
-    if(!m_rmaxGray) {
+float PLImg::Inclination::R_refLM() {
+    if(!m_rreflm) {
         float temp_rMax = 0;
         int channels[] = {0};
         float histBounds[] = {0.0f+1e-10f, 1.0f};
@@ -142,13 +142,13 @@ float PLImg::Inclination::rmaxGray() {
             startPosition = fmax(0, (temp_rMax * NUMBER_OF_BINS - 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) - 1);
             endPosition = fmin((temp_rMax * NUMBER_OF_BINS + 2) * ((NUMBER_OF_BINS << 1) / NUMBER_OF_BINS) + 1, NUMBER_OF_BINS << 1);
         }
-        m_rmaxGray = std::make_unique<float>(temp_rMax);
+        m_rreflm = std::make_unique<float>(temp_rMax);
     }
-    return *m_rmaxGray;
+    return *m_rreflm;
 }
 
-float PLImg::Inclination::rmaxWhite() {
-    if(!m_rmaxWhite) {
+float PLImg::Inclination::R_refHM() {
+    if(!m_rrefhm) {
         // rmaxWhite is the mean value in the retardation based on the highest retardation values
         auto regionGrowingMask = this->regionGrowingMask();
 
@@ -178,10 +178,10 @@ float PLImg::Inclination::rmaxWhite() {
         if(isnan(temp_rmaxWhite) || isinf(temp_rmaxWhite)) {
             temp_rmaxWhite = 1.0f;
         }
-        m_rmaxWhite = std::make_unique<float>(temp_rmaxWhite);
+        m_rrefhm = std::make_unique<float>(temp_rmaxWhite);
 
     }
-    return *m_rmaxWhite;
+    return *m_rrefhm;
 }
 
 sharedMat PLImg::Inclination::regionGrowingMask() {
@@ -200,9 +200,9 @@ sharedMat PLImg::Inclination::inclination() {
         float blurredMaskVal;
         float transmittanceVal;
         // Those parameters are static and can be calculated ahead of time to save some computing time
-        float asinWRmax = std::asin(rmaxWhite());
-        float asinGRMax = std::asin(rmaxGray());
-        float logIcIm = logf(fmax(1e-15, ic() / im()));
+        float asinWRmax = std::asin(R_refHM());
+        float asinGRMax = std::asin(R_refLM());
+        float logIcIm = logf(fmax(1e-15, T_M() / T_c()));
 
         // Get pointers from OpenCV matrices to prevent overflow errors when image is larger than UINT_MAX
         float* inclinationPtr = (float*) m_inclination->data;
@@ -219,7 +219,7 @@ sharedMat PLImg::Inclination::inclination() {
             // If pixel is in tissue
             if(maskPtr[idx] > 0) {
                 blurredMaskVal = blurredMaskptr[idx];
-                transmittanceVal = fmax(im(), transmittancePtr[idx]);
+                transmittanceVal = fmax(T_c(), transmittancePtr[idx]);
                 if(blurredMaskVal > 0.95) {
                     blurredMaskVal = 1;
                 } else if(blurredMaskVal < 0.05) {
@@ -232,7 +232,7 @@ sharedMat PLImg::Inclination::inclination() {
                                 asin(retardationPtr[idx]) /
                                 asinWRmax *
                                 logIcIm /
-                                fmax(1e-15, logf(ic() / transmittanceVal))
+                                fmax(1e-15, logf(T_M() / transmittanceVal))
                          )
                          + (1.0f - blurredMaskVal) *
                           asin(retardationPtr[idx]) /
@@ -271,13 +271,13 @@ sharedMat PLImg::Inclination::saturation() {
             inc_val = inclinationPtr[idx];
             if((inc_val <= 0) || (inc_val >= 90)) {
                 if (inc_val <= 0) {
-                   if (retardationPtr[idx] > rmaxWhite()) {
+                   if (retardationPtr[idx] > R_refHM()) {
                        saturationPtr[idx] = 1;
                    } else {
                        saturationPtr[idx] = 3;
                    }
                 } else {
-                    if (retardationPtr[idx] > rmaxWhite()) {
+                    if (retardationPtr[idx] > R_refHM()) {
                         saturationPtr[idx] = 2;
                     } else {
                         saturationPtr[idx] = 4;

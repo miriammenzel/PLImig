@@ -97,10 +97,10 @@ int main(int argc, char** argv) {
             std::cout << "Med10Transmittance generated" << std::endl;
             generation.setModalities(retardation, medTransmittance);
             generation.removeBackground();
-            generation.tMax();
-            generation.tMin();
-            generation.tRet();
-            generation.tTra();
+            generation.T_back();
+            generation.T_ref();
+            generation.R_thres();
+            generation.T_thres();
 
             std::cout << "Will run " << num_retakes << " takes with " << num_iterations << " each" << std::endl;
             for (int take = 0; take < num_retakes; ++take) {
@@ -171,22 +171,22 @@ int main(int argc, char** argv) {
                             small_retardation = std::make_shared<cv::Mat>(small_modalities[1]);
 
                             iter_generation.setModalities(small_retardation, small_transmittance);
-                            iter_generation.set_tMin(generation.tMin());
-                            iter_generation.set_tMax(generation.tMax());
+                            iter_generation.set_tref(generation.T_ref());
+                            iter_generation.set_tback(generation.T_back());
 
-                            t_ret = iter_generation.tRet();
-                            t_tra = iter_generation.tTra();
+                            t_ret = iter_generation.R_thres();
+                            t_tra = iter_generation.T_thres();
 
                             #pragma omp critical
                             {
-                                if (t_tra >= generation.tTra()) {
+                                if (t_tra >= generation.T_thres()) {
                                     above_tTra.push_back(t_tra);
-                                } else if (t_tra <= generation.tTra() && t_tra > 0) {
+                                } else if (t_tra <= generation.T_thres() && t_tra > 0) {
                                     below_tTra.push_back(t_tra);
                                 }
-                                if (t_ret >= generation.tRet()) {
+                                if (t_ret >= generation.R_thres()) {
                                     above_tRet.push_back(t_ret);
-                                } else if (t_ret <= generation.tRet()) {
+                                } else if (t_ret <= generation.R_thres()) {
                                     below_tRet.push_back(t_ret);
                                 }
 
@@ -197,28 +197,28 @@ int main(int argc, char** argv) {
 
                                 float diff_tRet_p, diff_tRet_m, diff_tTra_p, diff_tTra_m;
                                 if (above_tRet.empty()) {
-                                    diff_tRet_p = generation.tRet();
+                                    diff_tRet_p = generation.R_thres();
                                 } else {
                                     diff_tRet_p = std::accumulate(above_tRet.begin(), above_tRet.end(), 0.0f) / above_tRet.size();
                                 }
                                 if (below_tRet.empty()) {
-                                    diff_tRet_m = generation.tRet();
+                                    diff_tRet_m = generation.R_thres();
                                 } else {
                                     diff_tRet_m = std::accumulate(below_tRet.begin(), below_tRet.end(), 0.0f) / below_tRet.size();
                                 }
                                 if (above_tTra.empty()) {
-                                    diff_tTra_p = generation.tTra();
+                                    diff_tTra_p = generation.T_thres();
                                 } else {
                                     diff_tTra_p = std::accumulate(above_tTra.begin(), above_tTra.end(), 0.0f) / above_tTra.size();
                                 }
                                 if (below_tTra.empty()) {
-                                    diff_tTra_m = generation.tTra();
+                                    diff_tTra_m = generation.T_thres();
                                 } else {
                                     diff_tTra_m = std::accumulate(below_tTra.begin(), below_tTra.end(), 0.0f) / below_tTra.size();
                                 }
 
-                                param_file << numberOfFinishedIterations << "," << diff_tRet_p << "," << generation.tRet() << "," << diff_tRet_m << "," << t_ret << ","
-                                                                         << diff_tTra_p << "," << generation.tTra() << "," << diff_tTra_m << "," << t_tra << std::endl;
+                                param_file << numberOfFinishedIterations << "," << diff_tRet_p << "," << generation.R_thres() << "," << diff_tRet_m << "," << t_ret << ","
+                                                                         << diff_tTra_p << "," << generation.T_thres() << "," << diff_tTra_m << "," << t_tra << std::endl;
                             }
                         }
                     }
